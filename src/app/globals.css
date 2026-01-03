@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-rgb: 248, 250, 252;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5;
+  }
+  
+  .btn-success {
+    @apply bg-emerald-500 text-white hover:bg-emerald-600;
+  }
+  
+  .btn-danger {
+    @apply bg-red-500 text-white hover:bg-red-600;
+  }
+
+  .btn-warning {
+    @apply bg-amber-500 text-white hover:bg-amber-600;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200;
+  }
+  
+  .card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
+  }
+  
+  .input {
+    @apply w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors;
+    font-size: 16px; /* Evita zoom en iOS */
+  }
+  
+  .label {
+    @apply block text-xs font-bold text-slate-500 uppercase mb-1.5;
+  }
+  
+  .tag {
+    @apply inline-flex px-3 py-1 rounded-full text-xs font-bold;
+  }
+  
+  .tag-visa {
+    @apply bg-blue-100 text-blue-700;
+  }
+  
+  .tag-mastercard {
+    @apply bg-red-100 text-red-700;
+  }
+  
+  .tag-amex {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+  
+  .tag-other {
+    @apply bg-slate-100 text-slate-700;
+  }
+  
+  .stat-card {
+    @apply card p-5 hover:shadow-md transition-shadow;
+  }
+  
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  }
+  
+  .modal {
+    @apply bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto;
+  }
+}
+
+/* Mejoras de responsive */
+@media (max-width: 640px) {
+  .card {
+    @apply rounded-xl;
+  }
+
+  .modal {
+    @apply rounded-t-2xl rounded-b-none max-h-[95vh];
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+}
+
+/* Soporte para notch/safe area en iOS */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
