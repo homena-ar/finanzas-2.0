@@ -44,7 +44,7 @@ export default function AhorrosPage() {
   const [showMetaModal, setShowMetaModal] = useState(false)
   const [editingMeta, setEditingMeta] = useState<Meta | null>(null)
   const [metaForm, setMetaForm] = useState({
-    nombre: '', icono: '🎯', objetivo: '', moneda: 'ARS', progreso: '0'
+    nombre: '', icono: '🎯', objetivo: '', moneda: 'ARS', progreso: '0', fecha_limite: ''
   })
   const [inputPesos, setInputPesos] = useState('')
   const [inputUsd, setInputUsd] = useState('')
@@ -114,12 +114,16 @@ export default function AhorrosPage() {
   const handleSaveMeta = async () => {
     if (!metaForm.nombre || !metaForm.objetivo) return
 
-    const data = {
+    const data: any = {
       nombre: metaForm.nombre,
       icono: metaForm.icono,
       objetivo: parseFloat(metaForm.objetivo),
       progreso: parseFloat(metaForm.progreso) || 0,
       moneda: metaForm.moneda as 'ARS' | 'USD'
+    }
+
+    if (metaForm.fecha_limite) {
+      data.fecha_limite = metaForm.fecha_limite
     }
 
     if (editingMeta) {
@@ -134,7 +138,7 @@ export default function AhorrosPage() {
   }
 
   const resetMetaForm = () => {
-    setMetaForm({ nombre: '', icono: '🎯', objetivo: '', moneda: 'ARS', progreso: '0' })
+    setMetaForm({ nombre: '', icono: '🎯', objetivo: '', moneda: 'ARS', progreso: '0', fecha_limite: '' })
   }
 
   const openEditMeta = (m: Meta) => {
@@ -144,9 +148,47 @@ export default function AhorrosPage() {
       icono: m.icono,
       objetivo: String(m.objetivo),
       moneda: m.moneda,
-      progreso: String(m.progreso)
+      progreso: String(m.progreso),
+      fecha_limite: m.fecha_limite || ''
     })
     setShowMetaModal(true)
+  }
+
+  // Función para calcular desafío de ahorro
+  const calcularDesafio = (meta: Meta) => {
+    if (!meta.fecha_limite) return null
+
+    const hoy = new Date()
+    const fechaLimite = new Date(meta.fecha_limite)
+    const diasRestantes = Math.ceil((fechaLimite.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (diasRestantes <= 0) return null
+
+    const faltante = meta.objetivo - meta.progreso
+    if (faltante <= 0) return null
+
+    const porDia = faltante / diasRestantes
+    const porSemana = porDia * 7
+    const porMes = porDia * 30
+
+    return { diasRestantes, porDia, porSemana, porMes, faltante }
+  }
+
+  // Frases motivacionales rotativas
+  const frases = [
+    "¡Vas muy bien! 💪",
+    "¡Sigue así! 🚀",
+    "¡Casi llegás! 🎯",
+    "¡Un paso más! 👣",
+    "¡Estás cerca! ⭐",
+    "¡No pares! 💪",
+    "¡Lo estás logrando! 🏆",
+    "¡Cada día más cerca! 📈"
+  ]
+
+  const getFraseMotivacional = (progreso: number) => {
+    const index = Math.floor(progreso) % frases.length
+    return frases[index]
   }
 
   const addToMeta = async (meta: Meta, amount: number) => {
@@ -566,14 +608,21 @@ export default function AhorrosPage() {
             {metas.map(m => {
               const pct = Math.min((m.progreso / m.objetivo) * 100, 100)
               const isDone = pct >= 100
+              const desafio = calcularDesafio(m)
+              const frase = getFraseMotivacional(pct)
 
               return (
                 <div key={m.id} className={`border-2 rounded-xl p-4 ${isDone ? 'bg-emerald-50 border-emerald-300' : 'border-slate-200'}`}>
                   <div className="flex justify-between items-start mb-3">
-                    <div>
+                    <div className="flex-1">
                       <div className="text-2xl mb-1">{m.icono}</div>
                       <div className="font-bold">{m.nombre}</div>
                       <div className="text-sm text-slate-500">Meta: {formatMoney(m.objetivo, m.moneda)}</div>
+                      {m.fecha_limite && (
+                        <div className="text-xs text-purple-600 font-semibold mt-1">
+                          📅 Límite: {new Date(m.fecha_limite).toLocaleDateString('es-AR')}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => openEditMeta(m)} className="p-2 hover:bg-slate-100 rounded-lg">
@@ -587,7 +636,7 @@ export default function AhorrosPage() {
 
                   {/* Progress bar */}
                   <div className="bg-slate-200 h-3 rounded-full overflow-hidden mb-2">
-                    <div 
+                    <div
                       className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
                       style={{ width: `${pct}%` }}
                     />
@@ -596,6 +645,32 @@ export default function AhorrosPage() {
                     <span className="text-indigo-600 font-bold">{formatMoney(m.progreso, m.moneda)}</span>
                     <span className="font-bold">{pct.toFixed(0)}%</span>
                   </div>
+
+                  {/* Desafío de ahorro */}
+                  {!isDone && desafio && (
+                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-3 mb-3 border border-purple-200">
+                      <div className="text-xs font-bold text-purple-900 mb-2">
+                        💰 DESAFÍO DE AHORRO · Faltan {desafio.diasRestantes} días
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-xs text-slate-600">Por día</div>
+                          <div className="font-bold text-purple-700 text-sm">{formatMoney(desafio.porDia, m.moneda)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-600">Por semana</div>
+                          <div className="font-bold text-purple-700 text-sm">{formatMoney(desafio.porSemana, m.moneda)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-600">Por mes</div>
+                          <div className="font-bold text-purple-700 text-sm">{formatMoney(desafio.porMes, m.moneda)}</div>
+                        </div>
+                      </div>
+                      <div className="text-center mt-2 text-xs font-semibold text-purple-800">
+                        {frase}
+                      </div>
+                    </div>
+                  )}
 
                   {isDone ? (
                     <div className="bg-emerald-100 text-emerald-700 p-3 rounded-lg text-center font-bold">
@@ -699,6 +774,20 @@ export default function AhorrosPage() {
                   placeholder="0"
                   value={metaForm.progreso}
                   onChange={e => setMetaForm(f => ({ ...f, progreso: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label">
+                  Fecha límite (opcional)
+                  <span className="text-xs text-slate-500 font-normal ml-2">
+                    Para ver el desafío de ahorro
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  value={metaForm.fecha_limite}
+                  onChange={e => setMetaForm(f => ({ ...f, fecha_limite: e.target.value }))}
                 />
               </div>
               <button onClick={handleSaveMeta} className="btn btn-primary w-full justify-center">

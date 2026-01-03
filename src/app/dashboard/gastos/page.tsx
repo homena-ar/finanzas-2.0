@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useData } from '@/hooks/useData'
 import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
-import { Plus, Search, Edit2, Trash2, Pin, X } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Pin, X, Download } from 'lucide-react'
 import { Gasto } from '@/types'
 
 export default function GastosPage() {
@@ -15,17 +15,29 @@ export default function GastosPage() {
     tarjetas, categorias, tags,
     currentMonth, monthKey, getGastosMes, getImpuestosMes,
     addGasto, updateGasto, deleteGasto,
-    addImpuesto, updateImpuesto, deleteImpuesto
+    addImpuesto, updateImpuesto, deleteImpuesto,
+    addTag, addCategoria
   } = useData()
 
   console.log('🔵🔵🔵 [GastosPage] addGasto function reference:', addGasto)
 
   const [showGastoModal, setShowGastoModal] = useState(false)
   const [showImpModal, setShowImpModal] = useState(false)
+  const [showPagoModal, setShowPagoModal] = useState(false)
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null)
   const [editingImp, setEditingImp] = useState<any>(null)
+  const [gastoToMarkPaid, setGastoToMarkPaid] = useState<Gasto | null>(null)
   const [filters, setFilters] = useState({ search: '', tarjeta: '', moneda: '', tag: '', sort: 'monto-desc' })
   const [gastoError, setGastoError] = useState('')
+  const [showNewTagInput, setShowNewTagInput] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const [showNewCategoriaInput, setShowNewCategoriaInput] = useState(false)
+  const [newCategoria, setNewCategoria] = useState({ nombre: '', icono: '💰' })
+  const [pagoForm, setPagoForm] = useState({
+    fecha_pago: new Date().toISOString().split('T')[0],
+    medio_pago: '',
+    comprobante: null as File | null
+  })
 
   // Apply filter from URL query params
   useEffect(() => {
@@ -188,7 +200,76 @@ export default function GastosPage() {
   }
 
   const togglePagado = async (g: Gasto) => {
-    await updateGasto(g.id, { pagado: !g.pagado })
+    if (!g.pagado) {
+      // Si va a marcar como pagado, abrir modal
+      setGastoToMarkPaid(g)
+      setShowPagoModal(true)
+    } else {
+      // Si va a desmarcar, solo actualizar
+      await updateGasto(g.id, { pagado: false, fecha_pago: null, medio_pago: null })
+    }
+  }
+
+  const handleConfirmPago = async () => {
+    if (!gastoToMarkPaid) return
+
+    // Convertir comprobante a base64 si existe
+    let comprobanteUrl = null
+    let comprobanteNombre = null
+
+    if (pagoForm.comprobante) {
+      comprobanteNombre = pagoForm.comprobante.name
+      const reader = new FileReader()
+      comprobanteUrl = await new Promise((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(pagoForm.comprobante!)
+      })
+    }
+
+    await updateGasto(gastoToMarkPaid.id, {
+      pagado: true,
+      fecha_pago: pagoForm.fecha_pago,
+      medio_pago: pagoForm.medio_pago || null,
+      comprobante_url: comprobanteUrl,
+      comprobante_nombre: comprobanteNombre
+    })
+
+    setShowPagoModal(false)
+    setGastoToMarkPaid(null)
+    setPagoForm({
+      fecha_pago: new Date().toISOString().split('T')[0],
+      medio_pago: '',
+      comprobante: null
+    })
+  }
+
+  const handleAddNewTag = async () => {
+    if (!newTagName.trim()) return
+    await addTag(newTagName.trim())
+    setNewTagName('')
+    setShowNewTagInput(false)
+  }
+
+  const handleAddNewCategoria = async () => {
+    if (!newCategoria.nombre.trim()) return
+    await addCategoria({
+      nombre: newCategoria.nombre.trim(),
+      icono: newCategoria.icono,
+      color: '#6366f1'
+    })
+    setNewCategoria({ nombre: '', icono: '💰' })
+    setShowNewCategoriaInput(false)
+  }
+
+  const downloadComprobante = (gasto: Gasto) => {
+    if (!gasto.comprobante_url || !gasto.comprobante_nombre) return
+
+    const link = document.createElement('a')
+    link.href = gasto.comprobante_url
+    link.download = gasto.comprobante_nombre
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const toggleFijo = async (g: Gasto) => {
@@ -257,7 +338,7 @@ export default function GastosPage() {
             value={filters.tag}
             onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
           >
-            <option value="">Todos los tags</option>
+            <option value="">Todas las etiquetas</option>
             {tags.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
           </select>
           <select
@@ -363,20 +444,32 @@ export default function GastosPage() {
                       </button>
                     </td>
                     <td className="p-4">
-                      <button
-                        onClick={() => togglePagado(g)}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                          g.pagado
-                            ? 'bg-emerald-500 border-emerald-500'
-                            : 'bg-white border-slate-300 hover:border-emerald-400'
-                        }`}
-                      >
-                        {g.pagado && (
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => togglePagado(g)}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                            g.pagado
+                              ? 'bg-emerald-500 border-emerald-500'
+                              : 'bg-white border-slate-300 hover:border-emerald-400'
+                          }`}
+                          title={g.pagado && g.fecha_pago ? `Pagado el ${new Date(g.fecha_pago).toLocaleDateString()}` : 'Marcar como pagado'}
+                        >
+                          {g.pagado && (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                        {g.pagado && g.comprobante_url && (
+                          <button
+                            onClick={() => downloadComprobante(g)}
+                            className="p-1 hover:bg-indigo-50 rounded text-indigo-600"
+                            title="Descargar comprobante"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
                         )}
-                      </button>
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex gap-1">
@@ -550,14 +643,69 @@ export default function GastosPage() {
                 </div>
                 <div>
                   <label className="label">Categoría</label>
-                  <select
-                    className="input"
-                    value={gastoForm.categoria_id}
-                    onChange={e => setGastoForm(f => ({ ...f, categoria_id: e.target.value }))}
-                  >
-                    <option value="">Seleccionar</option>
-                    {categorias.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
-                  </select>
+                  {!showNewCategoriaInput ? (
+                    <div className="flex gap-2">
+                      <select
+                        className="input flex-1"
+                        value={gastoForm.categoria_id}
+                        onChange={e => setGastoForm(f => ({ ...f, categoria_id: e.target.value }))}
+                      >
+                        <option value="">Seleccionar</option>
+                        {categorias.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewCategoriaInput(true)}
+                        className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-200 transition whitespace-nowrap"
+                      >
+                        + Nueva
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-3 bg-slate-50 rounded-lg border-2 border-indigo-200">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          className="input flex-1"
+                          placeholder="Nombre de categoría"
+                          value={newCategoria.nombre}
+                          onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                        />
+                        <select
+                          className="input w-20"
+                          value={newCategoria.icono}
+                          onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
+                        >
+                          <option value="💰">💰</option>
+                          <option value="🛒">🛒</option>
+                          <option value="🍔">🍔</option>
+                          <option value="🏠">🏠</option>
+                          <option value="🚗">🚗</option>
+                          <option value="💊">💊</option>
+                          <option value="🎮">🎮</option>
+                          <option value="👕">👕</option>
+                          <option value="✈️">✈️</option>
+                          <option value="📚">📚</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAddNewCategoria}
+                          className="px-3 py-1.5 bg-emerald-500 text-white rounded text-sm font-bold hover:bg-emerald-600 flex-1"
+                        >
+                          ✓ Crear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewCategoriaInput(false); setNewCategoria({ nombre: '', icono: '💰' }) }}
+                          className="px-3 py-1.5 bg-slate-300 text-slate-700 rounded text-sm font-bold hover:bg-slate-400 flex-1"
+                        >
+                          ✕ Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <label className="flex items-center gap-3 cursor-pointer">
@@ -570,9 +718,14 @@ export default function GastosPage() {
                 <span className="font-semibold">Gasto fijo mensual</span>
               </label>
 
-              {/* Tags multiselect */}
+              {/* Etiquetas multiselect */}
               <div>
-                <label className="label">Tags</label>
+                <label className="label">
+                  Etiquetas
+                  <span className="text-xs text-slate-500 font-normal ml-2">
+                    (Para organizar y filtrar gastos por categorías personalizadas)
+                  </span>
+                </label>
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border-2 border-slate-200 min-h-[3rem]">
                   {tags.map(t => {
                     const isSelected = gastoForm.tag_ids.includes(t.id)
@@ -597,8 +750,41 @@ export default function GastosPage() {
                       </button>
                     )
                   })}
-                  {tags.length === 0 && (
-                    <span className="text-sm text-slate-400">Sin tags disponibles. Creá algunos en Configuración.</span>
+                  {!showNewTagInput && (
+                    <button
+                      type="button"
+                      onClick={() => setShowNewTagInput(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 transition"
+                    >
+                      + Nueva etiqueta
+                    </button>
+                  )}
+                  {showNewTagInput && (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="text"
+                        className="input py-1 px-2 text-xs w-32"
+                        placeholder="Nombre"
+                        value={newTagName}
+                        onChange={e => setNewTagName(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleAddNewTag()}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewTag}
+                        className="px-2 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewTagInput(false); setNewTagName('') }}
+                        className="px-2 py-1 bg-slate-300 text-slate-700 rounded text-xs font-bold hover:bg-slate-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -680,6 +866,87 @@ export default function GastosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmación de Pago */}
+      {showPagoModal && gastoToMarkPaid && (
+        <div className="modal-overlay" onClick={() => setShowPagoModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-lg">Confirmar Pago</h3>
+              <button onClick={() => setShowPagoModal(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-indigo-50 p-3 rounded-lg">
+                <div className="font-semibold text-indigo-900">{gastoToMarkPaid.descripcion}</div>
+                <div className="text-indigo-700 font-bold mt-1">
+                  {formatMoney(gastoToMarkPaid.monto, gastoToMarkPaid.moneda)}
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Fecha de Pago</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={pagoForm.fecha_pago}
+                  onChange={e => setPagoForm(f => ({ ...f, fecha_pago: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="label">Medio de Pago (opcional)</label>
+                <select
+                  className="input"
+                  value={pagoForm.medio_pago}
+                  onChange={e => setPagoForm(f => ({ ...f, medio_pago: e.target.value }))}
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="efectivo">💵 Efectivo</option>
+                  <option value="transferencia">🏦 Transferencia</option>
+                  <option value="debito">💳 Débito</option>
+                  <option value="credito">💳 Crédito</option>
+                  <option value="mercadopago">📱 Mercado Pago</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Comprobante (opcional)</label>
+                <input
+                  type="file"
+                  className="input"
+                  accept="image/*,.pdf"
+                  onChange={e => setPagoForm(f => ({ ...f, comprobante: e.target.files?.[0] || null }))}
+                />
+                {pagoForm.comprobante && (
+                  <div className="mt-2 text-sm text-emerald-600">
+                    ✓ {pagoForm.comprobante.name}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmPago}
+                  className="btn btn-success flex-1 justify-center"
+                >
+                  ✓ Confirmar Pago
+                </button>
+                <button
+                  onClick={() => setShowPagoModal(false)}
+                  className="btn btn-secondary flex-1 justify-center"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+const iconOptions = ['🎯', '💰', '🏠', '🚗', '✈️', '🎮', '📚', '💊', '👕', '🍔', '🛒']

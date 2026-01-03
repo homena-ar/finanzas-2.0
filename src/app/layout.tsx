@@ -1,10 +1,7 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/hooks/useAuth'
 import { DataProvider } from '@/hooks/useData'
-
-const inter = Inter({ subsets: ['latin'] })
 
 // URL base de la aplicación (cambiar según el entorno)
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.nexuno.com.ar'
@@ -73,7 +70,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
       </head>
-      <body className={inter.className}>
+      <body className="font-sans">
         <AuthProvider>
           <DataProvider>
             {children}

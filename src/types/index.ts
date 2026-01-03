@@ -51,6 +51,11 @@ export interface Gasto {
   es_fijo: boolean
   tag_ids: string[]
   pagado: boolean
+  // Campos de pago
+  fecha_pago?: string
+  medio_pago?: string
+  comprobante_url?: string
+  comprobante_nombre?: string
   created_at: string
   // Relaciones
   tarjeta?: Tarjeta
@@ -78,6 +83,7 @@ export interface Meta {
   progreso: number
   moneda: 'ARS' | 'USD'
   completada: boolean
+  fecha_limite?: string  // Fecha límite opcional
   created_at: string
 }
 
