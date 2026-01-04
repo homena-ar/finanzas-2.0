@@ -223,7 +223,7 @@ export default function TarjetasPage() {
             {/* Card content */}
             <div className="relative z-10">
               <div className="text-xs font-bold uppercase tracking-wider opacity-80 mb-4">
-                {t.tipo === 'visa' ? '💳 VISA' : t.tipo === 'mastercard' ? '💳 MASTERCARD' : t.tipo === 'amex' ? '💳 AMEX' : '💳 TARJETA'}
+                {t.tipo === 'visa' ? '💳 VISA' : t.tipo === 'mastercard' ? '💳 MASTERCARD' : t.tipo === 'amex' ? '💳 AMEX' : '🏦 CUENTA'}
               </div>
               
               <div className="text-xl font-bold mb-2">{t.nombre}</div>

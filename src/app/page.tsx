@@ -20,7 +20,7 @@ export default function LoginPage() {
   // Redirect to dashboard when user is authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/dashboard')
+      router.push('/dashboard/gastos')
     }
   }, [user, authLoading, router])
 

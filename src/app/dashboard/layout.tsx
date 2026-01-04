@@ -13,8 +13,8 @@ import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { useData } from '@/hooks/useData'
 
 const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
   { href: '/dashboard/gastos', icon: CreditCard, label: 'Gastos' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
   { href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' },
   { href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' },
   { href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' },
