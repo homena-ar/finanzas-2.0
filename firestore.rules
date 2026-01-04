@@ -438,8 +438,8 @@ service cloud.firestore {
       // Allow authenticated users to create email documents
       allow create: if request.auth != null;
 
-      // Only allow users to read/update/delete their own email documents
-      allow read, update, delete: if false;
+      // Allow the extension to read and update email status
+      allow read, update, delete: if request.auth != null;
     }
   }
 }

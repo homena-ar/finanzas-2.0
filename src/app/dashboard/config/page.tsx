@@ -20,6 +20,7 @@ export default function ConfigPage() {
     workspaces,
     currentWorkspace,
     createWorkspace,
+    updateWorkspace,
     inviteUser,
     members,
     invitations,
@@ -54,6 +55,8 @@ export default function ConfigPage() {
   const [inviteWorkspaceId, setInviteWorkspaceId] = useState('')
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingMember, setEditingMember] = useState<any>(null)
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
+  const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
 
   // Inicializar valores del perfil
   useEffect(() => {
@@ -336,6 +339,42 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
+  const handleEditWorkspace = (workspaceId: string, currentName: string) => {
+    setEditingWorkspaceId(workspaceId)
+    setEditingWorkspaceName(currentName)
+  }
+
+  const handleSaveWorkspaceName = async () => {
+    if (!editingWorkspaceId || !editingWorkspaceName.trim()) {
+      return
+    }
+
+    const result = await updateWorkspace(editingWorkspaceId, editingWorkspaceName)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo actualizar el nombre',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: 'Nombre actualizado',
+        message: 'El workspace fue renombrado exitosamente',
+        variant: 'success'
+      })
+      setEditingWorkspaceId(null)
+      setEditingWorkspaceName('')
+    }
+
+    setShowAlert(true)
+  }
+
+  const handleCancelEditWorkspace = () => {
+    setEditingWorkspaceId(null)
+    setEditingWorkspaceName('')
+  }
+
   const commonIcons = ['🍔', '🏠', '🚗', '🎮', '👕', '💊', '📚', '✈️', '🎬', '🏋️', '🐕', '💰', '🔧', '📱', '💡']
 
   return (
@@ -375,13 +414,45 @@ export default function ConfigPage() {
                 <div key={ws.id} className="bg-slate-50 rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <h4 className="font-semibold">{ws.name}</h4>
-                      <p className="text-xs text-slate-500">
-                        {isOwner ? 'Propietario' : 'Miembro'} • {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''}
-                      </p>
+                      {editingWorkspaceId === ws.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingWorkspaceName}
+                            onChange={(e) => setEditingWorkspaceName(e.target.value)}
+                            className="input input-sm flex-1 max-w-xs"
+                            autoFocus
+                            onKeyPress={(e) => e.key === 'Enter' && handleSaveWorkspaceName()}
+                          />
+                          <button onClick={handleSaveWorkspaceName} className="btn btn-primary btn-sm">
+                            Guardar
+                          </button>
+                          <button onClick={handleCancelEditWorkspace} className="btn btn-secondary btn-sm">
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{ws.name}</h4>
+                            {isOwner && (
+                              <button
+                                onClick={() => handleEditWorkspace(ws.id, ws.name)}
+                                className="p-1 hover:bg-slate-200 rounded transition"
+                                title="Editar nombre"
+                              >
+                                <Edit2 className="w-4 h-4 text-slate-600" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            {isOwner ? 'Propietario' : 'Miembro'} • {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''}
+                          </p>
+                        </>
+                      )}
                     </div>
                     <div className="flex gap-2">
-                      {isOwner && (
+                      {isOwner && editingWorkspaceId !== ws.id && (
                         <>
                           <button
                             onClick={() => {
