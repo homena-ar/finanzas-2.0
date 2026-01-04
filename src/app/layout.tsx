@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/hooks/useAuth'
+import { WorkspaceProvider } from '@/hooks/useWorkspace'
 import { DataProvider } from '@/hooks/useData'
 
 // URL base de la aplicación (cambiar según el entorno)
@@ -72,9 +73,11 @@ export default function RootLayout({
       </head>
       <body className="font-sans">
         <AuthProvider>
-          <DataProvider>
-            {children}
-          </DataProvider>
+          <WorkspaceProvider>
+            <DataProvider>
+              {children}
+            </DataProvider>
+          </WorkspaceProvider>
         </AuthProvider>
       </body>
     </html>

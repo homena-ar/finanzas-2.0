@@ -3,17 +3,28 @@
 import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { formatMoney, getMonthName } from '@/lib/utils'
-import { Save, Plus, X, Edit2 } from 'lucide-react'
+import { Save, Plus, X, Edit2, Users, Mail } from 'lucide-react'
 import { AlertModal } from '@/components/Modal'
+import type { WorkspacePermissions } from '@/types'
 
 export default function ConfigPage() {
-  const { profile, updateProfile } = useAuth()
+  const { profile, updateProfile, user } = useAuth()
   const {
     tags, addTag, deleteTag,
     categorias, addCategoria, updateCategoria, deleteCategoria,
     gastos, addGasto, currentMonth
   } = useData()
+  const {
+    workspaces,
+    createWorkspace,
+    inviteUser,
+    members,
+    invitations,
+    acceptInvitation,
+    rejectInvitation
+  } = useWorkspace()
 
   const [budgetEnabled, setBudgetEnabled] = useState(false)
   const [budgetArs, setBudgetArs] = useState('')
@@ -31,6 +42,13 @@ export default function ConfigPage() {
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [editingCategoria, setEditingCategoria] = useState<any>(null)
   const [categoriaForm, setCategoriaForm] = useState({ nombre: '', icono: '', color: '#6366f1' })
+
+  // Workspace modal states
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteWorkspaceId, setInviteWorkspaceId] = useState('')
 
   // Inicializar valores del perfil
   useEffect(() => {
@@ -135,6 +153,139 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
+  // Workspace handlers
+  const handleCreateWorkspace = async () => {
+    if (!workspaceName.trim()) {
+      setAlertData({
+        title: 'Nombre requerido',
+        message: 'Por favor ingresá un nombre para el workspace',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    if (workspaces.length >= 3) {
+      setAlertData({
+        title: 'Límite alcanzado',
+        message: 'No podés crear más de 3 workspaces',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    const result = await createWorkspace(workspaceName)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo crear el workspace',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: '¡Workspace creado!',
+        message: `El workspace "${workspaceName}" fue creado correctamente`,
+        variant: 'success'
+      })
+      setWorkspaceName('')
+      setShowWorkspaceModal(false)
+    }
+
+    setShowAlert(true)
+  }
+
+  const handleInviteUser = async () => {
+    if (!inviteEmail.trim()) {
+      setAlertData({
+        title: 'Email requerido',
+        message: 'Por favor ingresá un email válido',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    if (inviteEmail === user?.email) {
+      setAlertData({
+        title: 'Email inválido',
+        message: 'No podés invitarte a vos mismo',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    // Default permissions: solo lectura para todo
+    const defaultPermissions: WorkspacePermissions = {
+      gastos: 'solo_lectura',
+      ingresos: 'solo_lectura',
+      ahorros: 'solo_lectura',
+      tarjetas: 'solo_lectura'
+    }
+
+    const result = await inviteUser(inviteWorkspaceId, inviteEmail, defaultPermissions)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo enviar la invitación',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: '¡Invitación enviada!',
+        message: `Se envió una invitación a ${inviteEmail}`,
+        variant: 'success'
+      })
+      setInviteEmail('')
+      setShowInviteModal(false)
+    }
+
+    setShowAlert(true)
+  }
+
+  const handleAcceptInvitation = async (id: string) => {
+    const result = await acceptInvitation(id)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo aceptar la invitación',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: '¡Invitación aceptada!',
+        message: 'Ahora tenés acceso al workspace',
+        variant: 'success'
+      })
+    }
+
+    setShowAlert(true)
+  }
+
+  const handleRejectInvitation = async (id: string) => {
+    const result = await rejectInvitation(id)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo rechazar la invitación',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: 'Invitación rechazada',
+        message: 'La invitación fue rechazada',
+        variant: 'success'
+      })
+    }
+
+    setShowAlert(true)
+  }
+
   const commonIcons = ['🍔', '🏠', '🚗', '🎮', '👕', '💊', '📚', '✈️', '🎬', '🏋️', '🐕', '💰', '🔧', '📱', '💡']
 
   return (
@@ -142,6 +293,91 @@ export default function ConfigPage() {
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="text-slate-500">Personalizá tu experiencia</p>
+      </div>
+
+      {/* Sección de Workspaces */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold">🏢 Workspaces Colaborativos</h3>
+            <p className="text-slate-500 text-sm mt-1">
+              Compartí tus finanzas con otras personas
+            </p>
+          </div>
+          <button
+            onClick={() => setShowWorkspaceModal(true)}
+            disabled={workspaces.length >= 3}
+            className="btn btn-primary"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Workspace
+          </button>
+        </div>
+
+        {/* Lista de Workspaces */}
+        <div className="space-y-3">
+          {workspaces.length > 0 ? (
+            workspaces.map(ws => (
+              <div key={ws.id} className="bg-slate-50 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold">{ws.name}</h4>
+                    <p className="text-xs text-slate-500">
+                      {ws.owner_id === user?.uid ? 'Propietario' : 'Miembro'}
+                    </p>
+                  </div>
+                  {ws.owner_id === user?.uid && (
+                    <button
+                      onClick={() => {
+                        setInviteWorkspaceId(ws.id)
+                        setShowInviteModal(true)
+                      }}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      <Mail className="w-4 h-4" /> Invitar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-slate-50 rounded-xl p-8 text-center text-slate-500">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="font-medium">Sin workspaces</p>
+              <p className="text-sm">Creá un workspace para compartir con otros</p>
+            </div>
+          )}
+        </div>
+
+        {/* Invitaciones Pendientes */}
+        {invitations.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-slate-200">
+            <h4 className="font-semibold mb-3">📬 Invitaciones Pendientes</h4>
+            <div className="space-y-2">
+              {invitations.map(inv => (
+                <div key={inv.id} className="bg-indigo-50 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">Invitación a workspace</p>
+                    <p className="text-xs text-slate-600">{inv.email}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleAcceptInvitation(inv.id)}
+                      className="btn btn-primary btn-sm"
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      onClick={() => handleRejectInvitation(inv.id)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sección de Ingresos */}
@@ -424,6 +660,84 @@ export default function ConfigPage() {
               </button>
               <button onClick={handleSaveCategoria} className="btn btn-primary">
                 {editingCategoria ? 'Actualizar' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Crear Workspace */}
+      {showWorkspaceModal && (
+        <div className="modal-overlay" onClick={() => setShowWorkspaceModal(false)}>
+          <div className="modal max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-lg">Crear Workspace</h3>
+              <button onClick={() => setShowWorkspaceModal(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="label">Nombre del Workspace</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="ej: Finanzas Familiares"
+                  value={workspaceName}
+                  onChange={e => setWorkspaceName(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleCreateWorkspace()}
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Podés crear hasta 3 workspaces
+                </p>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">
+              <button onClick={() => setShowWorkspaceModal(false)} className="btn btn-secondary">
+                Cancelar
+              </button>
+              <button onClick={handleCreateWorkspace} className="btn btn-primary">
+                Crear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Invitar Usuario */}
+      {showInviteModal && (
+        <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+          <div className="modal max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-lg">Invitar Usuario</h3>
+              <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="label">Email del usuario</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="usuario@ejemplo.com"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleInviteUser()}
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  El usuario recibirá permisos de solo lectura por defecto
+                </p>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">
+              <button onClick={() => setShowInviteModal(false)} className="btn btn-secondary">
+                Cancelar
+              </button>
+              <button onClick={handleInviteUser} className="btn btn-primary">
+                Enviar Invitación
               </button>
             </div>
           </div>
