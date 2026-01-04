@@ -405,15 +405,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       console.log('📊 [Firebase useData] Medios Pago result:', mediosPagoData.length, 'rows')
 
-      // Fetch categorias_ingresos
-      const categoriasIngresosRef = collection(db, 'categorias_ingresos')
-      const categoriasIngresosQuery = query(
-        categoriasIngresosRef,
-        where('user_id', '==', user.uid),
-        orderBy('created_at', 'desc')
-      )
-      const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
-      let categoriasIngresosData = categoriasIngresosSnap.docs.map(doc => {
+      // Fetch categorias_ingresos (wrapped in try-catch to not break existing data)
+      let categoriasIngresosData: CategoriaIngreso[] = []
+      let tagsIngresosData: TagIngreso[] = []
+      let ingresosData: Ingreso[] = []
+
+      try {
+        const categoriasIngresosRef = collection(db, 'categorias_ingresos')
+        const categoriasIngresosQuery = query(
+          categoriasIngresosRef,
+          where('user_id', '==', user.uid),
+          orderBy('created_at', 'desc')
+        )
+        const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
+        categoriasIngresosData = categoriasIngresosSnap.docs.map(doc => {
         const data = doc.data()
         return {
           id: doc.id,
@@ -472,15 +477,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.log('📊 [Firebase useData] Categorias Ingresos after creation:', categoriasIngresosData.length, 'rows')
       }
 
-      // Fetch tags_ingresos
-      const tagsIngresosRef = collection(db, 'tags_ingresos')
-      const tagsIngresosQuery = query(
-        tagsIngresosRef,
-        where('user_id', '==', user.uid),
-        orderBy('created_at', 'desc')
-      )
-      const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
-      const tagsIngresosData = tagsIngresosSnap.docs.map(doc => {
+        // Fetch tags_ingresos
+        const tagsIngresosRef = collection(db, 'tags_ingresos')
+        const tagsIngresosQuery = query(
+          tagsIngresosRef,
+          where('user_id', '==', user.uid),
+          orderBy('created_at', 'desc')
+        )
+        const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
+        tagsIngresosData = tagsIngresosSnap.docs.map(doc => {
         const data = doc.data()
         return {
           id: doc.id,
@@ -492,17 +497,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }) as TagIngreso[]
 
-      console.log('📊 [Firebase useData] Tags Ingresos result:', tagsIngresosData.length, 'rows')
+        console.log('📊 [Firebase useData] Tags Ingresos result:', tagsIngresosData.length, 'rows')
 
-      // Fetch ingresos
-      const ingresosRef = collection(db, 'ingresos')
-      const ingresosQuery = query(
-        ingresosRef,
-        where('user_id', '==', user.uid),
-        orderBy('created_at', 'desc')
-      )
-      const ingresosSnap = await getDocs(ingresosQuery)
-      const ingresosData = ingresosSnap.docs.map(doc => {
+        // Fetch ingresos
+        const ingresosRef = collection(db, 'ingresos')
+        const ingresosQuery = query(
+          ingresosRef,
+          where('user_id', '==', user.uid),
+          orderBy('created_at', 'desc')
+        )
+        const ingresosSnap = await getDocs(ingresosQuery)
+        ingresosData = ingresosSnap.docs.map(doc => {
         const data = doc.data()
         return {
           id: doc.id,
@@ -520,7 +525,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }) as Ingreso[]
 
-      console.log('📊 [Firebase useData] Ingresos result:', ingresosData.length, 'rows')
+        console.log('📊 [Firebase useData] Ingresos result:', ingresosData.length, 'rows')
+      } catch (ingresosError) {
+        console.error('⚠️ [Firebase useData] Error fetching ingresos data (non-critical):', ingresosError)
+        console.log('📊 [Firebase useData] Continuing with existing data...')
+      }
 
       const endTime = Date.now()
       console.log('📊 [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
