@@ -383,27 +383,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       console.log('📊 [Firebase useData] Tags result:', tagsData.length, 'rows')
 
-      // Fetch medios_pago
-      const mediosPagoRef = collection(db, 'medios_pago')
-      const mediosPagoQuery = query(
-        mediosPagoRef,
-        where('user_id', '==', user.uid),
-        orderBy('created_at', 'desc')
-      )
-      const mediosPagoSnap = await getDocs(mediosPagoQuery)
-      const mediosPagoData = mediosPagoSnap.docs.map(doc => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          user_id: data.user_id,
-          nombre: data.nombre,
-          created_at: data.created_at instanceof Timestamp
-            ? data.created_at.toDate().toISOString()
-            : data.created_at
-        }
-      }) as MedioPago[]
+      // Fetch medios_pago (wrapped in try-catch to not break existing data)
+      let mediosPagoData: MedioPago[] = []
+      try {
+        const mediosPagoRef = collection(db, 'medios_pago')
+        const mediosPagoQuery = query(
+          mediosPagoRef,
+          where('user_id', '==', user.uid),
+          orderBy('created_at', 'desc')
+        )
+        const mediosPagoSnap = await getDocs(mediosPagoQuery)
+        mediosPagoData = mediosPagoSnap.docs.map(doc => {
+          const data = doc.data()
+          return {
+            id: doc.id,
+            user_id: data.user_id,
+            nombre: data.nombre,
+            created_at: data.created_at instanceof Timestamp
+              ? data.created_at.toDate().toISOString()
+              : data.created_at
+          }
+        }) as MedioPago[]
 
-      console.log('📊 [Firebase useData] Medios Pago result:', mediosPagoData.length, 'rows')
+        console.log('📊 [Firebase useData] Medios Pago result:', mediosPagoData.length, 'rows')
+      } catch (mediosPagoError) {
+        console.error('⚠️ [Firebase useData] Error fetching medios_pago (non-critical):', mediosPagoError)
+        console.log('📊 [Firebase useData] Continuing without medios_pago...')
+      }
 
       // Fetch categorias_ingresos (wrapped in try-catch to not break existing data)
       let categoriasIngresosData: CategoriaIngreso[] = []
