@@ -16,11 +16,6 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/workspace_members/$(workspaceId + '_' + request.auth.uid));
     }
 
-    // Get workspace member role
-    function getWorkspaceMemberRole(workspaceId) {
-      return get(/databases/$(database)/documents/workspace_members/$(workspaceId + '_' + request.auth.uid)).data.role;
-    }
-
     // Check if user has specific permission for a section
     function hasPermission(workspaceId, section, permission) {
       let member = get(/databases/$(database)/documents/workspace_members/$(workspaceId + '_' + request.auth.uid)).data;
