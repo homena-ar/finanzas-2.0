@@ -18,8 +18,10 @@ export default function ConfigPage() {
   const [budgetEnabled, setBudgetEnabled] = useState(false)
   const [budgetArs, setBudgetArs] = useState('')
   const [budgetUsd, setBudgetUsd] = useState('')
+  const [ingresosEnabled, setIngresosEnabled] = useState(false)
   const [newTag, setNewTag] = useState('')
   const [saving, setSaving] = useState(false)
+  const [savingIngresos, setSavingIngresos] = useState(false)
 
   // Modal states
   const [showAlert, setShowAlert] = useState(false)
@@ -38,12 +40,30 @@ export default function ConfigPage() {
       setBudgetEnabled(hasArs || hasUsd)
       setBudgetArs(profile.budget_ars ? String(profile.budget_ars) : '')
       setBudgetUsd(profile.budget_usd ? String(profile.budget_usd) : '')
+      setIngresosEnabled(profile.ingresos_habilitado || false)
     }
   }, [profile])
 
+  const handleSaveIngresos = async () => {
+    setSavingIngresos(true)
+    await updateProfile({
+      ingresos_habilitado: ingresosEnabled
+    })
+    setSavingIngresos(false)
+
+    setAlertData({
+      title: ingresosEnabled ? '¡Ingresos activados!' : 'Ingresos desactivados',
+      message: ingresosEnabled
+        ? 'Ahora podés registrar tus ingresos en la sección correspondiente'
+        : 'La sección de ingresos se ocultó del menú',
+      variant: 'success'
+    })
+    setShowAlert(true)
+  }
+
   const handleSaveBudget = async () => {
     setSaving(true)
-    
+
     if (budgetEnabled) {
       await updateProfile({
         budget_ars: parseFloat(budgetArs) || 0,
@@ -56,7 +76,7 @@ export default function ConfigPage() {
         budget_usd: 0
       })
     }
-    
+
     setSaving(false)
   }
 
@@ -122,6 +142,41 @@ export default function ConfigPage() {
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="text-slate-500">Personalizá tu experiencia</p>
+      </div>
+
+      {/* Sección de Ingresos */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold">💵 Registro de Ingresos</h3>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ingresosEnabled}
+              onChange={e => setIngresosEnabled(e.target.checked)}
+              className="w-5 h-5 accent-indigo-500"
+            />
+            <span className="text-sm font-medium">Activar</span>
+          </label>
+        </div>
+
+        {ingresosEnabled ? (
+          <div className="bg-emerald-50 rounded-xl p-4">
+            <p className="text-emerald-700 font-medium mb-1">✓ Sección de ingresos activada</p>
+            <p className="text-emerald-600 text-sm">
+              Podés registrar tus ingresos mensuales con categorías y tags personalizados
+            </p>
+          </div>
+        ) : (
+          <div className="bg-slate-50 rounded-xl p-4 text-center text-slate-500">
+            <p>Sección de ingresos desactivada</p>
+            <p className="text-sm">Activá el checkbox para habilitar el registro de ingresos</p>
+          </div>
+        )}
+
+        <button onClick={handleSaveIngresos} disabled={savingIngresos} className="btn btn-primary mt-4">
+          <Save className="w-4 h-4" />
+          {savingIngresos ? 'Guardando...' : 'Guardar'}
+        </button>
       </div>
 
       {/* Presupuesto - OPCIONAL */}

@@ -22,7 +22,7 @@ export default function TarjetasPage() {
   const [editing, setEditing] = useState<Tarjeta | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: ''
+    nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '', esCuenta: false
   })
 
   // Modal states
@@ -34,7 +34,7 @@ export default function TarjetasPage() {
   console.log('💳 [TarjetasPage] Render - loading:', loading)
 
   const resetForm = () => {
-    setForm({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '' })
+    setForm({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '', esCuenta: false })
   }
 
   const openEdit = (t: Tarjeta) => {
@@ -44,7 +44,8 @@ export default function TarjetasPage() {
       tipo: t.tipo,
       banco: t.banco || '',
       digitos: t.digitos || '',
-      cierre: t.cierre ? String(t.cierre) : ''
+      cierre: t.cierre ? String(t.cierre) : '',
+      esCuenta: t.tipo === 'other'
     })
     setShowModal(true)
   }
@@ -64,7 +65,7 @@ export default function TarjetasPage() {
 
     const data = {
       nombre: form.nombre,
-      tipo: form.tipo as 'visa' | 'mastercard' | 'amex' | 'other',
+      tipo: (form.esCuenta ? 'other' : form.tipo) as 'visa' | 'mastercard' | 'amex' | 'other',
       banco: form.banco || null,
       digitos: form.digitos || null,
       cierre: form.cierre ? parseInt(form.cierre) : null
@@ -260,36 +261,71 @@ export default function TarjetasPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* Selector Tarjeta/Cuenta */}
+              <div>
+                <label className="label">Tipo *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, esCuenta: false, tipo: 'visa' }))}
+                    className={`p-4 rounded-xl border-2 transition ${
+                      !form.esCuenta
+                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">💳</div>
+                    <div className="font-bold text-sm">Tarjeta</div>
+                    <div className="text-xs opacity-70">Crédito o débito</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, esCuenta: true, tipo: 'other' }))}
+                    className={`p-4 rounded-xl border-2 transition ${
+                      form.esCuenta
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🏦</div>
+                    <div className="font-bold text-sm">Cuenta</div>
+                    <div className="text-xs opacity-70">Banco, billetera digital</div>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="label">Nombre *</label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="Ej: Visa Gold BBVA, Cuenta Banco, Mercado Pago"
+                  placeholder={form.esCuenta ? "Ej: Cuenta Banco, Mercado Pago, Uala" : "Ej: Visa Gold BBVA, Mastercard Santander"}
                   value={form.nombre}
                   onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
+                {!form.esCuenta && (
+                  <div>
+                    <label className="label">Marca de Tarjeta</label>
+                    <select
+                      className="input"
+                      value={form.tipo}
+                      onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
+                    >
+                      <option value="visa">💳 Visa</option>
+                      <option value="mastercard">💳 Mastercard</option>
+                      <option value="amex">💳 Amex</option>
+                    </select>
+                  </div>
+                )}
                 <div>
-                  <label className="label">Tipo</label>
-                  <select
-                    className="input"
-                    value={form.tipo}
-                    onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                  >
-                    <option value="visa">Visa</option>
-                    <option value="mastercard">Mastercard</option>
-                    <option value="amex">Amex</option>
-                    <option value="other">Otra</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Banco</label>
+                  <label className="label">Banco{form.esCuenta ? ' o Institución' : ''}</label>
                   <input
                     type="text"
                     className="input"
-                    placeholder="BBVA, Santander..."
+                    placeholder={form.esCuenta ? "Ej: Mercado Pago, Santander..." : "Ej: BBVA, Santander..."}
                     value={form.banco}
                     onChange={e => setForm(f => ({ ...f, banco: e.target.value }))}
                   />
@@ -325,17 +361,17 @@ export default function TarjetasPage() {
               <div
                 className="rounded-xl p-4 text-white text-sm"
                 style={{
-                  background: form.tipo === 'visa'
-                    ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)'
-                    : form.tipo === 'mastercard'
-                      ? 'linear-gradient(135deg, #991b1b 0%, #ef4444 100%)'
-                      : form.tipo === 'amex'
-                        ? 'linear-gradient(135deg, #065f46 0%, #10b981 100%)'
-                        : 'linear-gradient(135deg, #374151 0%, #6b7280 100%)'
+                  background: form.esCuenta
+                    ? 'linear-gradient(135deg, #374151 0%, #6b7280 100%)'
+                    : form.tipo === 'visa'
+                      ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)'
+                      : form.tipo === 'mastercard'
+                        ? 'linear-gradient(135deg, #991b1b 0%, #ef4444 100%)'
+                        : 'linear-gradient(135deg, #065f46 0%, #10b981 100%)'
                 }}
               >
-                <div className="text-xs opacity-70 mb-1">Vista previa</div>
-                <div className="font-bold">{form.nombre || 'Nombre de cuenta'}</div>
+                <div className="text-xs opacity-70 mb-1">Vista previa - {form.esCuenta ? '🏦 Cuenta' : '💳 Tarjeta'}</div>
+                <div className="font-bold">{form.nombre || (form.esCuenta ? 'Nombre de cuenta' : 'Nombre de tarjeta')}</div>
                 <div className="font-mono text-xs opacity-70">•••• {form.digitos || '****'}</div>
               </div>
               

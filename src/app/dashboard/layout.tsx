@@ -3,23 +3,14 @@
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { 
-  LayoutDashboard, CreditCard, Wallet, TrendingUp, 
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight
+import {
+  LayoutDashboard, CreditCard, Wallet, TrendingUp,
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { useData } from '@/hooks/useData'
-
-const navItems = [
-  { href: '/dashboard/gastos', icon: CreditCard, label: 'Gastos' },
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
-  { href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' },
-  { href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' },
-  { href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' },
-  { href: '/dashboard/config', icon: Settings, label: 'Config' },
-]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
@@ -28,6 +19,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dolar, setDolar] = useState(0)
+
+  // Build navigation items based on profile settings
+  const navItems = [
+    { href: '/dashboard/gastos', icon: ArrowDownCircle, label: 'Gastos' },
+    ...(profile?.ingresos_habilitado ? [{ href: '/dashboard/ingresos', icon: ArrowUpCircle, label: 'Ingresos' }] : []),
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
+    { href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' },
+    { href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' },
+    { href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' },
+    { href: '/dashboard/config', icon: Settings, label: 'Config' },
+  ]
 
   console.log('🏠 [DashboardLayout] Render - loading:', loading, 'user:', user ? 'EXISTS' : 'NULL')
 
