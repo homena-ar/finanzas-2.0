@@ -26,29 +26,11 @@ service cloud.firestore {
       let member = get(/databases/$(database)/documents/workspace_members/$(workspaceId + '_' + request.auth.uid)).data;
       let sectionPermission = member.permissions[section];
 
-      // Admin has all permissions
-      if (sectionPermission == 'admin') {
-        return true;
-      }
-
-      // Check specific permissions
-      if (permission == 'read') {
-        return sectionPermission in ['solo_lectura', 'solo_propios', 'ver_todo_agregar_propio', 'admin'];
-      }
-
-      if (permission == 'create') {
-        return sectionPermission in ['solo_propios', 'ver_todo_agregar_propio', 'admin'];
-      }
-
-      if (permission == 'update') {
-        return sectionPermission in ['ver_todo_agregar_propio', 'admin'];
-      }
-
-      if (permission == 'delete') {
-        return sectionPermission == 'admin';
-      }
-
-      return false;
+      return sectionPermission == 'admin' ||
+        (permission == 'read' && sectionPermission in ['solo_lectura', 'solo_propios', 'ver_todo_agregar_propio', 'admin']) ||
+        (permission == 'create' && sectionPermission in ['solo_propios', 'ver_todo_agregar_propio', 'admin']) ||
+        (permission == 'update' && sectionPermission in ['ver_todo_agregar_propio', 'admin']) ||
+        (permission == 'delete' && sectionPermission == 'admin');
     }
 
     // ============================================
