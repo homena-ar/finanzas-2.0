@@ -18,12 +18,15 @@ export default function ConfigPage() {
   } = useData()
   const {
     workspaces,
+    currentWorkspace,
     createWorkspace,
     inviteUser,
     members,
     invitations,
     acceptInvitation,
-    rejectInvitation
+    rejectInvitation,
+    updateMemberPermissions,
+    removeMember
   } = useWorkspace()
 
   const [budgetEnabled, setBudgetEnabled] = useState(false)
@@ -49,6 +52,8 @@ export default function ConfigPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteWorkspaceId, setInviteWorkspaceId] = useState('')
+  const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
+  const [editingMember, setEditingMember] = useState<any>(null)
 
   // Inicializar valores del perfil
   useEffect(() => {
@@ -286,6 +291,51 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
+  const handleUpdateMemberPermission = async (memberId: string, section: keyof WorkspacePermissions, level: string) => {
+    const member = members.find(m => m.id === memberId)
+    if (!member) return
+
+    const updatedPermissions = {
+      ...member.permissions,
+      [section]: level
+    }
+
+    const result = await updateMemberPermissions(memberId, updatedPermissions)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudieron actualizar los permisos',
+        variant: 'error'
+      })
+      setShowAlert(true)
+    }
+  }
+
+  const handleRemoveMember = async (memberId: string, memberEmail: string) => {
+    if (!confirm(`¿Eliminar a ${memberEmail} del workspace?`)) {
+      return
+    }
+
+    const result = await removeMember(memberId)
+
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo eliminar el miembro',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: 'Miembro eliminado',
+        message: `${memberEmail} fue eliminado del workspace`,
+        variant: 'success'
+      })
+    }
+
+    setShowAlert(true)
+  }
+
   const commonIcons = ['🍔', '🏠', '🚗', '🎮', '👕', '💊', '📚', '✈️', '🎬', '🏋️', '🐕', '💰', '🔧', '📱', '💡']
 
   return (
@@ -316,29 +366,141 @@ export default function ConfigPage() {
         {/* Lista de Workspaces */}
         <div className="space-y-3">
           {workspaces.length > 0 ? (
-            workspaces.map(ws => (
-              <div key={ws.id} className="bg-slate-50 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold">{ws.name}</h4>
-                    <p className="text-xs text-slate-500">
-                      {ws.owner_id === user?.uid ? 'Propietario' : 'Miembro'}
-                    </p>
+            workspaces.map(ws => {
+              const isOwner = ws.owner_id === user?.uid
+              const isExpanded = expandedWorkspaceId === ws.id
+              const workspaceMembers = members.filter(m => m.workspace_id === ws.id)
+
+              return (
+                <div key={ws.id} className="bg-slate-50 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold">{ws.name}</h4>
+                      <p className="text-xs text-slate-500">
+                        {isOwner ? 'Propietario' : 'Miembro'} • {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {isOwner && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setInviteWorkspaceId(ws.id)
+                              setShowInviteModal(true)
+                            }}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <Mail className="w-4 h-4" /> Invitar
+                          </button>
+                          <button
+                            onClick={() => setExpandedWorkspaceId(isExpanded ? null : ws.id)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <Users className="w-4 h-4" /> {isExpanded ? 'Ocultar' : 'Ver'} Miembros
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  {ws.owner_id === user?.uid && (
-                    <button
-                      onClick={() => {
-                        setInviteWorkspaceId(ws.id)
-                        setShowInviteModal(true)
-                      }}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      <Mail className="w-4 h-4" /> Invitar
-                    </button>
+
+                  {/* Member Management - Only for owners */}
+                  {isOwner && isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <h5 className="font-semibold mb-3 text-sm">Gestión de Miembros</h5>
+
+                      {workspaceMembers.length > 0 ? (
+                        <div className="space-y-3">
+                          {workspaceMembers.map(member => (
+                            <div key={member.id} className="bg-white rounded-lg p-3 border border-slate-200">
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <p className="font-medium text-sm">{member.user_email}</p>
+                                  <p className="text-xs text-slate-500">ID: {member.user_id.slice(0, 8)}...</p>
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveMember(member.id, member.user_email)}
+                                  className="text-red-600 hover:text-red-700 text-sm"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {/* Permission Selectors */}
+                              <div className="grid grid-cols-2 gap-2">
+                                {/* Gastos */}
+                                <div>
+                                  <label className="text-xs text-slate-600">💰 Gastos</label>
+                                  <select
+                                    value={member.permissions.gastos}
+                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'gastos', e.target.value)}
+                                    className="input input-sm text-xs mt-1"
+                                  >
+                                    <option value="solo_lectura">Solo lectura</option>
+                                    <option value="solo_propios">Solo sus datos</option>
+                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
+                                    <option value="admin">Administrador</option>
+                                  </select>
+                                </div>
+
+                                {/* Ingresos */}
+                                <div>
+                                  <label className="text-xs text-slate-600">💵 Ingresos</label>
+                                  <select
+                                    value={member.permissions.ingresos}
+                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'ingresos', e.target.value)}
+                                    className="input input-sm text-xs mt-1"
+                                  >
+                                    <option value="solo_lectura">Solo lectura</option>
+                                    <option value="solo_propios">Solo sus datos</option>
+                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
+                                    <option value="admin">Administrador</option>
+                                  </select>
+                                </div>
+
+                                {/* Ahorros */}
+                                <div>
+                                  <label className="text-xs text-slate-600">🏦 Ahorros</label>
+                                  <select
+                                    value={member.permissions.ahorros}
+                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'ahorros', e.target.value)}
+                                    className="input input-sm text-xs mt-1"
+                                  >
+                                    <option value="solo_lectura">Solo lectura</option>
+                                    <option value="solo_propios">Solo sus datos</option>
+                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
+                                    <option value="admin">Administrador</option>
+                                  </select>
+                                </div>
+
+                                {/* Tarjetas */}
+                                <div>
+                                  <label className="text-xs text-slate-600">💳 Tarjetas</label>
+                                  <select
+                                    value={member.permissions.tarjetas}
+                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'tarjetas', e.target.value)}
+                                    className="input input-sm text-xs mt-1"
+                                  >
+                                    <option value="solo_lectura">Solo lectura</option>
+                                    <option value="solo_propios">Solo sus datos</option>
+                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
+                                    <option value="admin">Administrador</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center text-slate-500 text-sm py-4">
+                          <p>No hay miembros en este workspace</p>
+                          <p className="text-xs mt-1">Invitá a alguien para colaborar</p>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))
+              )
+            })
           ) : (
             <div className="bg-slate-50 rounded-xl p-8 text-center text-slate-500">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
