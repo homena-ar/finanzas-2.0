@@ -173,21 +173,71 @@ export default function AhorrosPage() {
     return { diasRestantes, porDia, porSemana, porMes, faltante }
   }
 
-  // Frases motivacionales rotativas
-  const frases = [
-    "¡Vas muy bien! 💪",
-    "¡Sigue así! 🚀",
-    "¡Casi llegás! 🎯",
-    "¡Un paso más! 👣",
-    "¡Estás cerca! ⭐",
-    "¡No pares! 💪",
-    "¡Lo estás logrando! 🏆",
-    "¡Cada día más cerca! 📈"
-  ]
+  // Frases motivacionales dinámicas según el progreso
+  const getFraseMotivacional = (progreso: number, objetivo: number) => {
+    const porcentaje = (progreso / objetivo) * 100
 
-  const getFraseMotivacional = (progreso: number) => {
-    const index = Math.floor(progreso) % frases.length
-    return frases[index]
+    if (porcentaje === 0) {
+      const frasesInicio = [
+        "¡Empezá hoy! 🚀",
+        "¡Dale que podés! 💪",
+        "¡El primer paso es el más importante! 👣",
+        "¡Arrancá ahora! ⭐"
+      ]
+      return frasesInicio[Math.floor(Math.random() * frasesInicio.length)]
+    }
+
+    if (porcentaje < 10) {
+      const frasesMuyBajo = [
+        "¡Buen comienzo! 🌱",
+        "¡Ya empezaste! 💪",
+        "¡Seguí sumando! 📈",
+        "¡Cada poquito cuenta! ⭐"
+      ]
+      return frasesMuyBajo[Math.floor(Math.random() * frasesMuyBajo.length)]
+    }
+
+    if (porcentaje < 40) {
+      const frasesBajo = [
+        "¡Vas bien! 🚀",
+        "¡Seguí así! 💪",
+        "¡Dale con todo! 📊",
+        "¡Buen ritmo! ⚡"
+      ]
+      return frasesBajo[Math.floor(Math.random() * frasesBajo.length)]
+    }
+
+    if (porcentaje < 70) {
+      const frasesMedio = [
+        "¡Ya pasaste la mitad! 🎯",
+        "¡Vas muy bien! 💪",
+        "¡Sigue así! 🚀",
+        "¡Estás en camino! 📈"
+      ]
+      return frasesMedio[Math.floor(Math.random() * frasesMedio.length)]
+    }
+
+    if (porcentaje < 90) {
+      const frasesAlto = [
+        "¡Casi llegás! 🎯",
+        "¡Ya falta poco! ⭐",
+        "¡Un empujón más! 💪",
+        "¡Estás cerca! 🚀"
+      ]
+      return frasesAlto[Math.floor(Math.random() * frasesAlto.length)]
+    }
+
+    if (porcentaje < 100) {
+      const frasesMuyAlto = [
+        "¡Ya casi! 🏆",
+        "¡Un paso más! 👣",
+        "¡Lo estás logrando! 🎯",
+        "¡Falta nada! ⭐"
+      ]
+      return frasesMuyAlto[Math.floor(Math.random() * frasesMuyAlto.length)]
+    }
+
+    return "¡Meta cumplida! 🎉"
   }
 
   const addToMeta = async (meta: Meta, amount: number) => {
@@ -608,7 +658,7 @@ export default function AhorrosPage() {
               const pct = Math.min((m.progreso / m.objetivo) * 100, 100)
               const isDone = pct >= 100
               const desafio = calcularDesafio(m)
-              const frase = getFraseMotivacional(pct)
+              const frase = getFraseMotivacional(m.progreso, m.objetivo)
 
               return (
                 <div key={m.id} className={`border-2 rounded-xl p-4 ${isDone ? 'bg-emerald-50 border-emerald-300' : 'border-slate-200'}`}>
