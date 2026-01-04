@@ -649,6 +649,108 @@ export default function GastosPage() {
                   placeholder="Ej: Compra en supermercado"
                 />
               </div>
+
+              {/* 2️⃣ CATEGORÍA */}
+              <div>
+                <label className="label">Categoría</label>
+                {!showNewCategoriaInput ? (
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={gastoForm.categoria_id}
+                      onChange={e => setGastoForm(f => ({ ...f, categoria_id: e.target.value }))}
+                    >
+                      <option value="">Seleccionar</option>
+                      {categorias.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCategoriaInput(true)}
+                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                    >
+                      + Crear nueva categoría
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
+                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                    <div className="flex gap-3 items-start">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          className="input w-full text-base"
+                          placeholder="Ej: Comidas, Transporte, Servicios..."
+                          value={newCategoria.nombre}
+                          onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                          autoFocus
+                        />
+                      </div>
+                      <select
+                        className="input w-20 h-11 text-center text-2xl p-1 cursor-pointer hover:bg-slate-50"
+                        value={newCategoria.icono}
+                        onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
+                        title="Seleccionar ícono"
+                      >
+                        <option value="💰">💰</option>
+                        <option value="🛒">🛒</option>
+                        <option value="🍔">🍔</option>
+                        <option value="🏠">🏠</option>
+                        <option value="🚗">🚗</option>
+                        <option value="💊">💊</option>
+                        <option value="🎮">🎮</option>
+                        <option value="👕">👕</option>
+                        <option value="✈️">✈️</option>
+                        <option value="📚">📚</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddNewCategoria}
+                        className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-sm"
+                      >
+                        ✓ Crear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewCategoriaInput(false); setNewCategoria({ nombre: '', icono: '💰' }) }}
+                        className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3️⃣ MONTO Y CUOTAS */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">
+                    Monto <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className={`input ${!gastoForm.monto && gastoError ? 'border-red-500 border-2' : ''}`}
+                    value={gastoForm.monto}
+                    onChange={e => setGastoForm(f => ({ ...f, monto: e.target.value }))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="label">Cuotas</label>
+                  <select
+                    className="input"
+                    value={gastoForm.cuotas}
+                    onChange={e => setGastoForm(f => ({ ...f, cuotas: e.target.value }))}
+                  >
+                    {[1,3,6,12,18,24].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* 4️⃣ MONEDA Y FECHA */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">Moneda</label>
@@ -661,10 +763,18 @@ export default function GastosPage() {
                     <option value="USD">USD</option>
                   </select>
                 </div>
-                <div></div> {/* Espacio vacío */}
+                <div>
+                  <label className="label">Fecha</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={gastoForm.fecha}
+                    onChange={e => setGastoForm(f => ({ ...f, fecha: e.target.value }))}
+                  />
+                </div>
               </div>
 
-              {/* Cuenta/Tarjeta - Fuera del grid para que se vea bien */}
+              {/* 5️⃣ CUENTA/TARJETA */}
               <div>
                 <label className="label">Cuenta/Tarjeta</label>
                 {!showNewTarjetaInput ? (
@@ -739,127 +849,8 @@ export default function GastosPage() {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">
-                    Monto <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className={`input ${!gastoForm.monto && gastoError ? 'border-red-500 border-2' : ''}`}
-                    value={gastoForm.monto}
-                    onChange={e => setGastoForm(f => ({ ...f, monto: e.target.value }))}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="label">Cuotas</label>
-                  <select
-                    className="input"
-                    value={gastoForm.cuotas}
-                    onChange={e => setGastoForm(f => ({ ...f, cuotas: e.target.value }))}
-                  >
-                    {[1,3,6,12,18,24].map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Fecha</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={gastoForm.fecha}
-                    onChange={e => setGastoForm(f => ({ ...f, fecha: e.target.value }))}
-                  />
-                </div>
-                <div></div> {/* Espacio vacío */}
-              </div>
 
-              {/* Categoría - Fuera del grid para que se vea bien */}
-              <div>
-                <label className="label">Categoría</label>
-                {!showNewCategoriaInput ? (
-                  <div className="space-y-2">
-                    <select
-                      className="input w-full"
-                      value={gastoForm.categoria_id}
-                      onChange={e => setGastoForm(f => ({ ...f, categoria_id: e.target.value }))}
-                    >
-                      <option value="">Seleccionar</option>
-                      {categorias.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setShowNewCategoriaInput(true)}
-                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
-                    >
-                      + Crear nueva categoría
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
-                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
-                    <div className="flex gap-3 items-start">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          className="input w-full text-base"
-                          placeholder="Ej: Comidas, Transporte, Servicios..."
-                          value={newCategoria.nombre}
-                          onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
-                          autoFocus
-                        />
-                      </div>
-                      <select
-                        className="input w-20 h-11 text-center text-2xl p-1 cursor-pointer hover:bg-slate-50"
-                        value={newCategoria.icono}
-                        onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
-                        title="Seleccionar ícono"
-                      >
-                        <option value="💰">💰</option>
-                        <option value="🛒">🛒</option>
-                        <option value="🍔">🍔</option>
-                        <option value="🏠">🏠</option>
-                        <option value="🚗">🚗</option>
-                        <option value="💊">💊</option>
-                        <option value="🎮">🎮</option>
-                        <option value="👕">👕</option>
-                        <option value="✈️">✈️</option>
-                        <option value="📚">📚</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAddNewCategoria}
-                        className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-sm"
-                      >
-                        ✓ Crear
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowNewCategoriaInput(false); setNewCategoria({ nombre: '', icono: '💰' }) }}
-                        className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={gastoForm.es_fijo}
-                  onChange={e => setGastoForm(f => ({ ...f, es_fijo: e.target.checked }))}
-                  className="w-5 h-5 accent-indigo-500"
-                />
-                <span className="font-semibold">Gasto fijo mensual</span>
-              </label>
-
-              {/* Etiquetas multiselect */}
+              {/* 6️⃣ ETIQUETAS */}
               <div>
                 <label className="label">
                   Etiquetas
@@ -929,6 +920,17 @@ export default function GastosPage() {
                   )}
                 </div>
               </div>
+
+              {/* 7️⃣ OPCIONES ADICIONALES */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={gastoForm.es_fijo}
+                  onChange={e => setGastoForm(f => ({ ...f, es_fijo: e.target.checked }))}
+                  className="w-5 h-5 accent-indigo-500"
+                />
+                <span className="font-semibold">Gasto fijo mensual</span>
+              </label>
 
               {/* Error de validación */}
               {gastoError && (
