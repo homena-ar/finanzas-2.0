@@ -163,8 +163,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
 
             {/* Dropdown Menu */}
-            {workspaceDropdownOpen && workspaces.length > 0 && (
+            {workspaceDropdownOpen && (
               <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                {/* Personal Option */}
+                <button
+                  onClick={() => {
+                    setCurrentWorkspace(null)
+                    setWorkspaceDropdownOpen(false)
+                  }}
+                  className={`
+                    w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
+                    ${currentWorkspace === null ? 'bg-indigo-50' : ''}
+                  `}
+                >
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-slate-600" />
+                    <span className="text-sm font-medium text-slate-900">Personal</span>
+                  </div>
+                  {currentWorkspace === null && (
+                    <div className="w-2 h-2 bg-indigo-500 rounded-full" />
+                  )}
+                </button>
+
+                {/* Workspaces */}
                 {workspaces.map((workspace) => (
                   <button
                     key={workspace.id}

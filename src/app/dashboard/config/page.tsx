@@ -222,12 +222,12 @@ export default function ConfigPage() {
       return
     }
 
-    // Default permissions: solo lectura para todo
+    // Default permissions: ninguno para todo
     const defaultPermissions: WorkspacePermissions = {
-      gastos: 'solo_lectura',
-      ingresos: 'solo_lectura',
-      ahorros: 'solo_lectura',
-      tarjetas: 'solo_lectura'
+      gastos: 'ninguno',
+      ingresos: 'ninguno',
+      ahorros: 'ninguno',
+      tarjetas: 'ninguno'
     }
 
     const result = await inviteUser(inviteWorkspaceId, inviteEmail, defaultPermissions)
@@ -435,6 +435,7 @@ export default function ConfigPage() {
                                     onChange={(e) => handleUpdateMemberPermission(member.id, 'gastos', e.target.value)}
                                     className="input input-sm text-xs mt-1"
                                   >
+                                    <option value="ninguno">Ninguno</option>
                                     <option value="solo_lectura">Solo lectura</option>
                                     <option value="solo_propios">Solo sus datos</option>
                                     <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
@@ -450,6 +451,7 @@ export default function ConfigPage() {
                                     onChange={(e) => handleUpdateMemberPermission(member.id, 'ingresos', e.target.value)}
                                     className="input input-sm text-xs mt-1"
                                   >
+                                    <option value="ninguno">Ninguno</option>
                                     <option value="solo_lectura">Solo lectura</option>
                                     <option value="solo_propios">Solo sus datos</option>
                                     <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
@@ -465,6 +467,7 @@ export default function ConfigPage() {
                                     onChange={(e) => handleUpdateMemberPermission(member.id, 'ahorros', e.target.value)}
                                     className="input input-sm text-xs mt-1"
                                   >
+                                    <option value="ninguno">Ninguno</option>
                                     <option value="solo_lectura">Solo lectura</option>
                                     <option value="solo_propios">Solo sus datos</option>
                                     <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
@@ -480,6 +483,7 @@ export default function ConfigPage() {
                                     onChange={(e) => handleUpdateMemberPermission(member.id, 'tarjetas', e.target.value)}
                                     className="input input-sm text-xs mt-1"
                                   >
+                                    <option value="ninguno">Ninguno</option>
                                     <option value="solo_lectura">Solo lectura</option>
                                     <option value="solo_propios">Solo sus datos</option>
                                     <option value="ver_todo_agregar_propio">Ver todo + agregar</option>

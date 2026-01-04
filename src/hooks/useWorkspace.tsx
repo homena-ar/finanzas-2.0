@@ -109,11 +109,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       setWorkspaces(uniqueWorkspaces)
 
-      // Set current workspace if not set
-      if (!currentWorkspace && uniqueWorkspaces.length > 0) {
-        setCurrentWorkspace(uniqueWorkspaces[0])
-      }
-
       // Fetch members for current workspace
       if (currentWorkspace) {
         const currentMembersQuery = query(
