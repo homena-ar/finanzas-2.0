@@ -119,12 +119,11 @@ export default function AhorrosPage() {
       icono: metaForm.icono,
       objetivo: parseFloat(metaForm.objetivo),
       progreso: parseFloat(metaForm.progreso) || 0,
-      moneda: metaForm.moneda as 'ARS' | 'USD'
+      moneda: metaForm.moneda as 'ARS' | 'USD',
+      fecha_limite: metaForm.fecha_limite || null // Siempre enviar, aunque sea null
     }
 
-    if (metaForm.fecha_limite) {
-      data.fecha_limite = metaForm.fecha_limite
-    }
+    console.log('💾 [AhorrosPage] Guardando meta con fecha_limite:', data.fecha_limite)
 
     if (editingMeta) {
       await updateMeta(editingMeta.id, data)

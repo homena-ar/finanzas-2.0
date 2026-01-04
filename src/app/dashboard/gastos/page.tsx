@@ -201,12 +201,23 @@ export default function GastosPage() {
 
   const togglePagado = async (g: Gasto) => {
     if (!g.pagado) {
-      // Si va a marcar como pagado, abrir modal
+      // Si va a marcar como pagado, abrir modal vacío
       setGastoToMarkPaid(g)
+      setPagoForm({
+        fecha_pago: new Date().toISOString().split('T')[0],
+        medio_pago: '',
+        comprobante: null
+      })
       setShowPagoModal(true)
     } else {
-      // Si va a desmarcar, solo actualizar
-      await updateGasto(g.id, { pagado: false, fecha_pago: null, medio_pago: null })
+      // Si ya está pagado, abrir modal con datos existentes para ver/editar
+      setGastoToMarkPaid(g)
+      setPagoForm({
+        fecha_pago: g.fecha_pago || new Date().toISOString().split('T')[0],
+        medio_pago: g.medio_pago || '',
+        comprobante: null // No podemos pre-cargar el archivo
+      })
+      setShowPagoModal(true)
     }
   }
 
@@ -395,6 +406,13 @@ export default function GastosPage() {
                             {categoriaMap[g.categoria_id || '']?.nombre || 'Sin categoría'}
                             {g.es_fijo && ' 📌'}
                           </div>
+                          {g.pagado && (g.fecha_pago || g.medio_pago || g.comprobante_url) && (
+                            <div className="mt-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded inline-block">
+                              {g.fecha_pago && `📅 ${new Date(g.fecha_pago).toLocaleDateString('es-AR')}`}
+                              {g.medio_pago && ` · ${g.medio_pago}`}
+                              {g.comprobante_url && ' · 📎'}
+                            </div>
+                          )}
                           {g.tag_ids && g.tag_ids.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {g.tag_ids.map(tagId => {
@@ -644,9 +662,9 @@ export default function GastosPage() {
                 <div>
                   <label className="label">Categoría</label>
                   {!showNewCategoriaInput ? (
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                       <select
-                        className="input flex-1"
+                        className="input w-full"
                         value={gastoForm.categoria_id}
                         onChange={e => setGastoForm(f => ({ ...f, categoria_id: e.target.value }))}
                       >
@@ -656,23 +674,25 @@ export default function GastosPage() {
                       <button
                         type="button"
                         onClick={() => setShowNewCategoriaInput(true)}
-                        className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-200 transition whitespace-nowrap"
+                        className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
                       >
-                        + Nueva
+                        + Crear nueva categoría
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2 p-3 bg-slate-50 rounded-lg border-2 border-indigo-200">
-                      <div className="flex gap-2">
+                    <div className="space-y-3 p-4 bg-indigo-50 rounded-lg border-2 border-indigo-300">
+                      <div className="text-sm font-bold text-indigo-900 mb-1">Nueva Categoría</div>
+                      <div className="grid grid-cols-[1fr_auto] gap-2">
                         <input
                           type="text"
-                          className="input flex-1"
-                          placeholder="Nombre de categoría"
+                          className="input"
+                          placeholder="Ej: Comidas, Transporte..."
                           value={newCategoria.nombre}
                           onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                          autoFocus
                         />
                         <select
-                          className="input w-20"
+                          className="input w-16 text-center text-xl"
                           value={newCategoria.icono}
                           onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
                         >
@@ -692,16 +712,16 @@ export default function GastosPage() {
                         <button
                           type="button"
                           onClick={handleAddNewCategoria}
-                          className="px-3 py-1.5 bg-emerald-500 text-white rounded text-sm font-bold hover:bg-emerald-600 flex-1"
+                          className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition"
                         >
                           ✓ Crear
                         </button>
                         <button
                           type="button"
                           onClick={() => { setShowNewCategoriaInput(false); setNewCategoria({ nombre: '', icono: '💰' }) }}
-                          className="px-3 py-1.5 bg-slate-300 text-slate-700 rounded text-sm font-bold hover:bg-slate-400 flex-1"
+                          className="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-300 transition"
                         >
-                          ✕ Cancelar
+                          Cancelar
                         </button>
                       </div>
                     </div>
@@ -872,7 +892,9 @@ export default function GastosPage() {
         <div className="modal-overlay" onClick={() => setShowPagoModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-lg">Confirmar Pago</h3>
+              <h3 className="font-bold text-lg">
+                {gastoToMarkPaid.pagado ? 'Ver/Editar Pago' : 'Confirmar Pago'}
+              </h3>
               <button onClick={() => setShowPagoModal(false)} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
@@ -914,6 +936,20 @@ export default function GastosPage() {
 
               <div>
                 <label className="label">Comprobante (opcional)</label>
+                {gastoToMarkPaid.pagado && gastoToMarkPaid.comprobante_url && !pagoForm.comprobante && (
+                  <div className="mb-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                    <div className="text-sm text-emerald-800">
+                      📎 {gastoToMarkPaid.comprobante_nombre || 'Comprobante guardado'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => downloadComprobante(gastoToMarkPaid)}
+                      className="px-3 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
+                    >
+                      Descargar
+                    </button>
+                  </div>
+                )}
                 <input
                   type="file"
                   className="input"
@@ -925,6 +961,11 @@ export default function GastosPage() {
                     ✓ {pagoForm.comprobante.name}
                   </div>
                 )}
+                {gastoToMarkPaid.comprobante_url && pagoForm.comprobante && (
+                  <div className="mt-1 text-xs text-orange-600">
+                    ⚠️ Esto reemplazará el comprobante actual
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -932,8 +973,26 @@ export default function GastosPage() {
                   onClick={handleConfirmPago}
                   className="btn btn-success flex-1 justify-center"
                 >
-                  ✓ Confirmar Pago
+                  {gastoToMarkPaid.pagado ? '✓ Actualizar' : '✓ Confirmar Pago'}
                 </button>
+                {gastoToMarkPaid.pagado && (
+                  <button
+                    onClick={async () => {
+                      await updateGasto(gastoToMarkPaid.id, {
+                        pagado: false,
+                        fecha_pago: null,
+                        medio_pago: null,
+                        comprobante_url: null,
+                        comprobante_nombre: null
+                      })
+                      setShowPagoModal(false)
+                      setGastoToMarkPaid(null)
+                    }}
+                    className="btn btn-danger flex-1 justify-center"
+                  >
+                    Desmarcar
+                  </button>
+                )}
                 <button
                   onClick={() => setShowPagoModal(false)}
                   className="btn btn-secondary flex-1 justify-center"
