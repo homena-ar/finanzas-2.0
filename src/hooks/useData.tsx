@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from './useAuth'
-import { MovimientoAhorro, Meta, Tarjeta, Gasto, Impuesto, Categoria, Tag } from '@/types'
+import { MovimientoAhorro, Meta, Tarjeta, Gasto, Impuesto, Categoria, Tag, MedioPago } from '@/types'
 
 type DataContextType = {
   movimientos: MovimientoAhorro[]
@@ -26,6 +26,7 @@ type DataContextType = {
   impuestos: Impuesto[]
   categorias: Categoria[]
   tags: Tag[]
+  mediosPago: MedioPago[]
   loading: boolean
   currentMonth: Date
   monthKey: string
@@ -51,6 +52,8 @@ type DataContextType = {
   addImpuesto: (data: any) => Promise<{ error: any }>
   updateImpuesto: (id: string, data: any) => Promise<{ error: any }>
   deleteImpuesto: (id: string) => Promise<{ error: any }>
+  addMedioPago: (nombre: string) => Promise<{ error: any }>
+  deleteMedioPago: (id: string) => Promise<{ error: any }>
   getGastosMes: (mes: string) => Gasto[]
   getImpuestosMes: (mes: string) => Impuesto[]
   getGastosNoProximoMes: (mesActual: string) => any
@@ -71,6 +74,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [impuestos, setImpuestos] = useState<Impuesto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [tags, setTags] = useState<Tag[]>([])
+  const [mediosPago, setMediosPago] = useState<MedioPago[]>([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(() => {
     // Restore last viewed month from localStorage
@@ -364,6 +368,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       console.log('📊 [Firebase useData] Tags result:', tagsData.length, 'rows')
 
+      // Fetch medios_pago
+      const mediosPagoRef = collection(db, 'medios_pago')
+      const mediosPagoQuery = query(
+        mediosPagoRef,
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      )
+      const mediosPagoSnap = await getDocs(mediosPagoQuery)
+      const mediosPagoData = mediosPagoSnap.docs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          user_id: data.user_id,
+          nombre: data.nombre,
+          created_at: data.created_at instanceof Timestamp
+            ? data.created_at.toDate().toISOString()
+            : data.created_at
+        }
+      }) as MedioPago[]
+
+      console.log('📊 [Firebase useData] Medios Pago result:', mediosPagoData.length, 'rows')
+
       const endTime = Date.now()
       console.log('📊 [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
 
@@ -374,6 +400,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setImpuestos(impuestosData)
       setCategorias(categoriasData)
       setTags(tagsData)
+      setMediosPago(mediosPagoData)
       setLoading(false)
     } catch (error) {
       console.error('📊 [Firebase useData] Error fetching data:', error)
@@ -904,6 +931,56 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [user, fetchAll])
 
+  const addMedioPago = useCallback(async (nombre: string) => {
+    if (!user) {
+      console.error('💳 [Firebase addMedioPago] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('💳 [Firebase addMedioPago] called', nombre)
+
+    try {
+      const insertData = {
+        nombre,
+        user_id: user.uid,
+        created_at: serverTimestamp()
+      }
+
+      const mediosPagoRef = collection(db, 'medios_pago')
+      await addDoc(mediosPagoRef, insertData)
+
+      console.log('💳 [Firebase addMedioPago] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('💳 [Firebase addMedioPago] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const deleteMedioPago = useCallback(async (id: string) => {
+    if (!user) {
+      console.error('💳 [Firebase deleteMedioPago] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('💳 [Firebase deleteMedioPago] called', id)
+
+    try {
+      const medioPagoRef = doc(db, 'medios_pago', id)
+      await deleteDoc(medioPagoRef)
+
+      console.log('💳 [Firebase deleteMedioPago] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('💳 [Firebase deleteMedioPago] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
   const getGastosMes = useCallback((mes: string) => {
     console.log('📊 [Firebase getGastosMes] called - mes:', mes, 'total gastos:', gastos.length)
 
@@ -953,6 +1030,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     impuestos,
     categorias,
     tags,
+    mediosPago,
     loading,
     currentMonth,
     monthKey,
@@ -978,6 +1056,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addImpuesto,
     updateImpuesto,
     deleteImpuesto,
+    addMedioPago,
+    deleteMedioPago,
     getGastosMes,
     getImpuestosMes,
     getGastosNoProximoMes,

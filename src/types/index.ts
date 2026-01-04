@@ -96,6 +96,13 @@ export interface MovimientoAhorro {
   fecha: string
 }
 
+export interface MedioPago {
+  id: string
+  user_id: string
+  nombre: string
+  created_at: string
+}
+
 export interface DolarAPI {
   compra: number
   venta: number

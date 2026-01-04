@@ -12,11 +12,11 @@ export default function GastosPage() {
 
   const searchParams = useSearchParams()
   const {
-    tarjetas, categorias, tags,
+    tarjetas, categorias, tags, mediosPago,
     currentMonth, monthKey, getGastosMes, getImpuestosMes,
     addGasto, updateGasto, deleteGasto,
     addImpuesto, updateImpuesto, deleteImpuesto,
-    addTag, addCategoria, addTarjeta
+    addTag, addCategoria, addTarjeta, addMedioPago
   } = useData()
 
   console.log('🔵🔵🔵 [GastosPage] addGasto function reference:', addGasto)
@@ -46,19 +46,6 @@ export default function GastosPage() {
     banco: '',
     digitos: ''
   })
-  const [mediosPagoCustom, setMediosPagoCustom] = useState<string[]>([])
-
-  // Cargar medios de pago personalizados desde localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('medios_pago_custom')
-    if (saved) {
-      try {
-        setMediosPagoCustom(JSON.parse(saved))
-      } catch (e) {
-        console.error('Error loading custom payment methods:', e)
-      }
-    }
-  }, [])
 
   // Apply filter from URL query params
   useEffect(() => {
@@ -235,7 +222,7 @@ export default function GastosPage() {
       // Si ya está pagado, abrir modal con datos existentes para ver/editar
       setGastoToMarkPaid(g)
       const mediosPredefinidos = ['efectivo', 'transferencia', 'debito', 'credito', 'mercadopago']
-      const isInCustomList = g.medio_pago && mediosPagoCustom.includes(g.medio_pago)
+      const isInCustomList = g.medio_pago && mediosPago.some(m => m.nombre === g.medio_pago)
       const isNewCustom = g.medio_pago && !mediosPredefinidos.includes(g.medio_pago) && !isInCustomList
 
       setPagoForm({
@@ -270,11 +257,10 @@ export default function GastosPage() {
     if (pagoForm.medio_pago === 'nuevo' && pagoForm.medio_pago_custom.trim()) {
       medioPagoFinal = pagoForm.medio_pago_custom.trim()
 
-      // Guardar en la lista de medios personalizados si no existe
-      if (!mediosPagoCustom.includes(medioPagoFinal)) {
-        const newList = [...mediosPagoCustom, medioPagoFinal]
-        setMediosPagoCustom(newList)
-        localStorage.setItem('medios_pago_custom', JSON.stringify(newList))
+      // Guardar en Firebase si no existe
+      const exists = mediosPago.some(m => m.nombre === medioPagoFinal)
+      if (!exists) {
+        await addMedioPago(medioPagoFinal)
       }
     }
 
@@ -1065,9 +1051,9 @@ export default function GastosPage() {
                   <option value="debito">💳 Débito</option>
                   <option value="credito">💳 Crédito</option>
                   <option value="mercadopago">📱 Mercado Pago</option>
-                  {mediosPagoCustom.length > 0 && <option disabled>──────────</option>}
-                  {mediosPagoCustom.map(medio => (
-                    <option key={medio} value={medio}>✨ {medio}</option>
+                  {mediosPago.length > 0 && <option disabled>──────────</option>}
+                  {mediosPago.map(medio => (
+                    <option key={medio.id} value={medio.nombre}>✨ {medio.nombre}</option>
                   ))}
                   <option value="nuevo">➕ Nuevo medio de pago</option>
                 </select>
