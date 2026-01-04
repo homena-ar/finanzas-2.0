@@ -86,7 +86,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       // Fetch those workspaces
       const memberWorkspaces: Workspace[] = []
-      for (const wsId of memberWorkspaceIds) {
+      for (const wsId of Array.from(memberWorkspaceIds)) {
         const wsRef = doc(db, 'workspaces', wsId)
         const wsSnap = await getDocs(query(collection(db, 'workspaces'), where('__name__', '==', wsId)))
         wsSnap.docs.forEach(d => {
