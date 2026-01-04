@@ -149,7 +149,7 @@ export interface DolarAPI {
 // WORKSPACE TYPES
 // ============================================
 
-export type PermissionLevel = 'solo_lectura' | 'solo_propios' | 'ver_todo_agregar_propio' | 'admin'
+export type PermissionLevel = 'ninguno' | 'solo_lectura' | 'solo_propios' | 'ver_todo_agregar_propio' | 'admin'
 
 export type WorkspaceSection = 'gastos' | 'ingresos' | 'ahorros' | 'tarjetas'
 

@@ -109,11 +109,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       setWorkspaces(uniqueWorkspaces)
 
-      // Set current workspace if not set
-      if (!currentWorkspace && uniqueWorkspaces.length > 0) {
-        setCurrentWorkspace(uniqueWorkspaces[0])
-      }
-
       // Fetch members for current workspace
       if (currentWorkspace) {
         const currentMembersQuery = query(
@@ -263,6 +258,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     console.log('🏢 [useWorkspace] Inviting user:', email, 'to workspace:', workspaceId)
 
     try {
+      // Get workspace details
+      const workspace = workspaces.find(w => w.id === workspaceId)
+      const workspaceName = workspace?.name || 'Workspace'
+
+      // Create invitation in Firestore
       const invitationsRef = collection(db, 'workspace_invitations')
       await addDoc(invitationsRef, {
         workspace_id: workspaceId,
@@ -270,6 +270,57 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         permissions,
         status: 'pending',
         created_at: serverTimestamp()
+      })
+
+      // Send email via Firebase Extension
+      const mailRef = collection(db, 'mail')
+      await addDoc(mailRef, {
+        to: email,
+        message: {
+          subject: `Invitación a ${workspaceName} - FinControl`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #6366f1;">¡Te invitaron a colaborar!</h2>
+
+              <p>Has sido invitado a colaborar en <strong>${workspaceName}</strong> en FinControl.</p>
+
+              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #4b5563;">Permisos asignados:</h3>
+                <ul style="color: #6b7280;">
+                  <li>💰 Gastos: <strong>${permissions.gastos}</strong></li>
+                  <li>💵 Ingresos: <strong>${permissions.ingresos}</strong></li>
+                  <li>🏦 Ahorros: <strong>${permissions.ahorros}</strong></li>
+                  <li>💳 Tarjetas: <strong>${permissions.tarjetas}</strong></li>
+                </ul>
+              </div>
+
+              <p><strong>Para aceptar la invitación:</strong></p>
+              <ol style="color: #6b7280;">
+                <li>Inicia sesión en FinControl con este email: <strong>${email}</strong></li>
+                <li>Ve a la página de Configuración</li>
+                <li>Verás la invitación pendiente y podrás aceptarla</li>
+              </ol>
+
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
+                <p>Este es un email automático de FinControl. Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
+              </div>
+            </div>
+          `,
+          text: `
+Te invitaron a colaborar en ${workspaceName} en FinControl.
+
+Permisos asignados:
+- Gastos: ${permissions.gastos}
+- Ingresos: ${permissions.ingresos}
+- Ahorros: ${permissions.ahorros}
+- Tarjetas: ${permissions.tarjetas}
+
+Para aceptar la invitación:
+1. Inicia sesión en FinControl con este email: ${email}
+2. Ve a la página de Configuración
+3. Verás la invitación pendiente y podrás aceptarla
+          `
+        }
       })
 
       await fetchAll()
@@ -280,7 +331,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.error('🏢 [useWorkspace] Error sending invitation:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, workspaces, fetchAll])
 
   const updateMemberPermissions = useCallback(async (memberId: string, permissions: WorkspacePermissions) => {
     if (!user) {
