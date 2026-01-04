@@ -6,7 +6,7 @@ export interface Profile {
   budget_usd: number
   ahorro_pesos: number
   ahorro_usd: number
-  ingresos_habilitado: boolean
+  ingresos_habilitado?: boolean
   created_at: string
 }
 
