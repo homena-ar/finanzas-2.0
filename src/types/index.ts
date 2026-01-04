@@ -6,6 +6,7 @@ export interface Profile {
   budget_usd: number
   ahorro_pesos: number
   ahorro_usd: number
+  ingresos_habilitado: boolean
   created_at: string
 }
 
@@ -101,6 +102,38 @@ export interface MedioPago {
   user_id: string
   nombre: string
   created_at: string
+}
+
+export interface CategoriaIngreso {
+  id: string
+  user_id: string
+  nombre: string
+  icono: string
+  color: string
+  created_at: string
+}
+
+export interface TagIngreso {
+  id: string
+  user_id: string
+  nombre: string
+  created_at: string
+}
+
+export interface Ingreso {
+  id: string
+  user_id: string
+  categoria_id: string | null
+  descripcion: string
+  monto: number
+  moneda: 'ARS' | 'USD'
+  fecha: string
+  mes: string  // YYYY-MM
+  tag_ids: string[]
+  created_at: string
+  // Relaciones
+  categoria?: CategoriaIngreso
+  tags?: TagIngreso[]
 }
 
 export interface DolarAPI {

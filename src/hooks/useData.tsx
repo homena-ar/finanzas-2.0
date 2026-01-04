@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from './useAuth'
-import { MovimientoAhorro, Meta, Tarjeta, Gasto, Impuesto, Categoria, Tag, MedioPago } from '@/types'
+import { MovimientoAhorro, Meta, Tarjeta, Gasto, Impuesto, Categoria, Tag, MedioPago, Ingreso, CategoriaIngreso, TagIngreso } from '@/types'
 
 type DataContextType = {
   movimientos: MovimientoAhorro[]
@@ -27,6 +27,9 @@ type DataContextType = {
   categorias: Categoria[]
   tags: Tag[]
   mediosPago: MedioPago[]
+  ingresos: Ingreso[]
+  categoriasIngresos: CategoriaIngreso[]
+  tagsIngresos: TagIngreso[]
   loading: boolean
   currentMonth: Date
   monthKey: string
@@ -54,6 +57,15 @@ type DataContextType = {
   deleteImpuesto: (id: string) => Promise<{ error: any }>
   addMedioPago: (nombre: string) => Promise<{ error: any }>
   deleteMedioPago: (id: string) => Promise<{ error: any }>
+  addIngreso: (data: any) => Promise<{ error: any, data?: Ingreso }>
+  updateIngreso: (id: string, data: any) => Promise<{ error: any }>
+  deleteIngreso: (id: string) => Promise<{ error: any }>
+  addTagIngreso: (nombre: string) => Promise<{ error: any }>
+  deleteTagIngreso: (id: string) => Promise<{ error: any }>
+  addCategoriaIngreso: (data: any) => Promise<{ error: any }>
+  updateCategoriaIngreso: (id: string, data: any) => Promise<{ error: any }>
+  deleteCategoriaIngreso: (id: string) => Promise<{ error: any }>
+  getIngresosMes: (mes: string) => Ingreso[]
   getGastosMes: (mes: string) => Gasto[]
   getImpuestosMes: (mes: string) => Impuesto[]
   getGastosNoProximoMes: (mesActual: string) => any
@@ -75,6 +87,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [mediosPago, setMediosPago] = useState<MedioPago[]>([])
+  const [ingresos, setIngresos] = useState<Ingreso[]>([])
+  const [categoriasIngresos, setCategoriasIngresos] = useState<CategoriaIngreso[]>([])
+  const [tagsIngresos, setTagsIngresos] = useState<TagIngreso[]>([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(() => {
     // Restore last viewed month from localStorage
@@ -390,6 +405,123 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       console.log('📊 [Firebase useData] Medios Pago result:', mediosPagoData.length, 'rows')
 
+      // Fetch categorias_ingresos
+      const categoriasIngresosRef = collection(db, 'categorias_ingresos')
+      const categoriasIngresosQuery = query(
+        categoriasIngresosRef,
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      )
+      const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
+      let categoriasIngresosData = categoriasIngresosSnap.docs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          user_id: data.user_id,
+          nombre: data.nombre,
+          icono: data.icono,
+          color: data.color,
+          created_at: data.created_at instanceof Timestamp
+            ? data.created_at.toDate().toISOString()
+            : data.created_at
+        }
+      }) as CategoriaIngreso[]
+
+      console.log('📊 [Firebase useData] Categorias Ingresos result:', categoriasIngresosData.length, 'rows')
+
+      // Si no hay categorías de ingresos, crear las estándar automáticamente
+      if (categoriasIngresosData.length === 0) {
+        console.log('📂 [Firebase useData] No income categories found - Creating default categories')
+
+        const defaultCategoriasIngresos = [
+          { nombre: 'Salario', icono: '💼', color: '#3b82f6' },
+          { nombre: 'Freelance', icono: '💻', color: '#8b5cf6' },
+          { nombre: 'Inversiones', icono: '📈', color: '#10b981' },
+          { nombre: 'Alquiler', icono: '🏠', color: '#f59e0b' },
+          { nombre: 'Ventas', icono: '🛍️', color: '#ec4899' },
+          { nombre: 'Otros', icono: '💵', color: '#6b7280' }
+        ]
+
+        const categoriasIngresosRef = collection(db, 'categorias_ingresos')
+        for (const categoria of defaultCategoriasIngresos) {
+          await addDoc(categoriasIngresosRef, {
+            ...categoria,
+            user_id: user.uid,
+            created_at: serverTimestamp()
+          })
+        }
+
+        console.log('✅ [Firebase useData] Default income categories created - Fetching again')
+
+        // Volver a obtener las categorías
+        const categoriasIngresosSnapNew = await getDocs(categoriasIngresosQuery)
+        categoriasIngresosData = categoriasIngresosSnapNew.docs.map(doc => {
+          const data = doc.data()
+          return {
+            id: doc.id,
+            user_id: data.user_id,
+            nombre: data.nombre,
+            icono: data.icono,
+            color: data.color,
+            created_at: data.created_at instanceof Timestamp
+              ? data.created_at.toDate().toISOString()
+              : data.created_at
+          }
+        }) as CategoriaIngreso[]
+
+        console.log('📊 [Firebase useData] Categorias Ingresos after creation:', categoriasIngresosData.length, 'rows')
+      }
+
+      // Fetch tags_ingresos
+      const tagsIngresosRef = collection(db, 'tags_ingresos')
+      const tagsIngresosQuery = query(
+        tagsIngresosRef,
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      )
+      const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
+      const tagsIngresosData = tagsIngresosSnap.docs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          user_id: data.user_id,
+          nombre: data.nombre,
+          created_at: data.created_at instanceof Timestamp
+            ? data.created_at.toDate().toISOString()
+            : data.created_at
+        }
+      }) as TagIngreso[]
+
+      console.log('📊 [Firebase useData] Tags Ingresos result:', tagsIngresosData.length, 'rows')
+
+      // Fetch ingresos
+      const ingresosRef = collection(db, 'ingresos')
+      const ingresosQuery = query(
+        ingresosRef,
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      )
+      const ingresosSnap = await getDocs(ingresosQuery)
+      const ingresosData = ingresosSnap.docs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          user_id: data.user_id,
+          categoria_id: data.categoria_id || null,
+          descripcion: data.descripcion,
+          monto: data.monto,
+          moneda: data.moneda,
+          fecha: data.fecha,
+          mes: data.mes,
+          tag_ids: data.tag_ids || [],
+          created_at: data.created_at instanceof Timestamp
+            ? data.created_at.toDate().toISOString()
+            : data.created_at
+        }
+      }) as Ingreso[]
+
+      console.log('📊 [Firebase useData] Ingresos result:', ingresosData.length, 'rows')
+
       const endTime = Date.now()
       console.log('📊 [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
 
@@ -401,6 +533,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setCategorias(categoriasData)
       setTags(tagsData)
       setMediosPago(mediosPagoData)
+      setIngresos(ingresosData)
+      setCategoriasIngresos(categoriasIngresosData)
+      setTagsIngresos(tagsIngresosData)
       setLoading(false)
     } catch (error) {
       console.error('📊 [Firebase useData] Error fetching data:', error)
@@ -981,6 +1116,205 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [user, fetchAll])
 
+  const addIngreso = useCallback(async (data: any) => {
+    if (!user) {
+      console.error('💵 [Firebase addIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('💵 [Firebase addIngreso] called', data)
+
+    try {
+      const insertData = {
+        ...data,
+        user_id: user.uid,
+        created_at: serverTimestamp()
+      }
+
+      const ingresosRef = collection(db, 'ingresos')
+      const docRef = await addDoc(ingresosRef, insertData)
+
+      console.log('💵 [Firebase addIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null, data: { id: docRef.id, ...data } }
+    } catch (error) {
+      console.error('💵 [Firebase addIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const updateIngreso = useCallback(async (id: string, data: any) => {
+    if (!user) {
+      console.error('💵 [Firebase updateIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('💵 [Firebase updateIngreso] called', id, data)
+
+    try {
+      const ingresoRef = doc(db, 'ingresos', id)
+      await updateDoc(ingresoRef, data)
+
+      console.log('💵 [Firebase updateIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('💵 [Firebase updateIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const deleteIngreso = useCallback(async (id: string) => {
+    if (!user) {
+      console.error('💵 [Firebase deleteIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('💵 [Firebase deleteIngreso] called', id)
+
+    try {
+      const ingresoRef = doc(db, 'ingresos', id)
+      await deleteDoc(ingresoRef)
+
+      console.log('💵 [Firebase deleteIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('💵 [Firebase deleteIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const addTagIngreso = useCallback(async (nombre: string) => {
+    if (!user) {
+      console.error('🏷️ [Firebase addTagIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('🏷️ [Firebase addTagIngreso] called', nombre)
+
+    try {
+      const insertData = {
+        nombre,
+        user_id: user.uid,
+        created_at: serverTimestamp()
+      }
+
+      const tagsIngresosRef = collection(db, 'tags_ingresos')
+      await addDoc(tagsIngresosRef, insertData)
+
+      console.log('🏷️ [Firebase addTagIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('🏷️ [Firebase addTagIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const deleteTagIngreso = useCallback(async (id: string) => {
+    if (!user) {
+      console.error('🏷️ [Firebase deleteTagIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('🏷️ [Firebase deleteTagIngreso] called', id)
+
+    try {
+      const tagIngresoRef = doc(db, 'tags_ingresos', id)
+      await deleteDoc(tagIngresoRef)
+
+      console.log('🏷️ [Firebase deleteTagIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('🏷️ [Firebase deleteTagIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const addCategoriaIngreso = useCallback(async (data: any) => {
+    if (!user) {
+      console.error('📂 [Firebase addCategoriaIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('📂 [Firebase addCategoriaIngreso] called', data)
+
+    try {
+      const insertData = {
+        ...data,
+        user_id: user.uid,
+        created_at: serverTimestamp()
+      }
+
+      const categoriasIngresosRef = collection(db, 'categorias_ingresos')
+      await addDoc(categoriasIngresosRef, insertData)
+
+      console.log('📂 [Firebase addCategoriaIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('📂 [Firebase addCategoriaIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const updateCategoriaIngreso = useCallback(async (id: string, data: any) => {
+    if (!user) {
+      console.error('📂 [Firebase updateCategoriaIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('📂 [Firebase updateCategoriaIngreso] called', id, data)
+
+    try {
+      const categoriaIngresoRef = doc(db, 'categorias_ingresos', id)
+      await updateDoc(categoriaIngresoRef, data)
+
+      console.log('📂 [Firebase updateCategoriaIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('📂 [Firebase updateCategoriaIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const deleteCategoriaIngreso = useCallback(async (id: string) => {
+    if (!user) {
+      console.error('📂 [Firebase deleteCategoriaIngreso] No user!')
+      return { error: new Error('No user') }
+    }
+
+    console.log('📂 [Firebase deleteCategoriaIngreso] called', id)
+
+    try {
+      const categoriaIngresoRef = doc(db, 'categorias_ingresos', id)
+      await deleteDoc(categoriaIngresoRef)
+
+      console.log('📂 [Firebase deleteCategoriaIngreso] SUCCESS - Calling fetchAll')
+      await fetchAll()
+
+      return { error: null }
+    } catch (error) {
+      console.error('📂 [Firebase deleteCategoriaIngreso] ERROR:', error)
+      return { error }
+    }
+  }, [user, fetchAll])
+
+  const getIngresosMes = useCallback((mes: string) => {
+    console.log('📊 [Firebase getIngresosMes] called - mes:', mes, 'total ingresos:', ingresos.length)
+    return ingresos.filter(i => i.mes === mes)
+  }, [ingresos])
+
   const getGastosMes = useCallback((mes: string) => {
     console.log('📊 [Firebase getGastosMes] called - mes:', mes, 'total gastos:', gastos.length)
 
@@ -1031,6 +1365,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     categorias,
     tags,
     mediosPago,
+    ingresos,
+    categoriasIngresos,
+    tagsIngresos,
     loading,
     currentMonth,
     monthKey,
@@ -1058,6 +1395,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     deleteImpuesto,
     addMedioPago,
     deleteMedioPago,
+    addIngreso,
+    updateIngreso,
+    deleteIngreso,
+    addTagIngreso,
+    deleteTagIngreso,
+    addCategoriaIngreso,
+    updateCategoriaIngreso,
+    deleteCategoriaIngreso,
+    getIngresosMes,
     getGastosMes,
     getImpuestosMes,
     getGastosNoProximoMes,
