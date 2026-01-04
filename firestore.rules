@@ -1,0 +1,434 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    // Check if user is owner of a workspace
+    function isWorkspaceOwner(workspaceId) {
+      return get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.owner_id == request.auth.uid;
+    }
+
+    // Check if user is member of a workspace
+    function isWorkspaceMember(workspaceId) {
+      return exists(/databases/$(database)/documents/workspace_members/$(workspaceId + '_' + request.auth.uid));
+    }
+
+    // Check if user has specific permission for a section
+    function hasPermission(workspaceId, section, permission) {
+      let member = get(/databases/$(database)/documents/workspace_members/$(workspaceId + '_' + request.auth.uid)).data;
+      let sectionPermission = member.permissions[section];
+
+      return sectionPermission == 'admin' ||
+        (permission == 'read' && sectionPermission in ['solo_lectura', 'solo_propios', 'ver_todo_agregar_propio', 'admin']) ||
+        (permission == 'create' && sectionPermission in ['solo_propios', 'ver_todo_agregar_propio', 'admin']) ||
+        (permission == 'update' && sectionPermission in ['ver_todo_agregar_propio', 'admin']) ||
+        (permission == 'delete' && sectionPermission == 'admin');
+    }
+
+    // ============================================
+    // PROFILES COLLECTION
+    // ============================================
+
+    match /profiles/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // WORKSPACE COLLECTIONS
+    // ============================================
+
+    match /workspaces/{workspaceId} {
+      // Owner and members can read
+      allow read: if request.auth != null &&
+        (resource.data.owner_id == request.auth.uid || isWorkspaceMember(workspaceId));
+
+      // Only authenticated users can create (max 3 workspaces checked in app)
+      allow create: if request.auth != null &&
+        request.resource.data.owner_id == request.auth.uid &&
+        request.resource.data.name is string &&
+        request.resource.data.created_at is timestamp;
+
+      // Only owner can update
+      allow update: if request.auth != null &&
+        resource.data.owner_id == request.auth.uid;
+
+      // Only owner can delete
+      allow delete: if request.auth != null &&
+        resource.data.owner_id == request.auth.uid;
+    }
+
+    match /workspace_members/{memberId} {
+      // Members can read their own membership
+      allow read: if request.auth != null &&
+        (resource.data.user_id == request.auth.uid ||
+         isWorkspaceOwner(resource.data.workspace_id));
+
+      // Only workspace owner can create memberships
+      allow create: if request.auth != null &&
+        isWorkspaceOwner(request.resource.data.workspace_id);
+
+      // Only workspace owner can update memberships
+      allow update: if request.auth != null &&
+        isWorkspaceOwner(resource.data.workspace_id);
+
+      // Only workspace owner can delete memberships
+      allow delete: if request.auth != null &&
+        isWorkspaceOwner(resource.data.workspace_id);
+    }
+
+    match /workspace_invitations/{invitationId} {
+      // User can read invitations sent to them or sent by them
+      allow read: if request.auth != null &&
+        (resource.data.email == request.auth.token.email ||
+         isWorkspaceOwner(resource.data.workspace_id));
+
+      // Only workspace owner can create invitations
+      allow create: if request.auth != null &&
+        isWorkspaceOwner(request.resource.data.workspace_id) &&
+        request.resource.data.status == 'pending';
+
+      // Invited user can update to accept/reject, owner can cancel
+      allow update: if request.auth != null &&
+        (resource.data.email == request.auth.token.email ||
+         isWorkspaceOwner(resource.data.workspace_id));
+
+      // Only workspace owner can delete
+      allow delete: if request.auth != null &&
+        isWorkspaceOwner(resource.data.workspace_id);
+    }
+
+    // ============================================
+    // AHORROS (SAVINGS) COLLECTIONS
+    // ============================================
+
+    match /movimientos_ahorro/{movimientoId} {
+      // Read: own data (user_id) OR workspace member with permission
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id) &&
+         hasPermission(resource.data.workspace_id, 'ahorros', 'read'))
+      );
+
+      // Create: own data OR workspace member with permission
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id) &&
+         hasPermission(request.resource.data.workspace_id, 'ahorros', 'create') &&
+         request.resource.data.created_by == request.auth.uid)
+      );
+
+      // Update: own data OR workspace admin
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'ahorros', 'update'))
+      );
+
+      // Delete: own data OR workspace admin
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'ahorros', 'delete'))
+      );
+    }
+
+    match /metas/{metaId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id) &&
+         hasPermission(resource.data.workspace_id, 'ahorros', 'read'))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id) &&
+         hasPermission(request.resource.data.workspace_id, 'ahorros', 'create') &&
+         request.resource.data.created_by == request.auth.uid)
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'ahorros', 'update'))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'ahorros', 'delete'))
+      );
+    }
+
+    // ============================================
+    // TARJETAS/CUENTAS (CARDS/ACCOUNTS)
+    // ============================================
+
+    match /tarjetas/{tarjetaId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id) &&
+         hasPermission(resource.data.workspace_id, 'tarjetas', 'read'))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id) &&
+         hasPermission(request.resource.data.workspace_id, 'tarjetas', 'create') &&
+         request.resource.data.created_by == request.auth.uid)
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'tarjetas', 'update'))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'tarjetas', 'delete'))
+      );
+    }
+
+    // ============================================
+    // GASTOS (EXPENSES)
+    // ============================================
+
+    match /gastos/{gastoId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id) &&
+         hasPermission(resource.data.workspace_id, 'gastos', 'read'))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id) &&
+         hasPermission(request.resource.data.workspace_id, 'gastos', 'create') &&
+         request.resource.data.created_by == request.auth.uid)
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'gastos', 'update'))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'gastos', 'delete'))
+      );
+    }
+
+    match /impuestos/{impuestoId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id) &&
+         hasPermission(resource.data.workspace_id, 'gastos', 'read'))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id) &&
+         hasPermission(request.resource.data.workspace_id, 'gastos', 'create') &&
+         request.resource.data.created_by == request.auth.uid)
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'gastos', 'update'))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'gastos', 'delete'))
+      );
+    }
+
+    // ============================================
+    // INGRESOS (INCOME)
+    // ============================================
+
+    match /ingresos/{ingresoId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id) &&
+         hasPermission(resource.data.workspace_id, 'ingresos', 'read'))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id) &&
+         hasPermission(request.resource.data.workspace_id, 'ingresos', 'create') &&
+         request.resource.data.created_by == request.auth.uid)
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'ingresos', 'update'))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         hasPermission(resource.data.workspace_id, 'ingresos', 'delete'))
+      );
+    }
+
+    // ============================================
+    // CONFIGURATION COLLECTIONS
+    // ============================================
+
+    match /categorias/{categoriaId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id))
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+    }
+
+    match /tags/{tagId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id))
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+    }
+
+    match /medios_pago/{medioPagoId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id))
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+    }
+
+    match /categorias_ingresos/{categoriaId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id))
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+    }
+
+    match /tags_ingresos/{tagId} {
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(request.resource.data.workspace_id))
+      );
+
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceMember(resource.data.workspace_id))
+      );
+    }
+  }
+}

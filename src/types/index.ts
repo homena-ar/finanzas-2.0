@@ -144,3 +144,44 @@ export interface DolarAPI {
   moneda: string
   fechaActualizacion: string
 }
+
+// ============================================
+// WORKSPACE TYPES
+// ============================================
+
+export type PermissionLevel = 'solo_lectura' | 'solo_propios' | 'ver_todo_agregar_propio' | 'admin'
+
+export type WorkspaceSection = 'gastos' | 'ingresos' | 'ahorros' | 'tarjetas'
+
+export interface WorkspacePermissions {
+  gastos: PermissionLevel
+  ingresos: PermissionLevel
+  ahorros: PermissionLevel
+  tarjetas: PermissionLevel
+}
+
+export interface Workspace {
+  id: string
+  name: string
+  owner_id: string
+  created_at: string
+}
+
+export interface WorkspaceMember {
+  id: string
+  workspace_id: string
+  user_id: string
+  user_email: string
+  permissions: WorkspacePermissions
+  created_at: string
+}
+
+export interface WorkspaceInvitation {
+  id: string
+  workspace_id: string
+  email: string
+  permissions: WorkspacePermissions
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
+  created_at: string
+  workspace?: Workspace
+}

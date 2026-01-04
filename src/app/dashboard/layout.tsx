@@ -5,19 +5,22 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, CreditCard, Wallet, TrendingUp,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { useData } from '@/hooks/useData'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, loading: workspaceLoading } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false)
   const [dolar, setDolar] = useState(0)
 
   // Build navigation items based on profile settings
@@ -46,6 +49,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .then(setDolar)
       .catch(err => console.error('Error al obtener cotización del dólar:', err))
   }, [])
+
+  // Close workspace dropdown when sidebar closes
+  useEffect(() => {
+    if (!sidebarOpen) {
+      setWorkspaceDropdownOpen(false)
+    }
+  }, [sidebarOpen])
 
   const handleSignOut = async () => {
     await signOut()
@@ -131,6 +141,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1">
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Workspace Selector */}
+        <div className="p-4 border-b border-slate-200">
+          <div className="relative">
+            <button
+              onClick={() => setWorkspaceDropdownOpen(!workspaceDropdownOpen)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between hover:bg-slate-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-600" />
+                <div className="text-left">
+                  <div className="text-xs text-slate-500">Workspace</div>
+                  <div className="text-sm font-medium text-slate-900 truncate max-w-[140px]">
+                    {currentWorkspace?.name || 'Personal'}
+                  </div>
+                </div>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${workspaceDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {workspaceDropdownOpen && workspaces.length > 0 && (
+              <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                {workspaces.map((workspace) => (
+                  <button
+                    key={workspace.id}
+                    onClick={() => {
+                      setCurrentWorkspace(workspace)
+                      setWorkspaceDropdownOpen(false)
+                    }}
+                    className={`
+                      w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
+                      ${currentWorkspace?.id === workspace.id ? 'bg-indigo-50' : ''}
+                    `}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-slate-600" />
+                      <span className="text-sm font-medium text-slate-900">{workspace.name}</span>
+                    </div>
+                    {currentWorkspace?.id === workspace.id && (
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Dolar Badge */}

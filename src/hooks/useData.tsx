@@ -12,10 +12,12 @@ import {
   doc,
   serverTimestamp,
   orderBy,
-  Timestamp
+  Timestamp,
+  or
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from './useAuth'
+import { useWorkspace } from './useWorkspace'
 import { MovimientoAhorro, Meta, Tarjeta, Gasto, Impuesto, Categoria, Tag, MedioPago, Ingreso, CategoriaIngreso, TagIngreso } from '@/types'
 
 type DataContextType = {
@@ -76,8 +78,9 @@ const DataContext = createContext<DataContextType | undefined>(undefined)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
+  const { currentWorkspace } = useWorkspace()
 
-  console.log('📊 [Firebase DataProvider] RENDER - authLoading:', authLoading, 'user:', user?.uid || 'NULL')
+  console.log('📊 [Firebase DataProvider] RENDER - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'PERSONAL')
 
   const [movimientos, setMovimientos] = useState<MovimientoAhorro[]>([])
   const [metas, setMetas] = useState<Meta[]>([])
@@ -114,6 +117,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fetchAll = useCallback(async () => {
     console.log('📊 [Firebase useData] fetchAll called')
     console.log('📊 [Firebase useData] Current user.uid:', user?.uid)
+    console.log('📊 [Firebase useData] Current workspace:', currentWorkspace?.id || 'PERSONAL')
 
     setLoading(true)
     try {
@@ -124,14 +128,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      console.log('📊 [Firebase useData] Fetching movimientos for user:', user.uid)
+      console.log('📊 [Firebase useData] Fetching data for workspace:', currentWorkspace?.name || 'Personal')
       const startTime = Date.now()
+
+      // Determine query filter based on workspace
+      const isWorkspaceMode = currentWorkspace !== null
+      const workspaceFilter = isWorkspaceMode
+        ? where('workspace_id', '==', currentWorkspace.id)
+        : where('user_id', '==', user.uid)
+
+      console.log('📊 [Firebase useData] Query mode:', isWorkspaceMode ? 'WORKSPACE' : 'PERSONAL')
 
       // Fetch movimientos
       const movimientosRef = collection(db, 'movimientos_ahorro')
       const movimientosQuery = query(
         movimientosRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const movimientosSnap = await getDocs(movimientosQuery)
@@ -165,7 +177,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const metasRef = collection(db, 'metas')
       const metasQuery = query(
         metasRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const metasSnap = await getDocs(metasQuery)
@@ -196,7 +208,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const tarjetasRef = collection(db, 'tarjetas')
       const tarjetasQuery = query(
         tarjetasRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const tarjetasSnap = await getDocs(tarjetasQuery)
@@ -222,7 +234,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const gastosRef = collection(db, 'gastos')
       const gastosQuery = query(
         gastosRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const gastosSnap = await getDocs(gastosQuery)
@@ -271,7 +283,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const impuestosRef = collection(db, 'impuestos')
       const impuestosQuery = query(
         impuestosRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const impuestosSnap = await getDocs(impuestosQuery)
@@ -296,7 +308,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const categoriasRef = collection(db, 'categorias')
       const categoriasQuery = query(
         categoriasRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const categoriasSnap = await getDocs(categoriasQuery)
@@ -333,11 +345,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
         const categoriasRef = collection(db, 'categorias')
         for (const categoria of defaultCategorias) {
-          await addDoc(categoriasRef, {
+          const docData: any = {
             ...categoria,
             user_id: user.uid,
             created_at: serverTimestamp()
-          })
+          }
+          if (isWorkspaceMode) {
+            docData.workspace_id = currentWorkspace.id
+            docData.created_by = user.uid
+          }
+          await addDoc(categoriasRef, docData)
         }
 
         console.log('✅ [Firebase useData] Default categories created - Fetching again')
@@ -365,7 +382,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const tagsRef = collection(db, 'tags')
       const tagsQuery = query(
         tagsRef,
-        where('user_id', '==', user.uid),
+        workspaceFilter,
         orderBy('created_at', 'desc')
       )
       const tagsSnap = await getDocs(tagsQuery)
@@ -389,7 +406,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const mediosPagoRef = collection(db, 'medios_pago')
         const mediosPagoQuery = query(
           mediosPagoRef,
-          where('user_id', '==', user.uid),
+          workspaceFilter,
           orderBy('created_at', 'desc')
         )
         const mediosPagoSnap = await getDocs(mediosPagoQuery)
@@ -420,7 +437,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const categoriasIngresosRef = collection(db, 'categorias_ingresos')
         const categoriasIngresosQuery = query(
           categoriasIngresosRef,
-          where('user_id', '==', user.uid),
+          workspaceFilter,
           orderBy('created_at', 'desc')
         )
         const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
@@ -455,11 +472,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
         const categoriasIngresosRef = collection(db, 'categorias_ingresos')
         for (const categoria of defaultCategoriasIngresos) {
-          await addDoc(categoriasIngresosRef, {
+          const docData: any = {
             ...categoria,
             user_id: user.uid,
             created_at: serverTimestamp()
-          })
+          }
+          if (isWorkspaceMode) {
+            docData.workspace_id = currentWorkspace.id
+            docData.created_by = user.uid
+          }
+          await addDoc(categoriasIngresosRef, docData)
         }
 
         console.log('✅ [Firebase useData] Default income categories created - Fetching again')
@@ -487,7 +509,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const tagsIngresosRef = collection(db, 'tags_ingresos')
         const tagsIngresosQuery = query(
           tagsIngresosRef,
-          where('user_id', '==', user.uid),
+          workspaceFilter,
           orderBy('created_at', 'desc')
         )
         const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
@@ -509,7 +531,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const ingresosRef = collection(db, 'ingresos')
         const ingresosQuery = query(
           ingresosRef,
-          where('user_id', '==', user.uid),
+          workspaceFilter,
           orderBy('created_at', 'desc')
         )
         const ingresosSnap = await getDocs(ingresosQuery)
@@ -556,7 +578,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('📊 [Firebase useData] Error fetching data:', error)
       setLoading(false)
     }
-  }, [user])
+  }, [user, currentWorkspace])
 
   useEffect(() => {
     console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL')
@@ -592,6 +614,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       insertData.descripcion = descripcion
     }
 
+    // Add workspace fields if in workspace mode
+    if (currentWorkspace) {
+      insertData.workspace_id = currentWorkspace.id
+      insertData.created_by = user.uid
+    }
+
     console.log('💵 [Firebase addMovimiento] Inserting:', insertData)
 
     try {
@@ -606,7 +634,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('💵 [Firebase addMovimiento] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateMovimiento = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -679,11 +707,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('🎯 [Firebase addMeta] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         completada: false,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const metasRef = collection(db, 'metas')
@@ -697,7 +731,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('🎯 [Firebase addMeta] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateMeta = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -752,10 +786,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('🏷️ [Firebase addTag] called', nombre)
 
     try {
-      const insertData = {
+      const insertData: any = {
         nombre,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const tagsRef = collection(db, 'tags')
@@ -769,7 +809,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('🏷️ [Firebase addTag] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const deleteTag = useCallback(async (id: string) => {
     if (!user) {
@@ -802,10 +842,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('📂 [Firebase addCategoria] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const categoriasRef = collection(db, 'categorias')
@@ -819,7 +865,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('📂 [Firebase addCategoria] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateCategoria = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -874,10 +920,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('💰 [Firebase addGasto] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const gastosRef = collection(db, 'gastos')
@@ -891,7 +943,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('💰 [Firebase addGasto] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateGasto = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -946,10 +998,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('💳 [Firebase addTarjeta] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const tarjetasRef = collection(db, 'tarjetas')
@@ -963,7 +1021,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('💳 [Firebase addTarjeta] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateTarjeta = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -1018,10 +1076,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('🧾 [Firebase addImpuesto] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const impuestosRef = collection(db, 'impuestos')
@@ -1035,7 +1099,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('🧾 [Firebase addImpuesto] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateImpuesto = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -1090,10 +1154,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('💳 [Firebase addMedioPago] called', nombre)
 
     try {
-      const insertData = {
+      const insertData: any = {
         nombre,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const mediosPagoRef = collection(db, 'medios_pago')
@@ -1107,7 +1177,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('💳 [Firebase addMedioPago] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const deleteMedioPago = useCallback(async (id: string) => {
     if (!user) {
@@ -1140,10 +1210,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('💵 [Firebase addIngreso] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const ingresosRef = collection(db, 'ingresos')
@@ -1157,7 +1233,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('💵 [Firebase addIngreso] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateIngreso = useCallback(async (id: string, data: any) => {
     if (!user) {
@@ -1212,10 +1288,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('🏷️ [Firebase addTagIngreso] called', nombre)
 
     try {
-      const insertData = {
+      const insertData: any = {
         nombre,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const tagsIngresosRef = collection(db, 'tags_ingresos')
@@ -1229,7 +1311,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('🏷️ [Firebase addTagIngreso] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const deleteTagIngreso = useCallback(async (id: string) => {
     if (!user) {
@@ -1262,10 +1344,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('📂 [Firebase addCategoriaIngreso] called', data)
 
     try {
-      const insertData = {
+      const insertData: any = {
         ...data,
         user_id: user.uid,
         created_at: serverTimestamp()
+      }
+
+      // Add workspace fields if in workspace mode
+      if (currentWorkspace) {
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid
       }
 
       const categoriasIngresosRef = collection(db, 'categorias_ingresos')
@@ -1279,7 +1367,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('📂 [Firebase addCategoriaIngreso] ERROR:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, currentWorkspace, fetchAll])
 
   const updateCategoriaIngreso = useCallback(async (id: string, data: any) => {
     if (!user) {
