@@ -22,9 +22,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Build navigation items based on profile settings
   const navItems = [
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
     { href: '/dashboard/gastos', icon: ArrowDownCircle, label: 'Gastos' },
     ...(profile?.ingresos_habilitado ? [{ href: '/dashboard/ingresos', icon: ArrowUpCircle, label: 'Ingresos' }] : []),
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
     { href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' },
     { href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' },
     { href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' },

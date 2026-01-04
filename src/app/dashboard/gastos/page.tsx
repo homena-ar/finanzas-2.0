@@ -260,7 +260,12 @@ export default function GastosPage() {
       // Guardar en Firebase si no existe
       const exists = mediosPago.some(m => m.nombre === medioPagoFinal)
       if (!exists) {
-        await addMedioPago(medioPagoFinal)
+        const { error } = await addMedioPago(medioPagoFinal)
+        if (error) {
+          console.error('Error al guardar medio de pago:', error)
+          // Continuar de todas formas para que se guarde en el gasto
+          console.log('⚠️ Medio de pago no se guardó en la lista global, pero se usará para este gasto')
+        }
       }
     }
 
