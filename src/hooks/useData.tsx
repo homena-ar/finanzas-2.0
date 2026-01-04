@@ -161,6 +161,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           progreso: data.progreso,
           moneda: data.moneda,
           completada: data.completada || false,
+          fecha_limite: data.fecha_limite || null,
           created_at: data.created_at instanceof Timestamp
             ? data.created_at.toDate().toISOString()
             : data.created_at
@@ -168,6 +169,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }) as Meta[]
 
       console.log('📊 [Firebase useData] Metas result:', metasData.length, 'rows')
+      if (metasData.length > 0) {
+        console.log('📊 [Firebase useData] Primera meta con fecha_limite:', metasData[0].fecha_limite)
+      }
 
       // Fetch tarjetas
       const tarjetasRef = collection(db, 'tarjetas')
@@ -220,6 +224,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           es_fijo: data.es_fijo,
           tag_ids: data.tag_ids || [],
           pagado: data.pagado || false,
+          // Campos de pago
+          fecha_pago: data.fecha_pago || null,
+          medio_pago: data.medio_pago || null,
+          comprobante_url: data.comprobante_url || null,
+          comprobante_nombre: data.comprobante_nombre || null,
           created_at: data.created_at instanceof Timestamp
             ? data.created_at.toDate().toISOString()
             : data.created_at
@@ -227,6 +236,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }) as Gasto[]
 
       console.log('📊 [Firebase useData] Gastos result:', gastosData.length, 'rows')
+      const gastosPagadosConInfo = gastosData.filter(g => g.pagado && (g.fecha_pago || g.medio_pago || g.comprobante_url))
+      if (gastosPagadosConInfo.length > 0) {
+        console.log('📊 [Firebase useData] Gastos pagados con info:', gastosPagadosConInfo.length)
+        console.log('📊 [Firebase useData] Primer gasto pagado:', {
+          id: gastosPagadosConInfo[0].id,
+          descripcion: gastosPagadosConInfo[0].descripcion,
+          fecha_pago: gastosPagadosConInfo[0].fecha_pago,
+          medio_pago: gastosPagadosConInfo[0].medio_pago,
+          tiene_comprobante: !!gastosPagadosConInfo[0].comprobante_url
+        })
+      }
 
       // Fetch impuestos
       const impuestosRef = collection(db, 'impuestos')
