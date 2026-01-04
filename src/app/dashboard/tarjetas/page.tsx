@@ -53,7 +53,7 @@ export default function TarjetasPage() {
     if (!form.nombre) {
       setAlertData({
         title: 'Campo requerido',
-        message: 'El nombre de la tarjeta es requerido',
+        message: 'El nombre de la cuenta es requerido',
         variant: 'warning'
       })
       setShowAlert(true)
@@ -108,7 +108,7 @@ export default function TarjetasPage() {
       console.error('Exception:', err)
       setAlertData({
         title: 'Error inesperado',
-        message: 'Ocurrió un error al guardar la tarjeta',
+        message: 'Ocurrió un error al guardar la cuenta',
         variant: 'error'
       })
       setShowAlert(true)
@@ -154,11 +154,11 @@ export default function TarjetasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Tarjetas</h1>
-          <p className="text-slate-500">Administrá tus tarjetas ({tarjetas.length})</p>
+          <h1 className="text-2xl font-bold">Cuentas</h1>
+          <p className="text-slate-500">Administrá tus cuentas y tarjetas ({tarjetas.length})</p>
         </div>
         <button onClick={() => { resetForm(); setEditing(null); setShowModal(true) }} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> Nueva Tarjeta
+          <Plus className="w-4 h-4" /> Nueva Cuenta
         </button>
       </div>
 
@@ -167,9 +167,9 @@ export default function TarjetasPage() {
         {tarjetas.length === 0 ? (
           <div className="col-span-full card p-12 text-center">
             <CreditCard className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-            <p className="text-slate-500 mb-4">No tenés tarjetas configuradas</p>
+            <p className="text-slate-500 mb-4">No tenés cuentas o tarjetas configuradas</p>
             <button onClick={() => { resetForm(); setEditing(null); setShowModal(true) }} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> Agregar primera tarjeta
+              <Plus className="w-4 h-4" /> Agregar primera cuenta
             </button>
           </div>
         ) : tarjetas.map(t => (
@@ -202,7 +202,7 @@ export default function TarjetasPage() {
                   openEdit(t)
                 }}
                 className="px-3 py-2 bg-white/20 backdrop-blur rounded-lg flex items-center gap-1 hover:bg-white/30 transition"
-                title="Editar tarjeta"
+                title="Editar cuenta"
               >
                 <Edit2 className="w-4 h-4" />
                 <span className="text-xs font-medium hidden sm:inline">Editar</span>
@@ -213,7 +213,7 @@ export default function TarjetasPage() {
                   handleDelete(t.id)
                 }}
                 className="px-3 py-2 bg-white/20 backdrop-blur rounded-lg flex items-center gap-1 hover:bg-white/30 transition"
-                title="Eliminar tarjeta"
+                title="Eliminar cuenta"
               >
                 <Trash2 className="w-4 h-4" />
                 <span className="text-xs font-medium hidden sm:inline">Borrar</span>
@@ -254,7 +254,7 @@ export default function TarjetasPage() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-lg">{editing ? 'Editar' : 'Nueva'} Tarjeta</h3>
+              <h3 className="font-bold text-lg">{editing ? 'Editar' : 'Nueva'} Cuenta</h3>
               <button onClick={() => setShowModal(false)} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
@@ -265,7 +265,7 @@ export default function TarjetasPage() {
                 <input
                   type="text"
                   className="input"
-                  placeholder="Ej: Visa Gold BBVA"
+                  placeholder="Ej: Visa Gold BBVA, Cuenta Banco, Mercado Pago"
                   value={form.nombre}
                   onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                 />
@@ -322,10 +322,10 @@ export default function TarjetasPage() {
               </div>
               
               {/* Preview */}
-              <div 
+              <div
                 className="rounded-xl p-4 text-white text-sm"
                 style={{
-                  background: form.tipo === 'visa' 
+                  background: form.tipo === 'visa'
                     ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)'
                     : form.tipo === 'mastercard'
                       ? 'linear-gradient(135deg, #991b1b 0%, #ef4444 100%)'
@@ -335,7 +335,7 @@ export default function TarjetasPage() {
                 }}
               >
                 <div className="text-xs opacity-70 mb-1">Vista previa</div>
-                <div className="font-bold">{form.nombre || 'Nombre de tarjeta'}</div>
+                <div className="font-bold">{form.nombre || 'Nombre de cuenta'}</div>
                 <div className="font-mono text-xs opacity-70">•••• {form.digitos || '****'}</div>
               </div>
               
@@ -359,8 +359,8 @@ export default function TarjetasPage() {
           setDeleteTargetId(null)
         }}
         onConfirm={confirmDelete}
-        title="¿Eliminar tarjeta?"
-        message="Los gastos asociados a esta tarjeta quedarán sin tarjeta (Efectivo)."
+        title="¿Eliminar cuenta?"
+        message="Los gastos asociados a esta cuenta quedarán como Efectivo."
         confirmText="Eliminar"
         cancelText="Cancelar"
         variant="danger"

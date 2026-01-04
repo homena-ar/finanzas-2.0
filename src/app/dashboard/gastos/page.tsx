@@ -16,7 +16,7 @@ export default function GastosPage() {
     currentMonth, monthKey, getGastosMes, getImpuestosMes,
     addGasto, updateGasto, deleteGasto,
     addImpuesto, updateImpuesto, deleteImpuesto,
-    addTag, addCategoria
+    addTag, addCategoria, addTarjeta
   } = useData()
 
   console.log('🔵🔵🔵 [GastosPage] addGasto function reference:', addGasto)
@@ -36,7 +36,15 @@ export default function GastosPage() {
   const [pagoForm, setPagoForm] = useState({
     fecha_pago: new Date().toISOString().split('T')[0],
     medio_pago: '',
-    comprobante: null as File | null
+    comprobante: null as File | null,
+    medio_pago_custom: '' // Para cuando selecciona "Otro"
+  })
+  const [showNewTarjetaInput, setShowNewTarjetaInput] = useState(false)
+  const [newTarjeta, setNewTarjeta] = useState({
+    nombre: '',
+    tipo: 'visa' as 'visa' | 'mastercard' | 'amex' | 'other',
+    banco: '',
+    digitos: ''
   })
 
   // Apply filter from URL query params
@@ -206,16 +214,20 @@ export default function GastosPage() {
       setPagoForm({
         fecha_pago: new Date().toISOString().split('T')[0],
         medio_pago: '',
-        comprobante: null
+        comprobante: null,
+        medio_pago_custom: ''
       })
       setShowPagoModal(true)
     } else {
       // Si ya está pagado, abrir modal con datos existentes para ver/editar
       setGastoToMarkPaid(g)
+      const mediosPredefinidos = ['efectivo', 'transferencia', 'debito', 'credito', 'mercadopago']
+      const isCustom = g.medio_pago && !mediosPredefinidos.includes(g.medio_pago)
       setPagoForm({
         fecha_pago: g.fecha_pago || new Date().toISOString().split('T')[0],
-        medio_pago: g.medio_pago || '',
-        comprobante: null // No podemos pre-cargar el archivo
+        medio_pago: isCustom ? 'otro' : (g.medio_pago || ''),
+        comprobante: null, // No podemos pre-cargar el archivo
+        medio_pago_custom: isCustom ? g.medio_pago || '' : ''
       })
       setShowPagoModal(true)
     }
@@ -237,10 +249,15 @@ export default function GastosPage() {
       })
     }
 
+    // Determinar el medio de pago a guardar
+    const medioPagoFinal = pagoForm.medio_pago === 'otro'
+      ? pagoForm.medio_pago_custom.trim() || null
+      : pagoForm.medio_pago || null
+
     await updateGasto(gastoToMarkPaid.id, {
       pagado: true,
       fecha_pago: pagoForm.fecha_pago,
-      medio_pago: pagoForm.medio_pago || null,
+      medio_pago: medioPagoFinal,
       comprobante_url: comprobanteUrl,
       comprobante_nombre: comprobanteNombre
     })
@@ -250,7 +267,8 @@ export default function GastosPage() {
     setPagoForm({
       fecha_pago: new Date().toISOString().split('T')[0],
       medio_pago: '',
-      comprobante: null
+      comprobante: null,
+      medio_pago_custom: ''
     })
   }
 
@@ -270,6 +288,21 @@ export default function GastosPage() {
     })
     setNewCategoria({ nombre: '', icono: '💰' })
     setShowNewCategoriaInput(false)
+  }
+
+  const handleAddNewTarjeta = async () => {
+    if (!newTarjeta.nombre.trim()) return
+    await addTarjeta({
+      nombre: newTarjeta.nombre.trim(),
+      tipo: newTarjeta.tipo,
+      banco: newTarjeta.banco || null,
+      digitos: newTarjeta.digitos || null,
+      cierre: null
+    })
+
+    // La nueva tarjeta estará disponible después de fetchAll que se llama automáticamente
+    setNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setShowNewTarjetaInput(false)
   }
 
   const downloadComprobante = (gasto: Gasto) => {
@@ -332,7 +365,7 @@ export default function GastosPage() {
             value={filters.tarjeta}
             onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
           >
-            <option value="">Tarjeta</option>
+            <option value="">Cuenta</option>
             {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
           </select>
           <select
@@ -369,7 +402,7 @@ export default function GastosPage() {
             <thead>
               <tr className="bg-slate-50">
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Descripción</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Tarjeta</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Monto</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuotas</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Fijo</th>
@@ -463,29 +496,35 @@ export default function GastosPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => togglePagado(g)}
-                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                            g.pagado
-                              ? 'bg-emerald-500 border-emerald-500'
-                              : 'bg-white border-slate-300 hover:border-emerald-400'
-                          }`}
-                          title={g.pagado && g.fecha_pago ? `Pagado el ${new Date(g.fecha_pago).toLocaleDateString()}` : 'Marcar como pagado'}
-                        >
-                          {g.pagado && (
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
-                        {g.pagado && g.comprobante_url && (
+                        {!g.pagado ? (
                           <button
-                            onClick={() => downloadComprobante(g)}
-                            className="p-1 hover:bg-indigo-50 rounded text-indigo-600"
-                            title="Descargar comprobante"
+                            onClick={() => togglePagado(g)}
+                            className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
                           >
-                            <Download className="w-4 h-4" />
+                            💰 Registrar Pago
                           </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => togglePagado(g)}
+                              className="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1"
+                              title={g.fecha_pago ? `Pagado el ${new Date(g.fecha_pago).toLocaleDateString()}` : 'Ver detalles de pago'}
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Ver Pago
+                            </button>
+                            {g.comprobante_url && (
+                              <button
+                                onClick={() => downloadComprobante(g)}
+                                className="p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-600 border border-indigo-200"
+                                title="Descargar comprobante"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -525,7 +564,7 @@ export default function GastosPage() {
             <thead>
               <tr className="bg-slate-50">
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Concepto</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Tarjeta</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Monto</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase"></th>
               </tr>
@@ -602,17 +641,6 @@ export default function GastosPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Tarjeta</label>
-                  <select
-                    className="input"
-                    value={gastoForm.tarjeta_id}
-                    onChange={e => setGastoForm(f => ({ ...f, tarjeta_id: e.target.value }))}
-                  >
-                    <option value="">💵 Efectivo</option>
-                    {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
                   <label className="label">Moneda</label>
                   <select
                     className="input"
@@ -623,6 +651,83 @@ export default function GastosPage() {
                     <option value="USD">USD</option>
                   </select>
                 </div>
+                <div></div> {/* Espacio vacío */}
+              </div>
+
+              {/* Cuenta/Tarjeta - Fuera del grid para que se vea bien */}
+              <div>
+                <label className="label">Cuenta/Tarjeta</label>
+                {!showNewTarjetaInput ? (
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={gastoForm.tarjeta_id}
+                      onChange={e => setGastoForm(f => ({ ...f, tarjeta_id: e.target.value }))}
+                    >
+                      <option value="">💵 Efectivo</option>
+                      {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewTarjetaInput(true)}
+                      className="w-full px-3 py-2 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-bold hover:bg-purple-100 transition"
+                    >
+                      + Crear nueva cuenta/tarjeta
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-300 shadow-sm">
+                    <div className="text-sm font-bold text-purple-900">💳 Nueva Cuenta/Tarjeta</div>
+                    <div>
+                      <input
+                        type="text"
+                        className="input w-full text-base mb-2"
+                        placeholder="Nombre (Ej: Visa BBVA, Cuenta Banco, Mercado Pago...)"
+                        value={newTarjeta.nombre}
+                        onChange={e => setNewTarjeta(t => ({ ...t, nombre: e.target.value }))}
+                        autoFocus
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          className="input text-sm"
+                          value={newTarjeta.tipo}
+                          onChange={e => setNewTarjeta(t => ({ ...t, tipo: e.target.value as any }))}
+                        >
+                          <option value="visa">💳 Visa</option>
+                          <option value="mastercard">💳 Mastercard</option>
+                          <option value="amex">💳 Amex</option>
+                          <option value="other">🏦 Otra/Cuenta</option>
+                        </select>
+                        <input
+                          type="text"
+                          className="input text-sm"
+                          placeholder="Banco (opcional)"
+                          value={newTarjeta.banco}
+                          onChange={e => setNewTarjeta(t => ({ ...t, banco: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddNewTarjeta}
+                        className="flex-1 px-4 py-2.5 bg-purple-500 text-white rounded-lg text-sm font-bold hover:bg-purple-600 transition shadow-sm"
+                      >
+                        ✓ Crear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewTarjetaInput(false)
+                          setNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+                        }}
+                        className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -855,7 +960,7 @@ export default function GastosPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Tarjeta</label>
+                  <label className="label">Cuenta</label>
                   <select
                     className="input"
                     value={impForm.tarjeta_id}
@@ -936,24 +1041,51 @@ export default function GastosPage() {
                   <option value="debito">💳 Débito</option>
                   <option value="credito">💳 Crédito</option>
                   <option value="mercadopago">📱 Mercado Pago</option>
-                  <option value="otro">Otro</option>
+                  <option value="otro">✏️ Otro (personalizado)</option>
                 </select>
+                {pagoForm.medio_pago === 'otro' && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Escribí el nombre del medio de pago..."
+                      value={pagoForm.medio_pago_custom}
+                      onChange={e => setPagoForm(f => ({ ...f, medio_pago_custom: e.target.value }))}
+                      autoFocus
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Por ejemplo: PayPal, Uala, Brubank, etc.</p>
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="label">Comprobante (opcional)</label>
                 {gastoToMarkPaid.pagado && gastoToMarkPaid.comprobante_url && !pagoForm.comprobante && (
-                  <div className="mb-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
-                    <div className="text-sm text-emerald-800">
-                      📎 {gastoToMarkPaid.comprobante_nombre || 'Comprobante guardado'}
+                  <div className="mb-3 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-xl shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-bold text-emerald-900 mb-1 flex items-center gap-2">
+                          📎 {gastoToMarkPaid.comprobante_nombre || 'Comprobante guardado'}
+                        </div>
+                        {gastoToMarkPaid.fecha_pago && (
+                          <div className="text-xs text-emerald-700">
+                            Subido el {new Date(gastoToMarkPaid.fecha_pago).toLocaleDateString('es-AR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => downloadComprobante(gastoToMarkPaid)}
+                        className="px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Descargar
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => downloadComprobante(gastoToMarkPaid)}
-                      className="px-3 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
-                    >
-                      Descargar
-                    </button>
                   </div>
                 )}
                 <input
@@ -963,12 +1095,12 @@ export default function GastosPage() {
                   onChange={e => setPagoForm(f => ({ ...f, comprobante: e.target.files?.[0] || null }))}
                 />
                 {pagoForm.comprobante && (
-                  <div className="mt-2 text-sm text-emerald-600">
+                  <div className="mt-2 text-sm text-emerald-600 font-semibold">
                     ✓ {pagoForm.comprobante.name}
                   </div>
                 )}
                 {gastoToMarkPaid.comprobante_url && pagoForm.comprobante && (
-                  <div className="mt-1 text-xs text-orange-600">
+                  <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
                     ⚠️ Esto reemplazará el comprobante actual
                   </div>
                 )}
