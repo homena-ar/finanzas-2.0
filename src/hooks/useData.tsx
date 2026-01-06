@@ -119,6 +119,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     console.log('📊 [Firebase useData] Current user.uid:', user?.uid)
     console.log('📊 [Firebase useData] Current workspace:', currentWorkspace?.id || 'PERSONAL')
 
+    // 🟢 AGREGAR ESTE BLOQUE DE LIMPIEZA
+    // Esto borra la pantalla antes de intentar cargar datos nuevos
+    setMovimientos([])
+    setMetas([])
+    setTarjetas([])
+    setGastos([])
+    setImpuestos([])
+    setCategorias([])
+    setTags([])
+    setIngresos([])
+    setCategoriasIngresos([])
+    setTagsIngresos([])
+    setMediosPago([])
+    // ----------------------------------
+
     setLoading(true)
     try {
       if (!user) {
