@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase'
 import {
   collection,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -389,8 +390,11 @@ Para aceptar la invitación:
       }
 
       // Create workspace member
-      const membersRef = collection(db, 'workspace_members')
-      await addDoc(membersRef, {
+      // Usamos un ID compuesto para cumplir con las reglas de seguridad
+      const memberId = `${invitation.workspace_id}_${user.uid}`
+      const memberRef = doc(db, 'workspace_members', memberId)
+      
+      await setDoc(memberRef, {
         workspace_id: invitation.workspace_id,
         user_id: user.uid,
         user_email: user.email,
