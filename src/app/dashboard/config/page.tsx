@@ -36,6 +36,9 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false)
   const [savingIngresos, setSavingIngresos] = useState(false)
 
+  // Nombre Espacio Personal
+  const [personalName, setPersonalName] = useState('')
+
   // Modal states
   const [showAlert, setShowAlert] = useState(false)
   const [alertData, setAlertData] = useState({ title: '', message: '', variant: 'success' as 'success' | 'error' | 'warning' | 'info' })
@@ -73,6 +76,7 @@ export default function ConfigPage() {
       setBudgetArs(profile.budget_ars ? String(profile.budget_ars) : '')
       setBudgetUsd(profile.budget_usd ? String(profile.budget_usd) : '')
       setIngresosEnabled(profile.ingresos_habilitado || false)
+      setPersonalName(profile.personal_workspace_name || '')
     }
   }, [profile])
 
@@ -88,6 +92,19 @@ export default function ConfigPage() {
       message: ingresosEnabled
         ? 'Ahora podés registrar tus ingresos en la sección correspondiente'
         : 'La sección de ingresos se ocultó del menú',
+      variant: 'success'
+    })
+    setShowAlert(true)
+  }
+
+  const handleSavePersonalName = async () => {
+    if (!personalName.trim()) return
+    setSaving(true)
+    await updateProfile({ personal_workspace_name: personalName })
+    setSaving(false)
+    setAlertData({
+      title: 'Nombre actualizado',
+      message: 'Tu espacio personal ha sido renombrado.',
       variant: 'success'
     })
     setShowAlert(true)
@@ -416,6 +433,23 @@ export default function ConfigPage() {
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="text-slate-500">Personalizá tu experiencia</p>
+      </div>
+
+      {/* Sección Nombre de Espacio Personal */}
+      <div className="card p-5">
+        <h3 className="font-bold mb-4">🏠 Espacio Personal</h3>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="input flex-1"
+            placeholder="Ej: Mis Finanzas, Casa, etc."
+            value={personalName}
+            onChange={e => setPersonalName(e.target.value)}
+          />
+          <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary">
+            <Edit2 className="w-4 h-4" /> Renombrar
+          </button>
+        </div>
       </div>
 
       {/* Sección de Workspaces */}
@@ -827,7 +861,6 @@ export default function ConfigPage() {
       {showCategoriaModal && (
         <div className="modal-overlay" onClick={() => setShowCategoriaModal(false)}>
           <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>
-            {/* ... (Contenido del modal de categoría sin cambios) ... */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">
                 {editingCategoria ? 'Editar Categoría' : 'Nueva Categoría'}
@@ -896,6 +929,7 @@ export default function ConfigPage() {
                 </div>
               </div>
 
+              {/* Preview */}
               <div className="bg-slate-50 rounded-xl p-4">
                 <div className="text-xs text-slate-500 mb-2">Vista previa:</div>
                 <div className="flex items-center gap-3">
@@ -960,7 +994,7 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {/* Modal Invitar Usuario - ACTUALIZADO */}
+      {/* Modal Invitar Usuario */}
       {showInviteModal && (
         <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
           <div className="modal max-w-md w-full" onClick={e => e.stopPropagation()}>
