@@ -17,31 +17,37 @@ import type { WorkspacePermissions } from '@/types'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
-  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading } = useWorkspace()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, members } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false)
   const [dolar, setDolar] = useState(0)
 
-  // Verificar Permisos
-  const getCurrentPermissions = () => {
-    if (!currentWorkspace) return null // Modo Personal = Acceso total implícito
-    const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
-    return member?.permissions
-  }
-
-  const permissions = getCurrentPermissions()
-
+  // --- LÓGICA DE PERMISOS MEJORADA ---
   const hasAccess = (section: keyof WorkspacePermissions) => {
-    if (!currentWorkspace) return true // Personal tiene acceso a todo
-    if (!permissions) return false // Si está cargando o error, denegar por defecto
-    return permissions[section] !== 'ninguno'
+    // 1. Espacio Personal: Siempre acceso total
+    if (!currentWorkspace) return true
+    
+    // 2. Dueño del Workspace: Siempre acceso total (Failsafe anti-bloqueo)
+    if (currentWorkspace.owner_id === user?.uid) return true
+
+    // 3. Colaborador: Verificar permisos en la lista de miembros
+    const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
+    
+    // Si aún no cargaron los miembros, asumimos 'false' temporalmente para proteger, 
+    // pero idealmente deberíamos mostrar un "Cargando..." si es crítico.
+    if (!member) return false 
+
+    return member.permissions[section] !== 'ninguno'
   }
 
-  // Build navigation items based on profile settings AND workspace permissions
+  // Nombre del espacio personal (desde perfil o default)
+  const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
+
+  // Build navigation items based on permissions
   const navItems = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' }, // Resumen siempre visible
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' }, // Siempre visible
     
     ...(hasAccess('gastos') ? [{ href: '/dashboard/gastos', icon: ArrowDownCircle, label: 'Gastos' }] : []),
     
@@ -49,7 +55,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     
     ...(hasAccess('tarjetas') ? [{ href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' }] : []),
     
-    // La proyección suele depender de gastos, así que usamos ese permiso
     ...(hasAccess('gastos') ? [{ href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' }] : []),
     
     ...(hasAccess('ahorros') ? [{ href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' }] : []),
@@ -57,7 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/config', icon: Settings, label: 'Config' },
   ]
 
-  console.log('🏠 [DashboardLayout] Render - loading:', loading, 'user:', user ? 'EXISTS' : 'NULL')
+  console.log('🏠 [DashboardLayout] Render - user:', user?.uid)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -169,26 +174,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 currentWorkspace ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 overflow-hidden">
                 {currentWorkspace ? (
                   currentWorkspace.owner_id === user.uid ? (
-                    <Shield className="w-4 h-4 text-indigo-600" />
+                    <Shield className="w-4 h-4 text-indigo-600 shrink-0" />
                   ) : (
-                    <UserCheck className="w-4 h-4 text-purple-600" />
+                    <UserCheck className="w-4 h-4 text-purple-600 shrink-0" />
                   )
                 ) : (
-                  <Building2 className="w-4 h-4 text-slate-600" />
+                  <Building2 className="w-4 h-4 text-slate-600 shrink-0" />
                 )}
-                <div className="text-left">
+                <div className="text-left overflow-hidden">
                   <div className="text-[10px] uppercase font-bold text-slate-500">
                     {currentWorkspace ? (currentWorkspace.owner_id === user.uid ? 'Propietario' : 'Colaborador') : 'Espacio Personal'}
                   </div>
-                  <div className="text-sm font-medium text-slate-900 truncate max-w-[140px]">
-                    {currentWorkspace?.name || 'Mis Finanzas'}
+                  <div className="text-sm font-medium text-slate-900 truncate">
+                    {currentWorkspace?.name || personalWorkspaceName}
                   </div>
                 </div>
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${workspaceDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${workspaceDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Menu */}
@@ -210,8 +215,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <Building2 className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-slate-900">Personal</div>
-                      <div className="text-[10px] text-slate-500">Mis finanzas</div>
+                      <div className="text-sm font-medium text-slate-900">{personalWorkspaceName}</div>
+                      <div className="text-[10px] text-slate-500">Privado</div>
                     </div>
                   </div>
                   {currentWorkspace === null && (
@@ -236,21 +241,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         ${currentWorkspace?.id === workspace.id ? (isOwner ? 'bg-indigo-50' : 'bg-purple-50') : ''}
                       `}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
                           isOwner ? 'bg-indigo-500' : 'bg-purple-500'
                         }`}>
                           {workspace.name.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-slate-900 truncate max-w-[120px]">{workspace.name}</div>
+                        <div className="overflow-hidden">
+                          <div className="text-sm font-medium text-slate-900 truncate">{workspace.name}</div>
                           <div className={`text-[10px] font-bold uppercase ${isOwner ? 'text-indigo-600' : 'text-purple-600'}`}>
                             {isOwner ? 'Propietario' : 'Colaborador'}
                           </div>
                         </div>
                       </div>
                       {currentWorkspace?.id === workspace.id && (
-                        <div className={`w-2 h-2 rounded-full ${isOwner ? 'bg-indigo-600' : 'bg-purple-600'}`} />
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${isOwner ? 'bg-indigo-600' : 'bg-purple-600'}`} />
                       )}
                     </button>
                   )
