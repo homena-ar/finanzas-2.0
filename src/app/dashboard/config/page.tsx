@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { formatMoney, getMonthName } from '@/lib/utils'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2 } from 'lucide-react' // <--- Agregamos Trash2
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck } from 'lucide-react'
 import { AlertModal } from '@/components/Modal'
 import type { WorkspacePermissions } from '@/types'
 
@@ -14,14 +13,12 @@ export default function ConfigPage() {
   const {
     tags, addTag, deleteTag,
     categorias, addCategoria, updateCategoria, deleteCategoria,
-    gastos, addGasto, currentMonth
   } = useData()
   const {
     workspaces,
-    currentWorkspace,
     createWorkspace,
     updateWorkspace,
-    deleteWorkspace, // <--- Nos aseguramos de usar esto
+    deleteWorkspace,
     inviteUser,
     members,
     invitations,
@@ -51,9 +48,18 @@ export default function ConfigPage() {
   // Workspace modal states
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
   const [workspaceName, setWorkspaceName] = useState('')
+  
+  // Invite modal states
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteWorkspaceId, setInviteWorkspaceId] = useState('')
+  const [invitePermissions, setInvitePermissions] = useState<WorkspacePermissions>({
+    gastos: 'solo_lectura',
+    ingresos: 'solo_lectura',
+    ahorros: 'solo_lectura',
+    tarjetas: 'solo_lectura'
+  })
+
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
@@ -96,7 +102,6 @@ export default function ConfigPage() {
         budget_usd: parseFloat(budgetUsd) || 0
       })
     } else {
-      // Desactivar presupuesto
       await updateProfile({
         budget_ars: 0,
         budget_usd: 0
@@ -173,7 +178,6 @@ export default function ConfigPage() {
       return
     }
 
-    // CORREGIDO: Límite de 2 espacios propios (Personal + 2 = 3 contextos totales)
     const myWorkspacesCount = workspaces.filter(w => w.owner_id === user?.uid).length
     if (myWorkspacesCount >= 2) {
       setAlertData({
@@ -206,7 +210,6 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
-  // NUEVA FUNCIÓN: ELIMINAR WORKSPACE
   const handleDeleteWorkspace = async (id: string, name: string) => {
     if (confirm(`¿Estás seguro de eliminar el espacio "${name}"? ESTA ACCIÓN BORRARÁ TODOS LOS DATOS ASOCIADOS y no se puede deshacer.`)) {
       const result = await deleteWorkspace(id)
@@ -248,15 +251,7 @@ export default function ConfigPage() {
       return
     }
 
-    // Default permissions: ninguno para todo
-    const defaultPermissions: WorkspacePermissions = {
-      gastos: 'ninguno',
-      ingresos: 'ninguno',
-      ahorros: 'ninguno',
-      tarjetas: 'ninguno'
-    }
-
-    const result = await inviteUser(inviteWorkspaceId, inviteEmail, defaultPermissions)
+    const result = await inviteUser(inviteWorkspaceId, inviteEmail, invitePermissions)
 
     if (result.error) {
       setAlertData({
@@ -267,10 +262,17 @@ export default function ConfigPage() {
     } else {
       setAlertData({
         title: '¡Invitación enviada!',
-        message: `Se envió una invitación a ${inviteEmail}`,
+        message: `Se envió una invitación a ${inviteEmail} con los permisos seleccionados.`,
         variant: 'success'
       })
       setInviteEmail('')
+      // Reset permissions to default
+      setInvitePermissions({
+        gastos: 'solo_lectura',
+        ingresos: 'solo_lectura',
+        ahorros: 'solo_lectura',
+        tarjetas: 'solo_lectura'
+      })
       setShowInviteModal(false)
     }
 
@@ -400,6 +402,15 @@ export default function ConfigPage() {
 
   const commonIcons = ['🍔', '🏠', '🚗', '🎮', '👕', '💊', '📚', '✈️', '🎬', '🏋️', '🐕', '💰', '🔧', '📱', '💡']
 
+  // Permisos disponibles para el selector
+  const permissionOptions = [
+    { value: 'ninguno', label: 'Sin Acceso' },
+    { value: 'solo_lectura', label: 'Solo Lectura' },
+    { value: 'solo_propios', label: 'Solo sus datos' },
+    { value: 'ver_todo_agregar_propio', label: 'Ver todo + Agregar' },
+    { value: 'admin', label: 'Administrador Total' },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
@@ -418,7 +429,6 @@ export default function ConfigPage() {
           </div>
           <button
             onClick={() => setShowWorkspaceModal(true)}
-            // Deshabilitar si ya tiene 2 o más propios
             disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 2}
             className="btn btn-primary"
           >
@@ -435,7 +445,7 @@ export default function ConfigPage() {
               const workspaceMembers = members.filter(m => m.workspace_id === ws.id)
 
               return (
-                <div key={ws.id} className="bg-slate-50 rounded-xl p-4">
+                <div key={ws.id} className={`rounded-xl p-4 border ${isOwner ? 'bg-slate-50 border-slate-200' : 'bg-indigo-50 border-indigo-200'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       {editingWorkspaceId === ws.id ? (
@@ -459,8 +469,20 @@ export default function ConfigPage() {
                         <>
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold">{ws.name}</h4>
+                            
+                            {/* ETIQUETA DE ROL */}
+                            {isOwner ? (
+                              <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <Shield className="w-3 h-3" /> PROPIETARIO
+                              </span>
+                            ) : (
+                              <span className="bg-indigo-200 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <UserCheck className="w-3 h-3" /> COLABORADOR
+                              </span>
+                            )}
+
                             {isOwner && (
-                              <div className="flex gap-1">
+                              <div className="flex gap-1 ml-2">
                                 <button
                                   onClick={() => handleEditWorkspace(ws.id, ws.name)}
                                   className="p-1 hover:bg-slate-200 rounded transition"
@@ -468,7 +490,6 @@ export default function ConfigPage() {
                                 >
                                   <Edit2 className="w-4 h-4 text-slate-600" />
                                 </button>
-                                {/* NUEVO BOTÓN ELIMINAR */}
                                 <button
                                   onClick={() => handleDeleteWorkspace(ws.id, ws.name)}
                                   className="p-1 hover:bg-red-100 rounded transition"
@@ -479,13 +500,14 @@ export default function ConfigPage() {
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500">
-                            {isOwner ? 'Propietario' : 'Miembro'} • {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''}
+                          <p className="text-xs text-slate-500 mt-1">
+                             {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''} en total
                           </p>
                         </>
                       )}
                     </div>
                     <div className="flex gap-2">
+                      {/* SOLO EL DUEÑO PUEDE INVITAR Y GESTIONAR MIEMBROS */}
                       {isOwner && editingWorkspaceId !== ws.id && (
                         <>
                           <button
@@ -505,13 +527,20 @@ export default function ConfigPage() {
                           </button>
                         </>
                       )}
+                      
+                      {/* SI SOY COLABORADOR SOLO PUEDO VER, PERO NO GESTIONAR */}
+                      {!isOwner && (
+                        <div className="text-xs text-indigo-600 font-medium self-center px-3">
+                          Acceso Compartido
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Member Management - Only for owners */}
+                  {/* GESTIÓN DE MIEMBROS - Solo visible para el dueño */}
                   {isOwner && isExpanded && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
-                      <h5 className="font-semibold mb-3 text-sm">Gestión de Miembros</h5>
+                      <h5 className="font-semibold mb-3 text-sm">Gestión de Permisos</h5>
 
                       {workspaceMembers.length > 0 ? (
                         <div className="space-y-3">
@@ -519,90 +548,46 @@ export default function ConfigPage() {
                             <div key={member.id} className="bg-white rounded-lg p-3 border border-slate-200">
                               <div className="flex items-center justify-between mb-3">
                                 <div>
-                                  <p className="font-medium text-sm">{member.user_email}</p>
+                                  <p className="font-medium text-sm flex items-center gap-2">
+                                    {member.user_email}
+                                    {member.user_id === user?.uid && <span className="text-xs text-slate-400">(Tú)</span>}
+                                  </p>
                                   <p className="text-xs text-slate-500">ID: {member.user_id.slice(0, 8)}...</p>
                                 </div>
-                                <button
-                                  onClick={() => handleRemoveMember(member.id, member.user_email)}
-                                  className="text-red-600 hover:text-red-700 text-sm"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
+                                {member.user_id !== user?.uid && (
+                                  <button
+                                    onClick={() => handleRemoveMember(member.id, member.user_email)}
+                                    className="text-red-600 hover:text-red-700 text-sm flex items-center gap-1 bg-red-50 px-2 py-1 rounded-md"
+                                  >
+                                    <X className="w-3 h-3" /> Eliminar acceso
+                                  </button>
+                                )}
                               </div>
 
                               {/* Permission Selectors */}
                               <div className="grid grid-cols-2 gap-2">
-                                {/* Gastos */}
-                                <div>
-                                  <label className="text-xs text-slate-600">💰 Gastos</label>
-                                  <select
-                                    value={member.permissions.gastos}
-                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'gastos', e.target.value)}
-                                    className="input input-sm text-xs mt-1"
-                                  >
-                                    <option value="ninguno">Ninguno</option>
-                                    <option value="solo_lectura">Solo lectura</option>
-                                    <option value="solo_propios">Solo sus datos</option>
-                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
-                                    <option value="admin">Administrador</option>
-                                  </select>
-                                </div>
-
-                                {/* Ingresos */}
-                                <div>
-                                  <label className="text-xs text-slate-600">💵 Ingresos</label>
-                                  <select
-                                    value={member.permissions.ingresos}
-                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'ingresos', e.target.value)}
-                                    className="input input-sm text-xs mt-1"
-                                  >
-                                    <option value="ninguno">Ninguno</option>
-                                    <option value="solo_lectura">Solo lectura</option>
-                                    <option value="solo_propios">Solo sus datos</option>
-                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
-                                    <option value="admin">Administrador</option>
-                                  </select>
-                                </div>
-
-                                {/* Ahorros */}
-                                <div>
-                                  <label className="text-xs text-slate-600">🏦 Ahorros</label>
-                                  <select
-                                    value={member.permissions.ahorros}
-                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'ahorros', e.target.value)}
-                                    className="input input-sm text-xs mt-1"
-                                  >
-                                    <option value="ninguno">Ninguno</option>
-                                    <option value="solo_lectura">Solo lectura</option>
-                                    <option value="solo_propios">Solo sus datos</option>
-                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
-                                    <option value="admin">Administrador</option>
-                                  </select>
-                                </div>
-
-                                {/* Tarjetas */}
-                                <div>
-                                  <label className="text-xs text-slate-600">💳 Tarjetas</label>
-                                  <select
-                                    value={member.permissions.tarjetas}
-                                    onChange={(e) => handleUpdateMemberPermission(member.id, 'tarjetas', e.target.value)}
-                                    className="input input-sm text-xs mt-1"
-                                  >
-                                    <option value="ninguno">Ninguno</option>
-                                    <option value="solo_lectura">Solo lectura</option>
-                                    <option value="solo_propios">Solo sus datos</option>
-                                    <option value="ver_todo_agregar_propio">Ver todo + agregar</option>
-                                    <option value="admin">Administrador</option>
-                                  </select>
-                                </div>
+                                {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => (
+                                  <div key={section}>
+                                    <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
+                                    <select
+                                      value={member.permissions[section as keyof WorkspacePermissions]}
+                                      onChange={(e) => handleUpdateMemberPermission(member.id, section as keyof WorkspacePermissions, e.target.value)}
+                                      className="input input-sm text-xs mt-1 w-full"
+                                      disabled={member.user_id === user?.uid} // El dueño no se edita a sí mismo
+                                    >
+                                      {permissionOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <div className="text-center text-slate-500 text-sm py-4">
-                          <p>No hay miembros en este workspace</p>
-                          <p className="text-xs mt-1">Invitá a alguien para colaborar</p>
+                          <p>Cargando miembros...</p>
                         </div>
                       )}
                     </div>
@@ -625,15 +610,15 @@ export default function ConfigPage() {
             <h4 className="font-semibold mb-3">📬 Invitaciones Pendientes</h4>
             <div className="space-y-2">
               {invitations.map(inv => (
-                <div key={inv.id} className="bg-indigo-50 rounded-xl p-3 flex items-center justify-between">
+                <div key={inv.id} className="bg-indigo-50 rounded-xl p-3 flex items-center justify-between border border-indigo-100">
                   <div>
-                    <p className="font-medium text-sm">Invitación a workspace</p>
-                    <p className="text-xs text-slate-600">{inv.email}</p>
+                    <p className="font-medium text-sm text-indigo-900">Te invitaron a colaborar</p>
+                    <p className="text-xs text-indigo-600">{inv.email}</p>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleAcceptInvitation(inv.id)}
-                      className="btn btn-primary btn-sm"
+                      className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700"
                     >
                       Aceptar
                     </button>
@@ -686,7 +671,7 @@ export default function ConfigPage() {
         </button>
       </div>
 
-      {/* Presupuesto - OPCIONAL */}
+      {/* Presupuesto */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold">💰 Presupuesto Mensual</h3>
@@ -704,7 +689,6 @@ export default function ConfigPage() {
         {budgetEnabled ? (
           <>
             <p className="text-slate-500 text-sm mb-4">Establecé un límite mensual para controlar tus gastos</p>
-            
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="label">Presupuesto ARS</label>
@@ -843,6 +827,7 @@ export default function ConfigPage() {
       {showCategoriaModal && (
         <div className="modal-overlay" onClick={() => setShowCategoriaModal(false)}>
           <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>
+            {/* ... (Contenido del modal de categoría sin cambios) ... */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">
                 {editingCategoria ? 'Editar Categoría' : 'Nueva Categoría'}
@@ -911,7 +896,6 @@ export default function ConfigPage() {
                 </div>
               </div>
 
-              {/* Preview */}
               <div className="bg-slate-50 rounded-xl p-4">
                 <div className="text-xs text-slate-500 mb-2">Vista previa:</div>
                 <div className="flex items-center gap-3">
@@ -976,10 +960,10 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {/* Modal Invitar Usuario */}
+      {/* Modal Invitar Usuario - ACTUALIZADO */}
       {showInviteModal && (
         <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="modal max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="modal max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">Invitar Usuario</h3>
               <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-slate-100 rounded">
@@ -998,10 +982,33 @@ export default function ConfigPage() {
                   onKeyPress={e => e.key === 'Enter' && handleInviteUser()}
                   autoFocus
                 />
-                <p className="text-xs text-slate-500 mt-2">
-                  El usuario recibirá permisos de solo lectura por defecto
-                </p>
               </div>
+
+              {/* SELECTORES DE PERMISOS */}
+              <div className="space-y-3 pt-2">
+                <h4 className="font-semibold text-sm text-slate-700">Configurar Permisos</h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => (
+                    <div key={section}>
+                      <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
+                      <select
+                        value={invitePermissions[section as keyof WorkspacePermissions]}
+                        onChange={(e) => setInvitePermissions(p => ({
+                          ...p,
+                          [section]: e.target.value
+                        }))}
+                        className="input input-sm text-xs mt-1 w-full"
+                      >
+                        {permissionOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
             <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">
               <button onClick={() => setShowInviteModal(false)} className="btn btn-secondary">
