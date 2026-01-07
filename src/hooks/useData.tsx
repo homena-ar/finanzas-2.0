@@ -153,23 +153,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
 
       if (isWorkspaceMode) {
-        try {
-          const memberQuery = query(
-            collection(db, 'workspace_members'),
-            where('workspace_id', '==', currentWorkspace.id),
-            where('user_id', '==', user.uid)
-          );
-          const memberSnap = await getDocs(memberQuery);
-          
-          if (!memberSnap.empty) {
-            permissions = memberSnap.docs[0].data().permissions as WorkspacePermissions;
-            console.log('🔒 [useData] Permisos aplicados:', permissions);
-          } else {
-            // Si no hay ficha, asumimos 'ninguno' por seguridad
+        // Si el usuario es el dueño del workspace, tiene permisos de admin automáticamente
+        const isOwner = currentWorkspace.owner_id === user.uid;
+        
+        if (isOwner) {
+          // El dueño siempre tiene permisos de admin
+          permissions = { gastos: 'admin', ingresos: 'admin', ahorros: 'admin', tarjetas: 'admin' };
+          console.log('🔒 [useData] Usuario es dueño - Permisos admin aplicados');
+        } else {
+          // Si no es dueño, verificar permisos en workspace_members
+          try {
+            const memberQuery = query(
+              collection(db, 'workspace_members'),
+              where('workspace_id', '==', currentWorkspace.id),
+              where('user_id', '==', user.uid)
+            );
+            const memberSnap = await getDocs(memberQuery);
+            
+            if (!memberSnap.empty) {
+              permissions = memberSnap.docs[0].data().permissions as WorkspacePermissions;
+              console.log('🔒 [useData] Permisos aplicados:', permissions);
+            } else {
+              // Si no hay ficha, asumimos 'ninguno' por seguridad
+              permissions = { gastos: 'ninguno', ingresos: 'ninguno', ahorros: 'ninguno', tarjetas: 'ninguno' };
+              console.log('🔒 [useData] No se encontró registro de miembro - Permisos: ninguno');
+            }
+          } catch (e) {
+            console.error('Error fetching permissions', e);
+            // En caso de error, asumimos 'ninguno' por seguridad
             permissions = { gastos: 'ninguno', ingresos: 'ninguno', ahorros: 'ninguno', tarjetas: 'ninguno' };
           }
-        } catch (e) {
-          console.error('Error fetching permissions', e);
         }
       }
 

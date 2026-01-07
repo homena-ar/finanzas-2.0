@@ -108,35 +108,39 @@ service cloud.firestore {
     // ============================================
 
     match /movimientos_ahorro/{movimientoId} {
-      // Read: own data (user_id) OR workspace member with permission
+      // Read: own data (user_id) OR workspace owner OR workspace member with permission
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id) &&
-         hasPermission(resource.data.workspace_id, 'ahorros', 'read'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          (isWorkspaceMember(resource.data.workspace_id) &&
+           hasPermission(resource.data.workspace_id, 'ahorros', 'read'))))
       );
 
-      // Create: own data OR workspace member with permission
+      // Create: own data OR workspace owner OR workspace member with permission
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id) &&
-         hasPermission(request.resource.data.workspace_id, 'ahorros', 'create') &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          (isWorkspaceMember(request.resource.data.workspace_id) &&
+           hasPermission(request.resource.data.workspace_id, 'ahorros', 'create'))) &&
          request.resource.data.created_by == request.auth.uid)
       );
 
-      // Update: own data OR workspace admin
+      // Update: own data OR workspace owner OR workspace admin
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'ahorros', 'update'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'ahorros', 'update')))
       );
 
-      // Delete: own data OR workspace admin
+      // Delete: own data OR workspace owner OR workspace admin
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'ahorros', 'delete'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'ahorros', 'delete')))
       );
     }
 
@@ -144,28 +148,32 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id) &&
-         hasPermission(resource.data.workspace_id, 'ahorros', 'read'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          (isWorkspaceMember(resource.data.workspace_id) &&
+           hasPermission(resource.data.workspace_id, 'ahorros', 'read'))))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id) &&
-         hasPermission(request.resource.data.workspace_id, 'ahorros', 'create') &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          (isWorkspaceMember(request.resource.data.workspace_id) &&
+           hasPermission(request.resource.data.workspace_id, 'ahorros', 'create'))) &&
          request.resource.data.created_by == request.auth.uid)
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'ahorros', 'update'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'ahorros', 'update')))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'ahorros', 'delete'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'ahorros', 'delete')))
       );
     }
 
@@ -177,28 +185,32 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id) &&
-         hasPermission(resource.data.workspace_id, 'tarjetas', 'read'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          (isWorkspaceMember(resource.data.workspace_id) &&
+           hasPermission(resource.data.workspace_id, 'tarjetas', 'read'))))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id) &&
-         hasPermission(request.resource.data.workspace_id, 'tarjetas', 'create') &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          (isWorkspaceMember(request.resource.data.workspace_id) &&
+           hasPermission(request.resource.data.workspace_id, 'tarjetas', 'create'))) &&
          request.resource.data.created_by == request.auth.uid)
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'tarjetas', 'update'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'tarjetas', 'update')))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'tarjetas', 'delete'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'tarjetas', 'delete')))
       );
     }
 
@@ -210,28 +222,32 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id) &&
-         hasPermission(resource.data.workspace_id, 'gastos', 'read'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          (isWorkspaceMember(resource.data.workspace_id) &&
+           hasPermission(resource.data.workspace_id, 'gastos', 'read'))))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id) &&
-         hasPermission(request.resource.data.workspace_id, 'gastos', 'create') &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          (isWorkspaceMember(request.resource.data.workspace_id) &&
+           hasPermission(request.resource.data.workspace_id, 'gastos', 'create'))) &&
          request.resource.data.created_by == request.auth.uid)
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'gastos', 'update'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'gastos', 'update')))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'gastos', 'delete'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'gastos', 'delete')))
       );
     }
 
@@ -239,28 +255,32 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id) &&
-         hasPermission(resource.data.workspace_id, 'gastos', 'read'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          (isWorkspaceMember(resource.data.workspace_id) &&
+           hasPermission(resource.data.workspace_id, 'gastos', 'read'))))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id) &&
-         hasPermission(request.resource.data.workspace_id, 'gastos', 'create') &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          (isWorkspaceMember(request.resource.data.workspace_id) &&
+           hasPermission(request.resource.data.workspace_id, 'gastos', 'create'))) &&
          request.resource.data.created_by == request.auth.uid)
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'gastos', 'update'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'gastos', 'update')))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'gastos', 'delete'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'gastos', 'delete')))
       );
     }
 
@@ -272,28 +292,32 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id) &&
-         hasPermission(resource.data.workspace_id, 'ingresos', 'read'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          (isWorkspaceMember(resource.data.workspace_id) &&
+           hasPermission(resource.data.workspace_id, 'ingresos', 'read'))))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id) &&
-         hasPermission(request.resource.data.workspace_id, 'ingresos', 'create') &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          (isWorkspaceMember(request.resource.data.workspace_id) &&
+           hasPermission(request.resource.data.workspace_id, 'ingresos', 'create'))) &&
          request.resource.data.created_by == request.auth.uid)
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'ingresos', 'update'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'ingresos', 'update')))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         hasPermission(resource.data.workspace_id, 'ingresos', 'delete'))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          hasPermission(resource.data.workspace_id, 'ingresos', 'delete')))
       );
     }
 
