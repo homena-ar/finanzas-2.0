@@ -7,6 +7,7 @@ export interface Profile {
   ahorro_pesos: number
   ahorro_usd: number
   ingresos_habilitado?: boolean
+  personal_workspace_name?: string // <--- ESTE ES EL CAMPO NUEVO QUE FALTABA
   created_at: string
 }
 
