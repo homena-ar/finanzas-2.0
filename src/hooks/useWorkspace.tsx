@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase'
 import {
   collection,
   addDoc,
-  setDoc,
+  setDoc, // <--- Necesario para definir el ID del miembro manualmente
   updateDoc,
   deleteDoc,
   doc,
@@ -14,8 +14,7 @@ import {
   where,
   getDocs,
   serverTimestamp,
-  Timestamp,
-  or
+  Timestamp
 } from 'firebase/firestore'
 import type { Workspace, WorkspaceMember, WorkspaceInvitation, WorkspacePermissions } from '@/types'
 
@@ -61,12 +60,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setLoading(true)
 
     try {
-      // Fetch workspaces owned by user
+      // 1. Fetch workspaces owned by user
       const workspacesRef = collection(db, 'workspaces')
       const workspacesQuery = query(workspacesRef, where('owner_id', '==', user.uid))
       const workspacesSnap = await getDocs(workspacesQuery)
 
-      const workspacesData = workspacesSnap.docs.map(doc => ({
+      const ownedWorkspaces = workspacesSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name,
         owner_id: doc.data().owner_id,
@@ -75,20 +74,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           : doc.data().created_at
       })) as Workspace[]
 
-      console.log('🏢 [useWorkspace] Workspaces owned:', workspacesData.length)
-
-      // Fetch workspace memberships (workspaces where user is a member)
+      // 2. Fetch workspace memberships (workspaces where user is a member)
       const membersRef = collection(db, 'workspace_members')
+      // Buscamos documentos donde user_id sea el actual
+      // NOTA: Para que esto funcione rápido, Firebase podría pedir un índice compuesto.
       const membersQuery = query(membersRef, where('user_id', '==', user.uid))
       const membersSnap = await getDocs(membersQuery)
 
       // Get unique workspace IDs from memberships
       const memberWorkspaceIds = new Set(membersSnap.docs.map(doc => doc.data().workspace_id))
 
-      // Fetch those workspaces
+      // Fetch those workspaces (only if not already in ownedWorkspaces)
       const memberWorkspaces: Workspace[] = []
       for (const wsId of Array.from(memberWorkspaceIds)) {
+        // Evitar duplicados si soy dueño y también tengo ficha de miembro (que ahora la tendré)
+        if (ownedWorkspaces.find(w => w.id === wsId)) continue;
+
         const wsRef = doc(db, 'workspaces', wsId)
+        // Usamos getDoc o query por ID
         const wsSnap = await getDocs(query(collection(db, 'workspaces'), where('__name__', '==', wsId)))
         wsSnap.docs.forEach(d => {
           memberWorkspaces.push({
@@ -102,15 +105,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      console.log('🏢 [useWorkspace] Workspaces as member:', memberWorkspaces.length)
-
       // Combine and deduplicate workspaces
-      const allWorkspaces = [...workspacesData, ...memberWorkspaces]
+      const allWorkspaces = [...ownedWorkspaces, ...memberWorkspaces]
+      // Map para asegurar unicidad por ID
       const uniqueWorkspaces = Array.from(new Map(allWorkspaces.map(w => [w.id, w])).values())
 
       setWorkspaces(uniqueWorkspaces)
 
-      // Fetch members for current workspace
+      // 3. Fetch members for current workspace
       if (currentWorkspace) {
         const currentMembersQuery = query(
           collection(db, 'workspace_members'),
@@ -129,10 +131,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         })) as WorkspaceMember[]
 
         setMembers(membersData)
-        console.log('🏢 [useWorkspace] Members:', membersData.length)
       }
 
-      // Fetch invitations for user
+      // 4. Fetch invitations for user
       const invitationsRef = collection(db, 'workspace_invitations')
       const invitationsQuery = query(
         invitationsRef,
@@ -152,9 +153,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       })) as WorkspaceInvitation[]
 
       setInvitations(invitationsData)
-      console.log('🏢 [useWorkspace] Pending invitations:', invitationsData.length)
-
       setLoading(false)
+
     } catch (error) {
       console.error('🏢 [useWorkspace] Error fetching data:', error)
       setLoading(false)
@@ -178,13 +178,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return { error: new Error('No user') }
     }
 
+    // 1. VALIDACIÓN DE LÍMITE (Máximo 2 propios + Personal)
+    const misWorkspaces = workspaces.filter(w => w.owner_id === user.uid)
+    if (misWorkspaces.length >= 2) {
+      return { error: new Error('Has alcanzado el límite de 2 espacios compartidos.') }
+    }
+
     console.log('🏢 [useWorkspace] Creating workspace:', name)
 
     try {
+      // 2. Crear el documento del Workspace
       const workspacesRef = collection(db, 'workspaces')
       const docRef = await addDoc(workspacesRef, {
         name,
         owner_id: user.uid,
+        created_at: serverTimestamp()
+      })
+
+      // 3. CORRECCIÓN CRÍTICA: Crear la ficha de MIEMBRO para el dueño
+      // Usamos setDoc con el ID compuesto (workspaceId_userId) para cumplir las reglas
+      const memberId = `${docRef.id}_${user.uid}`
+      await setDoc(doc(db, 'workspace_members', memberId), {
+        workspace_id: docRef.id,
+        user_id: user.uid,
+        user_email: user.email,
+        permissions: { 
+          gastos: 'admin', 
+          ingresos: 'admin', 
+          ahorros: 'admin', 
+          tarjetas: 'admin' 
+        },
         created_at: serverTimestamp()
       })
 
@@ -196,29 +219,27 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       await fetchAll()
+      
+      // Opcional: Cambiar al nuevo workspace automáticamente
+      setCurrentWorkspace(newWorkspace)
 
-      console.log('🏢 [useWorkspace] Workspace created:', docRef.id)
+      console.log('🏢 [useWorkspace] Workspace created and owner member added:', docRef.id)
       return { error: null, workspace: newWorkspace }
     } catch (error) {
       console.error('🏢 [useWorkspace] Error creating workspace:', error)
       return { error }
     }
-  }, [user, fetchAll])
+  }, [user, fetchAll, workspaces]) // Agregamos 'workspaces' a dependencias para el conteo
 
   const updateWorkspace = useCallback(async (id: string, name: string) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
+    if (!user) return { error: new Error('No user') }
 
     console.log('🏢 [useWorkspace] Updating workspace:', id)
 
     try {
       const workspaceRef = doc(db, 'workspaces', id)
       await updateDoc(workspaceRef, { name })
-
       await fetchAll()
-
-      console.log('🏢 [useWorkspace] Workspace updated')
       return { error: null }
     } catch (error) {
       console.error('🏢 [useWorkspace] Error updating workspace:', error)
@@ -227,13 +248,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user, fetchAll])
 
   const deleteWorkspace = useCallback(async (id: string) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
+    if (!user) return { error: new Error('No user') }
 
     console.log('🏢 [useWorkspace] Deleting workspace:', id)
 
     try {
+      // Nota: Idealmente deberías borrar también los miembros y datos asociados
+      // o usar una Cloud Function para limpieza en cascada.
       const workspaceRef = doc(db, 'workspaces', id)
       await deleteDoc(workspaceRef)
 
@@ -242,8 +263,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       await fetchAll()
-
-      console.log('🏢 [useWorkspace] Workspace deleted')
       return { error: null }
     } catch (error) {
       console.error('🏢 [useWorkspace] Error deleting workspace:', error)
@@ -252,18 +271,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user, currentWorkspace, fetchAll])
 
   const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
+    if (!user) return { error: new Error('No user') }
 
     console.log('🏢 [useWorkspace] Inviting user:', email, 'to workspace:', workspaceId)
 
     try {
-      // Get workspace details
       const workspace = workspaces.find(w => w.id === workspaceId)
       const workspaceName = workspace?.name || 'Workspace'
 
-      // Create invitation in Firestore
       const invitationsRef = collection(db, 'workspace_invitations')
       await addDoc(invitationsRef, {
         workspace_id: workspaceId,
@@ -273,7 +288,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         created_at: serverTimestamp()
       })
 
-      // Send email via Firebase Extension
       const mailRef = collection(db, 'mail')
       await addDoc(mailRef, {
         to: email,
@@ -282,9 +296,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <h2 style="color: #6366f1;">¡Te invitaron a colaborar!</h2>
-
               <p>Has sido invitado a colaborar en <strong>${workspaceName}</strong> en FinControl.</p>
-
               <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
                 <h3 style="margin-top: 0; color: #4b5563;">Permisos asignados:</h3>
                 <ul style="color: #6b7280;">
@@ -294,38 +306,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                   <li>💳 Tarjetas: <strong>${permissions.tarjetas}</strong></li>
                 </ul>
               </div>
-
               <p><strong>Para aceptar la invitación:</strong></p>
               <ol style="color: #6b7280;">
                 <li>Inicia sesión en FinControl con este email: <strong>${email}</strong></li>
                 <li>Ve a la página de Configuración</li>
                 <li>Verás la invitación pendiente y podrás aceptarla</li>
               </ol>
-
-              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
-                <p>Este es un email automático de FinControl. Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
-              </div>
             </div>
           `,
-          text: `
-Te invitaron a colaborar en ${workspaceName} en FinControl.
-
-Permisos asignados:
-- Gastos: ${permissions.gastos}
-- Ingresos: ${permissions.ingresos}
-- Ahorros: ${permissions.ahorros}
-- Tarjetas: ${permissions.tarjetas}
-
-Para aceptar la invitación:
-1. Inicia sesión en FinControl con este email: ${email}
-2. Ve a la página de Configuración
-3. Verás la invitación pendiente y podrás aceptarla
-          `
+          text: `Te invitaron a colaborar en ${workspaceName}. Entra a la app para aceptar.`
         }
       })
 
       await fetchAll()
-
       console.log('🏢 [useWorkspace] Invitation sent')
       return { error: null }
     } catch (error) {
@@ -335,62 +328,41 @@ Para aceptar la invitación:
   }, [user, workspaces, fetchAll])
 
   const updateMemberPermissions = useCallback(async (memberId: string, permissions: WorkspacePermissions) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
-
-    console.log('🏢 [useWorkspace] Updating member permissions:', memberId)
+    if (!user) return { error: new Error('No user') }
 
     try {
       const memberRef = doc(db, 'workspace_members', memberId)
       await updateDoc(memberRef, { permissions })
-
       await fetchAll()
-
-      console.log('🏢 [useWorkspace] Member permissions updated')
       return { error: null }
     } catch (error) {
-      console.error('🏢 [useWorkspace] Error updating permissions:', error)
       return { error }
     }
   }, [user, fetchAll])
 
   const removeMember = useCallback(async (memberId: string) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
-
-    console.log('🏢 [useWorkspace] Removing member:', memberId)
+    if (!user) return { error: new Error('No user') }
 
     try {
       const memberRef = doc(db, 'workspace_members', memberId)
       await deleteDoc(memberRef)
-
       await fetchAll()
-
-      console.log('🏢 [useWorkspace] Member removed')
       return { error: null }
     } catch (error) {
-      console.error('🏢 [useWorkspace] Error removing member:', error)
       return { error }
     }
   }, [user, fetchAll])
 
   const acceptInvitation = useCallback(async (invitationId: string) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
+    if (!user) return { error: new Error('No user') }
 
     console.log('🏢 [useWorkspace] Accepting invitation:', invitationId)
 
     try {
       const invitation = invitations.find(i => i.id === invitationId)
-      if (!invitation) {
-        return { error: new Error('Invitation not found') }
-      }
+      if (!invitation) return { error: new Error('Invitation not found') }
 
-      // Create workspace member
-      // Usamos un ID compuesto para cumplir con las reglas de seguridad
+      // CRÍTICO: Usar ID compuesto para cumplir con las reglas de seguridad
       const memberId = `${invitation.workspace_id}_${user.uid}`
       const memberRef = doc(db, 'workspace_members', memberId)
       
@@ -402,13 +374,10 @@ Para aceptar la invitación:
         created_at: serverTimestamp()
       })
 
-      // Update invitation status
       const invitationRef = doc(db, 'workspace_invitations', invitationId)
       await updateDoc(invitationRef, { status: 'accepted' })
 
       await fetchAll()
-
-      console.log('🏢 [useWorkspace] Invitation accepted')
       return { error: null }
     } catch (error) {
       console.error('🏢 [useWorkspace] Error accepting invitation:', error)
@@ -417,22 +386,14 @@ Para aceptar la invitación:
   }, [user, invitations, fetchAll])
 
   const rejectInvitation = useCallback(async (invitationId: string) => {
-    if (!user) {
-      return { error: new Error('No user') }
-    }
-
-    console.log('🏢 [useWorkspace] Rejecting invitation:', invitationId)
+    if (!user) return { error: new Error('No user') }
 
     try {
       const invitationRef = doc(db, 'workspace_invitations', invitationId)
       await updateDoc(invitationRef, { status: 'rejected' })
-
       await fetchAll()
-
-      console.log('🏢 [useWorkspace] Invitation rejected')
       return { error: null }
     } catch (error) {
-      console.error('🏢 [useWorkspace] Error rejecting invitation:', error)
       return { error }
     }
   }, [user, fetchAll])
