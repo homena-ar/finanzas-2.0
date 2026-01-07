@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck } from 'lucide-react'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2 } from 'lucide-react'
 import { AlertModal } from '@/components/Modal'
 import type { WorkspacePermissions } from '@/types'
 
@@ -62,6 +62,9 @@ export default function ConfigPage() {
     ahorros: 'solo_lectura',
     tarjetas: 'solo_lectura'
   })
+
+  // Estado para gestión de cambios pendientes en permisos (confirmación)
+  const [pendingPermissions, setPendingPermissions] = useState<Record<string, string>>({})
 
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
@@ -336,13 +339,21 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
-  const handleUpdateMemberPermission = async (memberId: string, section: keyof WorkspacePermissions, level: string) => {
-    const member = members.find(m => m.id === memberId)
-    if (!member) return
+  // --- LÓGICA DE PERMISOS CON CONFIRMACIÓN ---
+  const handlePermissionChange = (memberId: string, section: string, newValue: string) => {
+    setPendingPermissions(prev => ({
+      ...prev,
+      [`${memberId}_${section}`]: newValue
+    }))
+  }
+
+  const savePermission = async (memberId: string, section: keyof WorkspacePermissions, member: any) => {
+    const newValue = pendingPermissions[`${memberId}_${section}`]
+    if (!newValue) return
 
     const updatedPermissions = {
       ...member.permissions,
-      [section]: level
+      [section]: newValue
     }
 
     const result = await updateMemberPermissions(memberId, updatedPermissions)
@@ -354,6 +365,13 @@ export default function ConfigPage() {
         variant: 'error'
       })
       setShowAlert(true)
+    } else {
+      // Limpiar estado pendiente si fue exitoso
+      setPendingPermissions(prev => {
+        const newState = { ...prev }
+        delete newState[`${memberId}_${section}`]
+        return newState
+      })
     }
   }
 
@@ -534,9 +552,12 @@ export default function ConfigPage() {
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                             {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''} en total
-                          </p>
+                          {/* Solo el dueño ve cuántos miembros hay */}
+                          {isOwner && (
+                            <p className="text-xs text-slate-500 mt-1">
+                               {workspaceMembers.length} miembro{workspaceMembers.length !== 1 ? 's' : ''} en total
+                            </p>
+                          )}
                         </>
                       )}
                     </div>
@@ -600,21 +621,38 @@ export default function ConfigPage() {
 
                               {/* Permission Selectors */}
                               <div className="grid grid-cols-2 gap-2">
-                                {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => (
-                                  <div key={section}>
-                                    <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
-                                    <select
-                                      value={member.permissions[section as keyof WorkspacePermissions]}
-                                      onChange={(e) => handleUpdateMemberPermission(member.id, section as keyof WorkspacePermissions, e.target.value)}
-                                      className="input input-sm text-xs mt-1 w-full"
-                                      disabled={member.user_id === user?.uid} // El dueño no se edita a sí mismo
-                                    >
-                                      {permissionOptions.map(opt => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                ))}
+                                {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => {
+                                  const pendingValue = pendingPermissions[`${member.id}_${section}`]
+                                  const currentValue = member.permissions[section as keyof WorkspacePermissions]
+                                  const hasChange = pendingValue && pendingValue !== currentValue
+
+                                  return (
+                                    <div key={section} className="flex flex-col">
+                                      <label className="text-[10px] uppercase font-bold text-slate-500 mb-1">{section}</label>
+                                      <div className="flex gap-1">
+                                        <select
+                                          className={`input input-sm text-xs w-full ${hasChange ? 'border-indigo-500 bg-indigo-50' : ''}`}
+                                          value={pendingValue || currentValue}
+                                          onChange={(e) => handlePermissionChange(member.id, section, e.target.value)}
+                                          disabled={member.user_id === user?.uid} // El dueño no se edita a sí mismo
+                                        >
+                                          {permissionOptions.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                          ))}
+                                        </select>
+                                        {hasChange && (
+                                          <button 
+                                            onClick={() => savePermission(member.id, section as keyof WorkspacePermissions, member)}
+                                            className="bg-indigo-600 text-white p-1 rounded hover:bg-indigo-700 flex items-center justify-center min-w-[28px]"
+                                            title="Guardar cambio"
+                                          >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
                           ))}
@@ -638,16 +676,18 @@ export default function ConfigPage() {
           )}
         </div>
 
-        {/* Invitaciones Pendientes */}
+        {/* Invitaciones Pendientes - MEJORADO */}
         {invitations.length > 0 && (
           <div className="mt-6 pt-6 border-t border-slate-200">
             <h4 className="font-semibold mb-3">📬 Invitaciones Pendientes</h4>
             <div className="space-y-2">
               {invitations.map(inv => (
-                <div key={inv.id} className="bg-indigo-50 rounded-xl p-3 flex items-center justify-between border border-indigo-100">
+                <div key={inv.id} className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-sm text-indigo-900">Te invitaron a colaborar</p>
-                    <p className="text-xs text-indigo-600">{inv.email}</p>
+                    <p className="text-sm text-indigo-900">
+                      <strong>{inv.inviter_email || 'Alguien'}</strong> te invitó a unirte a:
+                    </p>
+                    <p className="text-lg font-bold text-indigo-700">{inv.workspace_name || 'Un Workspace'}</p>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -1032,7 +1072,7 @@ export default function ConfigPage() {
                           ...p,
                           [section]: e.target.value
                         }))}
-                        className="input input-sm text-xs mt-1 w-full"
+                        className="input input-sm text-xs w-full"
                       >
                         {permissionOptions.map(opt => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
