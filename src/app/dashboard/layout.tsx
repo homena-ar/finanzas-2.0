@@ -4,42 +4,63 @@ import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
-  LayoutDashboard, CreditCard, Wallet, TrendingUp,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown
+  LayoutDashboard, Wallet, TrendingUp,
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import type { WorkspacePermissions } from '@/types'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
-  const { workspaces, currentWorkspace, setCurrentWorkspace, loading: workspaceLoading } = useWorkspace()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false)
   const [dolar, setDolar] = useState(0)
 
-  // Build navigation items based on profile settings
+  // Verificar Permisos
+  const getCurrentPermissions = () => {
+    if (!currentWorkspace) return null // Modo Personal = Acceso total implícito
+    const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
+    return member?.permissions
+  }
+
+  const permissions = getCurrentPermissions()
+
+  const hasAccess = (section: keyof WorkspacePermissions) => {
+    if (!currentWorkspace) return true // Personal tiene acceso a todo
+    if (!permissions) return false // Si está cargando o error, denegar por defecto
+    return permissions[section] !== 'ninguno'
+  }
+
+  // Build navigation items based on profile settings AND workspace permissions
   const navItems = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' },
-    { href: '/dashboard/gastos', icon: ArrowDownCircle, label: 'Gastos' },
-    ...(profile?.ingresos_habilitado ? [{ href: '/dashboard/ingresos', icon: ArrowUpCircle, label: 'Ingresos' }] : []),
-    { href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' },
-    { href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' },
-    { href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' },
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' }, // Resumen siempre visible
+    
+    ...(hasAccess('gastos') ? [{ href: '/dashboard/gastos', icon: ArrowDownCircle, label: 'Gastos' }] : []),
+    
+    ...(profile?.ingresos_habilitado && hasAccess('ingresos') ? [{ href: '/dashboard/ingresos', icon: ArrowUpCircle, label: 'Ingresos' }] : []),
+    
+    ...(hasAccess('tarjetas') ? [{ href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' }] : []),
+    
+    // La proyección suele depender de gastos, así que usamos ese permiso
+    ...(hasAccess('gastos') ? [{ href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' }] : []),
+    
+    ...(hasAccess('ahorros') ? [{ href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' }] : []),
+    
     { href: '/dashboard/config', icon: Settings, label: 'Config' },
   ]
 
   console.log('🏠 [DashboardLayout] Render - loading:', loading, 'user:', user ? 'EXISTS' : 'NULL')
 
   useEffect(() => {
-    console.log('🏠 [DashboardLayout] useEffect - loading:', loading, 'user:', user ? 'EXISTS' : 'NULL')
     if (!loading && !user) {
-      console.log('🏠 [DashboardLayout] No user and not loading - Redirecting to /')
       router.push('/')
     }
   }, [user, loading, router])
@@ -63,7 +84,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   if (loading) {
-    console.log('🏠 [DashboardLayout] SHOWING LOADING SPINNER')
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
@@ -72,11 +92,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   if (!user) {
-    console.log('🏠 [DashboardLayout] No user - Returning null')
     return null
   }
-
-  console.log('🏠 [DashboardLayout] Rendering dashboard content')
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -148,14 +165,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="relative">
             <button
               onClick={() => setWorkspaceDropdownOpen(!workspaceDropdownOpen)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between hover:bg-slate-100 transition-colors"
+              className={`w-full border rounded-xl p-3 flex items-center justify-between hover:bg-slate-100 transition-colors ${
+                currentWorkspace ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'
+              }`}
             >
               <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-slate-600" />
+                {currentWorkspace ? (
+                  currentWorkspace.owner_id === user.uid ? (
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                  ) : (
+                    <UserCheck className="w-4 h-4 text-purple-600" />
+                  )
+                ) : (
+                  <Building2 className="w-4 h-4 text-slate-600" />
+                )}
                 <div className="text-left">
-                  <div className="text-xs text-slate-500">Workspace</div>
+                  <div className="text-[10px] uppercase font-bold text-slate-500">
+                    {currentWorkspace ? (currentWorkspace.owner_id === user.uid ? 'Propietario' : 'Colaborador') : 'Espacio Personal'}
+                  </div>
                   <div className="text-sm font-medium text-slate-900 truncate max-w-[140px]">
-                    {currentWorkspace?.name || 'Personal'}
+                    {currentWorkspace?.name || 'Mis Finanzas'}
                   </div>
                 </div>
               </div>
@@ -164,7 +193,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Dropdown Menu */}
             {workspaceDropdownOpen && (
-              <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+              <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-[300px] overflow-y-auto">
                 {/* Personal Option */}
                 <button
                   onClick={() => {
@@ -173,40 +202,65 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   }}
                   className={`
                     w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
-                    ${currentWorkspace === null ? 'bg-indigo-50' : ''}
+                    ${currentWorkspace === null ? 'bg-slate-100' : ''}
                   `}
                 >
-                  <div className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-slate-600" />
-                    <span className="text-sm font-medium text-slate-900">Personal</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-600">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">Personal</div>
+                      <div className="text-[10px] text-slate-500">Mis finanzas</div>
+                    </div>
                   </div>
                   {currentWorkspace === null && (
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full" />
+                    <div className="w-2 h-2 bg-slate-500 rounded-full" />
                   )}
                 </button>
 
+                <div className="border-t border-slate-100 my-1"></div>
+
                 {/* Workspaces */}
-                {workspaces.map((workspace) => (
-                  <button
-                    key={workspace.id}
-                    onClick={() => {
-                      setCurrentWorkspace(workspace)
-                      setWorkspaceDropdownOpen(false)
-                    }}
-                    className={`
-                      w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
-                      ${currentWorkspace?.id === workspace.id ? 'bg-indigo-50' : ''}
-                    `}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-slate-600" />
-                      <span className="text-sm font-medium text-slate-900">{workspace.name}</span>
-                    </div>
-                    {currentWorkspace?.id === workspace.id && (
-                      <div className="w-2 h-2 bg-indigo-500 rounded-full" />
-                    )}
-                  </button>
-                ))}
+                {workspaces.map((workspace) => {
+                  const isOwner = workspace.owner_id === user?.uid
+                  return (
+                    <button
+                      key={workspace.id}
+                      onClick={() => {
+                        setCurrentWorkspace(workspace)
+                        setWorkspaceDropdownOpen(false)
+                      }}
+                      className={`
+                        w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
+                        ${currentWorkspace?.id === workspace.id ? (isOwner ? 'bg-indigo-50' : 'bg-purple-50') : ''}
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
+                          isOwner ? 'bg-indigo-500' : 'bg-purple-500'
+                        }`}>
+                          {workspace.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-slate-900 truncate max-w-[120px]">{workspace.name}</div>
+                          <div className={`text-[10px] font-bold uppercase ${isOwner ? 'text-indigo-600' : 'text-purple-600'}`}>
+                            {isOwner ? 'Propietario' : 'Colaborador'}
+                          </div>
+                        </div>
+                      </div>
+                      {currentWorkspace?.id === workspace.id && (
+                        <div className={`w-2 h-2 rounded-full ${isOwner ? 'bg-indigo-600' : 'bg-purple-600'}`} />
+                      )}
+                    </button>
+                  )
+                })}
+                
+                {workspaces.length === 0 && (
+                  <div className="px-4 py-3 text-xs text-center text-slate-400">
+                    No tienes espacios compartidos
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -234,7 +288,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Navigation */}
-        <nav className="px-3 space-y-1">
+        <nav className="px-3 space-y-1 overflow-y-auto max-h-[calc(100vh-320px)]">
           {navItems.map((item) => {
             const isActive = pathname === item.href
             return (
