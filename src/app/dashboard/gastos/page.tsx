@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useData } from '@/hooks/useData'
+import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identificar al usuario
+import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy yo"
 import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download } from 'lucide-react'
 import { Gasto } from '@/types'
@@ -11,6 +13,8 @@ export default function GastosPage() {
   console.log('🔵🔵🔵 [GastosPage] COMPONENT RENDER')
 
   const searchParams = useSearchParams()
+  const { user } = useAuth()
+  const { currentWorkspace, members } = useWorkspace() // Traemos info del workspace
   const {
     tarjetas, categorias, tags, mediosPago,
     currentMonth, monthKey, getGastosMes, getImpuestosMes,
@@ -46,6 +50,16 @@ export default function GastosPage() {
     banco: '',
     digitos: ''
   })
+
+  // Función para obtener el nombre del usuario que creó el gasto
+  const getUserLabel = (userId: string) => {
+    if (!currentWorkspace) return null; // No mostrar en modo personal
+    if (userId === user?.uid) return 'Tú'; // Si soy yo
+    
+    const member = members.find(m => m.user_id === userId);
+    // Retornar email (antes del @) o "Desconocido"
+    return member ? member.user_email.split('@')[0] : 'Desconocido';
+  }
 
   // Apply filter from URL query params
   useEffect(() => {
@@ -441,6 +455,8 @@ export default function GastosPage() {
                     g.cuotas
                   )
                 }
+                const authorLabel = getUserLabel(g.user_id) // <-- Obtener etiqueta
+
                 return (
                   <tr key={g.id} className={`border-b border-slate-100 hover:bg-slate-50 transition ${g.pagado ? 'opacity-50' : ''}`}>
                     <td className="p-4">
@@ -450,6 +466,21 @@ export default function GastosPage() {
                         </div>
                         <div>
                           <div className={`font-semibold ${g.pagado ? 'line-through' : ''}`}>{g.descripcion}</div>
+                          
+                          {/* --- NUEVO: ETIQUETA DE AUTOR --- */}
+                          {currentWorkspace && authorLabel && (
+                            <div className="mb-1">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${
+                                authorLabel === 'Tú' 
+                                  ? 'bg-slate-100 text-slate-500 border-slate-200' 
+                                  : 'bg-purple-100 text-purple-700 border-purple-200'
+                              }`}>
+                                {authorLabel === 'Tú' ? '👤 Tú' : `👤 ${authorLabel}`}
+                              </span>
+                            </div>
+                          )}
+                          {/* -------------------------------- */}
+
                           <div className="text-xs text-slate-500">
                             {categoriaMap[g.categoria_id || '']?.nombre || 'Sin categoría'}
                             {g.es_fijo && ' 📌'}
@@ -1101,7 +1132,7 @@ export default function GastosPage() {
                       <button
                         type="button"
                         onClick={() => downloadComprobante(gastoToMarkPaid)}
-                        className="px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md flex items-center gap-2"
+                        className="px-4 py-2.5 bg-emerald-50 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md flex items-center gap-2"
                       >
                         <Download className="w-4 h-4" />
                         Descargar
