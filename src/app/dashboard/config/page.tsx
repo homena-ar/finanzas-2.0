@@ -5,7 +5,7 @@ import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { formatMoney, getMonthName } from '@/lib/utils'
-import { Save, Plus, X, Edit2, Users, Mail } from 'lucide-react'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2 } from 'lucide-react' // <--- Agregamos Trash2
 import { AlertModal } from '@/components/Modal'
 import type { WorkspacePermissions } from '@/types'
 
@@ -21,6 +21,7 @@ export default function ConfigPage() {
     currentWorkspace,
     createWorkspace,
     updateWorkspace,
+    deleteWorkspace, // <--- Nos aseguramos de usar esto
     inviteUser,
     members,
     invitations,
@@ -54,7 +55,6 @@ export default function ConfigPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteWorkspaceId, setInviteWorkspaceId] = useState('')
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
-  const [editingMember, setEditingMember] = useState<any>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
 
@@ -173,10 +173,12 @@ export default function ConfigPage() {
       return
     }
 
-    if (workspaces.length >= 3) {
+    // CORREGIDO: Límite de 2 espacios propios (Personal + 2 = 3 contextos totales)
+    const myWorkspacesCount = workspaces.filter(w => w.owner_id === user?.uid).length
+    if (myWorkspacesCount >= 2) {
       setAlertData({
         title: 'Límite alcanzado',
-        message: 'No podés crear más de 3 workspaces',
+        message: 'Ya tenés 2 espacios compartidos creados (el máximo permitido).',
         variant: 'warning'
       })
       setShowAlert(true)
@@ -202,6 +204,27 @@ export default function ConfigPage() {
     }
 
     setShowAlert(true)
+  }
+
+  // NUEVA FUNCIÓN: ELIMINAR WORKSPACE
+  const handleDeleteWorkspace = async (id: string, name: string) => {
+    if (confirm(`¿Estás seguro de eliminar el espacio "${name}"? ESTA ACCIÓN BORRARÁ TODOS LOS DATOS ASOCIADOS y no se puede deshacer.`)) {
+      const result = await deleteWorkspace(id)
+      if (result.error) {
+         setAlertData({
+            title: 'Error',
+            message: 'No se pudo eliminar el workspace.',
+            variant: 'error'
+          })
+      } else {
+         setAlertData({
+            title: 'Workspace eliminado',
+            message: `El espacio "${name}" fue eliminado correctamente.`,
+            variant: 'success'
+          })
+      }
+      setShowAlert(true)
+    }
   }
 
   const handleInviteUser = async () => {
@@ -395,7 +418,8 @@ export default function ConfigPage() {
           </div>
           <button
             onClick={() => setShowWorkspaceModal(true)}
-            disabled={workspaces.length >= 3}
+            // Deshabilitar si ya tiene 2 o más propios
+            disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 2}
             className="btn btn-primary"
           >
             <Plus className="w-4 h-4" /> Nuevo Workspace
@@ -436,13 +460,23 @@ export default function ConfigPage() {
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold">{ws.name}</h4>
                             {isOwner && (
-                              <button
-                                onClick={() => handleEditWorkspace(ws.id, ws.name)}
-                                className="p-1 hover:bg-slate-200 rounded transition"
-                                title="Editar nombre"
-                              >
-                                <Edit2 className="w-4 h-4 text-slate-600" />
-                              </button>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleEditWorkspace(ws.id, ws.name)}
+                                  className="p-1 hover:bg-slate-200 rounded transition"
+                                  title="Editar nombre"
+                                >
+                                  <Edit2 className="w-4 h-4 text-slate-600" />
+                                </button>
+                                {/* NUEVO BOTÓN ELIMINAR */}
+                                <button
+                                  onClick={() => handleDeleteWorkspace(ws.id, ws.name)}
+                                  className="p-1 hover:bg-red-100 rounded transition"
+                                  title="Eliminar workspace"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </button>
+                              </div>
                             )}
                           </div>
                           <p className="text-xs text-slate-500">
@@ -926,7 +960,7 @@ export default function ConfigPage() {
                   autoFocus
                 />
                 <p className="text-xs text-slate-500 mt-2">
-                  Podés crear hasta 3 workspaces
+                  Podés crear hasta 2 workspaces compartidos adicionales.
                 </p>
               </div>
             </div>
