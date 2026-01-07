@@ -7,7 +7,7 @@ export interface Profile {
   ahorro_pesos: number
   ahorro_usd: number
   ingresos_habilitado?: boolean
-  personal_workspace_name?: string // <--- ESTE ES EL CAMPO NUEVO QUE FALTABA
+  personal_workspace_name?: string
   created_at: string
 }
 
@@ -53,13 +53,11 @@ export interface Gasto {
   es_fijo: boolean
   tag_ids: string[]
   pagado: boolean
-  // Campos de pago
   fecha_pago?: string
   medio_pago?: string
   comprobante_url?: string
   comprobante_nombre?: string
   created_at: string
-  // Relaciones
   tarjeta?: Tarjeta
   categoria?: Categoria
   tags?: Tag[]
@@ -85,7 +83,7 @@ export interface Meta {
   progreso: number
   moneda: 'ARS' | 'USD'
   completada: boolean
-  fecha_limite?: string  // Fecha límite opcional
+  fecha_limite?: string
   created_at: string
 }
 
@@ -129,10 +127,9 @@ export interface Ingreso {
   monto: number
   moneda: 'ARS' | 'USD'
   fecha: string
-  mes: string  // YYYY-MM
+  mes: string
   tag_ids: string[]
   created_at: string
-  // Relaciones
   categoria?: CategoriaIngreso
   tags?: TagIngreso[]
 }
@@ -181,6 +178,8 @@ export interface WorkspaceInvitation {
   id: string
   workspace_id: string
   email: string
+  inviter_email?: string  // <--- NUEVO
+  workspace_name?: string // <--- NUEVO
   permissions: WorkspacePermissions
   status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
   created_at: string
