@@ -329,25 +329,29 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id))
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          isWorkspaceMember(request.resource.data.workspace_id)))
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
     }
 
@@ -355,25 +359,29 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id))
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          isWorkspaceMember(request.resource.data.workspace_id)))
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
     }
 
@@ -381,25 +389,29 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id))
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          isWorkspaceMember(request.resource.data.workspace_id)))
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
     }
 
@@ -407,25 +419,29 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id))
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          isWorkspaceMember(request.resource.data.workspace_id)))
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
     }
 
@@ -433,25 +449,29 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow create: if request.auth != null && (
         request.resource.data.user_id == request.auth.uid ||
         (request.resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(request.resource.data.workspace_id))
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          isWorkspaceMember(request.resource.data.workspace_id)))
       );
 
       allow update: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
 
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceMember(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
     }
 

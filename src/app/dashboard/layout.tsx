@@ -17,7 +17,7 @@ import type { WorkspacePermissions } from '@/types'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
-  const { workspaces, currentWorkspace, setCurrentWorkspace, members } = useWorkspace()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -32,11 +32,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // 2. Dueño del Workspace: Siempre acceso total (Failsafe anti-bloqueo)
     if (currentWorkspace.owner_id === user?.uid) return true
 
-    // 3. Colaborador: Verificar permisos en la lista de miembros
+    // 3. Si aún están cargando los miembros, asumimos acceso temporal para evitar ocultar pestañas
+    if (workspaceLoading) return true
+
+    // 4. Colaborador: Verificar permisos en la lista de miembros
     const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
     
-    // Si aún no cargaron los miembros, asumimos 'false' temporalmente para proteger, 
-    // pero idealmente deberíamos mostrar un "Cargando..." si es crítico.
+    // Si no se encontró el miembro después de cargar, no tiene acceso
     if (!member) return false 
 
     return member.permissions[section] !== 'ninguno'

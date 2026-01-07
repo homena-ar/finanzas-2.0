@@ -353,8 +353,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
       })) as Categoria[]
 
-      // Crear categorías por defecto si no existen (y tengo permiso de admin o es personal)
-      if (categoriasData.length === 0 && (!isWorkspaceMode || permissions.gastos === 'admin')) {
+      // Crear categorías por defecto si no existen (y tengo permiso de admin o es personal o soy dueño)
+      const isOwner = isWorkspaceMode && currentWorkspace.owner_id === user.uid
+      const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwner
+      
+      if (categoriasData.length === 0 && canCreateCategories) {
         console.log('📂 [Firebase useData] No categories found - Creating default categories')
         const defaultCategorias = [
           { nombre: 'Comida', icono: '🍔', color: '#f97316' },
@@ -468,7 +471,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
       })) as CategoriaIngreso[]
 
-      if (categoriasIngresosData.length === 0 && (!isWorkspaceMode || permissions.ingresos === 'admin')) {
+      const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwner
+      if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos) {
          const defaultCategoriasIngresos = [
           { nombre: 'Salario', icono: '💼', color: '#3b82f6' },
           { nombre: 'Freelance', icono: '💻', color: '#8b5cf6' },
