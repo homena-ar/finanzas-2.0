@@ -107,33 +107,64 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       
       setWorkspaces(uniqueWorkspaces)
 
-      // 3. Cargar MIEMBROS de TODOS los workspaces cargados
-      // (Esto arregla que diga "0 miembros" en la config cuando no estás en ese espacio)
-      const workspaceIds = uniqueWorkspaces.map(w => w.id)
+      // 3. Cargar MIEMBROS - Solo los del usuario actual (para cumplir con reglas de seguridad)
+      // Primero obtenemos todos los miembros donde el usuario actual es miembro
+      console.log('🏢 [useWorkspace] Cargando miembros del usuario:', user.uid)
+      const myMembersRef = collection(db, 'workspace_members')
+      const myMembersQuery = query(myMembersRef, where('user_id', '==', user.uid))
+      const myMembersSnap = await getDocs(myMembersQuery)
+      console.log('🏢 [useWorkspace] Miembros encontrados:', myMembersSnap.docs.length)
       
-      if (workspaceIds.length > 0) {
-        // Firestore 'in' soporta hasta 10 valores (tienes límite de 3 workspaces, así que OK)
-        const allMembersQuery = query(
-          collection(db, 'workspace_members'),
-          where('workspace_id', 'in', workspaceIds)
-        )
-        const allMembersSnap = await getDocs(allMembersQuery)
-        
-        const allMembersData = allMembersSnap.docs.map(doc => ({
-          id: doc.id,
-          workspace_id: doc.data().workspace_id,
-          user_id: doc.data().user_id,
-          user_email: doc.data().user_email,
-          permissions: doc.data().permissions,
-          created_at: doc.data().created_at instanceof Timestamp
-            ? doc.data().created_at.toDate().toISOString()
-            : doc.data().created_at
-        })) as WorkspaceMember[]
+      const myMembersData = myMembersSnap.docs.map(doc => ({
+        id: doc.id,
+        workspace_id: doc.data().workspace_id,
+        user_id: doc.data().user_id,
+        user_email: doc.data().user_email,
+        permissions: doc.data().permissions,
+        created_at: doc.data().created_at instanceof Timestamp
+          ? doc.data().created_at.toDate().toISOString()
+          : doc.data().created_at
+      })) as WorkspaceMember[]
 
-        setMembers(allMembersData)
-      } else {
-        setMembers([])
+      // Ahora, para cada workspace donde soy dueño, cargar TODOS los miembros
+      const ownedWorkspaceIds = ownedWorkspaces.map(w => w.id)
+      const allMembersData: WorkspaceMember[] = [...myMembersData]
+
+      if (ownedWorkspaceIds.length > 0) {
+        // Solo el dueño puede leer todos los miembros de sus workspaces
+        for (const wsId of ownedWorkspaceIds) {
+          try {
+            const workspaceMembersQuery = query(
+              collection(db, 'workspace_members'),
+              where('workspace_id', '==', wsId)
+            )
+            const workspaceMembersSnap = await getDocs(workspaceMembersQuery)
+            
+            const workspaceMembers = workspaceMembersSnap.docs.map(doc => ({
+              id: doc.id,
+              workspace_id: doc.data().workspace_id,
+              user_id: doc.data().user_id,
+              user_email: doc.data().user_email,
+              permissions: doc.data().permissions,
+              created_at: doc.data().created_at instanceof Timestamp
+                ? doc.data().created_at.toDate().toISOString()
+                : doc.data().created_at
+            })) as WorkspaceMember[]
+
+            // Agregar solo los que no están ya en la lista
+            workspaceMembers.forEach(member => {
+              if (!allMembersData.find(m => m.id === member.id)) {
+                allMembersData.push(member)
+              }
+            })
+          } catch (e) {
+            console.warn(`Error cargando miembros del workspace ${wsId}:`, e)
+          }
+        }
       }
+
+      console.log('🏢 [useWorkspace] Total miembros cargados:', allMembersData.length)
+      setMembers(allMembersData)
 
       // 4. Mis invitaciones pendientes
       const invitationsRef = collection(db, 'workspace_invitations')
