@@ -164,7 +164,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setInvitations([])
       setLoading(false)
     }
-  }, [user]) // Eliminamos currentWorkspace de dependencias para evitar loops infinitos, fetchAll ya lo maneja
+  }, [user, fetchAll]) // Agregamos fetchAll a las dependencias
+
+  // Recargar miembros cuando cambia el workspace actual (solo si es colaborador)
+  useEffect(() => {
+    if (user && currentWorkspace && !loading) {
+      console.log('🏢 [useWorkspace] Workspace cambió a:', currentWorkspace.id, 'verificando miembros...')
+      const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user.uid)
+      const isOwner = currentWorkspace.owner_id === user.uid
+      
+      if (!member && !isOwner) {
+        console.log('🏢 [useWorkspace] No se encontró miembro para colaborador, recargando...')
+        // Solo recargar si realmente no es dueño y no hay miembro
+        fetchAll()
+      } else {
+        console.log('🏢 [useWorkspace] Miembro encontrado o es dueño:', { isOwner, hasMember: !!member })
+      }
+    }
+  }, [currentWorkspace?.id, user?.uid, members.length]) // Solo cuando cambia el ID del workspace o del usuario
 
   const createWorkspace = useCallback(async (name: string) => {
     if (!user) return { error: new Error('No user') }

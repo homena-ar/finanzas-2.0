@@ -27,21 +27,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // --- LÓGICA DE PERMISOS MEJORADA ---
   const hasAccess = (section: keyof WorkspacePermissions) => {
     // 1. Espacio Personal: Siempre acceso total
-    if (!currentWorkspace) return true
+    if (!currentWorkspace) {
+      console.log('🔒 [Layout] Sin workspace - acceso completo a', section)
+      return true
+    }
     
     // 2. Dueño del Workspace: Siempre acceso total (Failsafe anti-bloqueo)
-    if (currentWorkspace.owner_id === user?.uid) return true
+    if (currentWorkspace.owner_id === user?.uid) {
+      console.log('🔒 [Layout] Usuario es dueño - acceso completo a', section)
+      return true
+    }
 
     // 3. Si aún están cargando los miembros, asumimos acceso temporal para evitar ocultar pestañas
-    if (workspaceLoading) return true
+    if (workspaceLoading) {
+      console.log('🔒 [Layout] Cargando miembros - acceso temporal a', section)
+      return true
+    }
 
     // 4. Colaborador: Verificar permisos en la lista de miembros
+    console.log('🔒 [Layout] Buscando miembro - workspace:', currentWorkspace.id, 'usuario:', user?.uid, 'total miembros:', members.length)
+    console.log('🔒 [Layout] Miembros disponibles:', members.map(m => ({ workspace_id: m.workspace_id, user_id: m.user_id })))
+    
     const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
     
-    // Si no se encontró el miembro después de cargar, no tiene acceso
-    if (!member) return false 
+    if (!member) {
+      console.log('🔒 [Layout] ❌ No se encontró miembro para workspace', currentWorkspace.id, 'usuario', user?.uid)
+      return false 
+    }
 
-    return member.permissions[section] !== 'ninguno'
+    const hasPermission = member.permissions[section] !== 'ninguno'
+    console.log('🔒 [Layout] ✅ Permiso para', section, ':', member.permissions[section], '->', hasPermission)
+    return hasPermission
   }
 
   // Nombre del espacio personal (desde perfil o default)
