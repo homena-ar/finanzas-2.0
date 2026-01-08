@@ -318,51 +318,66 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         created_at: serverTimestamp()
       })
 
-      // Enviar email usando Firebase Trigger Email extension
-      // Formato compatible con la extensión oficial de Firebase
+      // Enviar email usando Resend API
       try {
-        const emailDoc = {
-          to: [email], // Array requerido por la extensión
-          from: user.email || 'noreply@fincontrol.app', // Remitente
-          message: {
-            subject: `Invitación a ${workspaceName} - FinControl`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #6366f1;">¡Te invitaron a colaborar!</h2>
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #6366f1;">¡Te invitaron a colaborar!</h2>
 
-                <p>Has sido invitado a colaborar en <strong>${workspaceName}</strong> en FinControl.</p>
+            <p>Has sido invitado a colaborar en <strong>${workspaceName}</strong> en FinControl.</p>
 
-                <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                  <h3 style="margin-top: 0; color: #4b5563;">Permisos asignados:</h3>
-                  <ul style="color: #6b7280;">
-                    <li>💰 Gastos: <strong>${permissions.gastos}</strong></li>
-                    <li>💵 Ingresos: <strong>${permissions.ingresos}</strong></li>
-                    <li>🏦 Ahorros: <strong>${permissions.ahorros}</strong></li>
-                    <li>💳 Tarjetas: <strong>${permissions.tarjetas}</strong></li>
-                  </ul>
-                </div>
+            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #4b5563;">Permisos asignados:</h3>
+              <ul style="color: #6b7280;">
+                <li>💰 Gastos: <strong>${permissions.gastos}</strong></li>
+                <li>💵 Ingresos: <strong>${permissions.ingresos}</strong></li>
+                <li>🏦 Ahorros: <strong>${permissions.ahorros}</strong></li>
+                <li>💳 Tarjetas: <strong>${permissions.tarjetas}</strong></li>
+              </ul>
+            </div>
 
-                <p><strong>Para aceptar la invitación:</strong></p>
-                <ol style="color: #6b7280;">
-                  <li>Inicia sesión en FinControl con este email: <strong>${email}</strong></li>
-                  <li>Ve a la página de Configuración</li>
-                  <li>Verás la invitación pendiente y podrás aceptarla</li>
-                </ol>
+            <p><strong>Para aceptar la invitación:</strong></p>
+            <ol style="color: #6b7280;">
+              <li>Inicia sesión en FinControl con este email: <strong>${email}</strong></li>
+              <li>Ve a la página de Configuración</li>
+              <li>Verás la invitación pendiente y podrás aceptarla</li>
+            </ol>
 
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
-                  <p>Este es un email automático de FinControl. Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
-                </div>
-              </div>
-            `,
-            text: `Te invitaron a colaborar en ${workspaceName}. Entra a la app para aceptar.`
-          }
-        }
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
+              <p>Este es un email automático de FinControl. Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
+            </div>
+          </div>
+        `
+
+        const emailText = `Te invitaron a colaborar en ${workspaceName} en FinControl. Entra a la app para aceptar la invitación.`
 
         console.log('📧 [useWorkspace] Enviando email de invitación a:', email)
-        const mailRef = await addDoc(collection(db, 'mail'), emailDoc)
-        console.log('✅ [useWorkspace] Documento de correo creado con ID:', mailRef.id)
+        
+        const response = await fetch('/api/send-invitation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: email,
+            from: user.email || 'FinControl <onboarding@resend.dev>',
+            subject: `Invitación a ${workspaceName} - FinControl`,
+            html: emailHtml,
+            text: emailText,
+            workspaceName,
+            permissions
+          })
+        })
+
+        const result = await response.json()
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Error al enviar correo')
+        }
+
+        console.log('✅ [useWorkspace] Correo enviado exitosamente:', result)
       } catch (emailError) {
-        console.error('❌ [useWorkspace] Error al crear documento de correo:', emailError)
+        console.error('❌ [useWorkspace] Error al enviar correo:', emailError)
         // No fallar la invitación si el email falla, la invitación ya está creada
         // El usuario puede ver la invitación en la app aunque no reciba el email
       }
