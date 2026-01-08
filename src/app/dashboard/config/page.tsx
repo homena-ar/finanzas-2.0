@@ -25,6 +25,7 @@ export default function ConfigPage() {
     sentInvitations,
     acceptInvitation,
     rejectInvitation,
+    cancelInvitation,
     updateMemberPermissions,
     updateMemberDisplayName,
     removeMember
@@ -290,9 +291,10 @@ export default function ConfigPage() {
     const result = await inviteUser(inviteWorkspaceId, inviteEmail, invitePermissions)
 
     if (result.error) {
+      const errorMessage = result.error.message || 'No se pudo enviar la invitación'
       setAlertData({
         title: 'Error',
-        message: 'No se pudo enviar la invitación',
+        message: errorMessage,
         variant: 'error'
       })
     } else {
@@ -779,9 +781,36 @@ export default function ConfigPage() {
                                       Permisos: {Object.values(inv.permissions).join(', ')}
                                     </p>
                                   </div>
-                                  <span className={`text-xs px-2 py-1 rounded border font-medium ${statusColors[inv.status] || statusColors.pending}`}>
-                                    {statusLabels[inv.status] || '⏳ Pendiente'}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs px-2 py-1 rounded border font-medium ${statusColors[inv.status as keyof typeof statusColors] || statusColors.pending}`}>
+                                      {statusLabels[inv.status as keyof typeof statusLabels] || '⏳ Pendiente'}
+                                    </span>
+                                    {(inv.status === 'pending' || inv.status === 'rejected') && (
+                                      <button
+                                        onClick={async () => {
+                                          const result = await cancelInvitation(inv.id)
+                                          if (result.error) {
+                                            setAlertData({
+                                              title: 'Error',
+                                              message: 'No se pudo cancelar la invitación',
+                                              variant: 'error'
+                                            })
+                                          } else {
+                                            setAlertData({
+                                              title: 'Invitación cancelada',
+                                              message: 'La invitación fue cancelada. Ahora puedes volver a invitar.',
+                                              variant: 'success'
+                                            })
+                                          }
+                                          setShowAlert(true)
+                                        }}
+                                        className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition"
+                                        title="Cancelar invitación"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               )
                             })}

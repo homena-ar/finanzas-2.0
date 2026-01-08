@@ -38,6 +38,7 @@ interface WorkspaceContextType {
 
   acceptInvitation: (invitationId: string) => Promise<{ error: any }>
   rejectInvitation: (invitationId: string) => Promise<{ error: any }>
+  cancelInvitation: (invitationId: string) => Promise<{ error: any }>
 
   fetchAll: () => Promise<void>
 }
@@ -288,21 +289,40 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: new Error('No user') }
 
     try {
-      // VALIDACIÓN: Verificar si ya existe una invitación pendiente
-      const existingQuery = query(
+      // VALIDACIÓN: Verificar si ya existe una invitación (cualquier estado)
+      const existingInvitationQuery = query(
         collection(db, 'workspace_invitations'),
         where('workspace_id', '==', workspaceId),
-        where('email', '==', email),
-        where('status', '==', 'pending')
+        where('email', '==', email)
       )
-      const existingSnap = await getDocs(existingQuery)
-      if (!existingSnap.empty) {
-        return { error: new Error('Ya existe una invitación pendiente para este usuario.') }
+      const existingInvitationSnap = await getDocs(existingInvitationQuery)
+      
+      if (!existingInvitationSnap.empty) {
+        const existingInvitation = existingInvitationSnap.docs[0].data()
+        const status = existingInvitation.status
+        
+        if (status === 'pending') {
+          return { error: new Error('Ya existe una invitación pendiente para este email. Puedes cancelarla y volver a invitar.') }
+        } else if (status === 'accepted') {
+          return { error: new Error('Este usuario ya aceptó una invitación y es miembro del workspace.') }
+        } else if (status === 'rejected') {
+          return { error: new Error('Este usuario rechazó una invitación anterior. Puedes cancelarla y volver a invitar.') }
+        } else if (status === 'cancelled') {
+          // Si está cancelada, podemos crear una nueva
+        }
       }
 
-      // VALIDACIÓN: Verificar si ya es miembro
-      const memberId = `${workspaceId}_${user.uid}` // Nota: Esto chequea al usuario actual, idealmente chequeariamos si el email ya es miembro
-      // Por simplicidad en frontend confiamos en la UI, pero el backend/reglas deben proteger.
+      // VALIDACIÓN: Verificar si ya es miembro del workspace
+      const membersQuery = query(
+        collection(db, 'workspace_members'),
+        where('workspace_id', '==', workspaceId)
+      )
+      const membersSnap = await getDocs(membersQuery)
+      const isAlreadyMember = membersSnap.docs.some(doc => doc.data().user_email === email)
+      
+      if (isAlreadyMember) {
+        return { error: new Error('Este email ya es miembro del workspace.') }
+      }
 
       const workspace = workspaces.find(w => w.id === workspaceId)
       const workspaceName = workspace?.name || 'Workspace'
@@ -460,10 +480,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (e) { return { error: e } }
   }, [fetchAll])
 
+  const cancelInvitation = useCallback(async (invitationId: string) => {
+    try {
+        await updateDoc(doc(db, 'workspace_invitations', invitationId), { status: 'cancelled' })
+        await fetchAll()
+        return { error: null }
+    } catch (e) { return { error: e } }
+  }, [fetchAll])
+
   const value = {
     workspaces, currentWorkspace, members, invitations, sentInvitations, loading,
     setCurrentWorkspace, createWorkspace, updateWorkspace, deleteWorkspace,
-    inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, acceptInvitation, rejectInvitation, fetchAll
+    inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, acceptInvitation, rejectInvitation, cancelInvitation, fetchAll
   }
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
