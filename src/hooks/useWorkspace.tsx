@@ -371,33 +371,72 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
         const emailText = `Te invitaron a colaborar en ${workspaceName} en FinControl. Entra a la app para aceptar la invitación.`
 
-        console.log('📧 [useWorkspace] Enviando email de invitación a:', email)
+        // Formatear el campo 'from' correctamente para Resend
+        // Resend requiere formato: "Nombre <email@domain.com>" o solo "email@domain.com"
+        // Si el email del usuario no está verificado en Resend, usar el dominio por defecto
+        let emailFrom = 'FinControl <onboarding@resend.dev>'
+        if (user.email) {
+          // Intentar usar el email del usuario, pero Resend solo permite dominios verificados
+          // Por ahora usamos el dominio por defecto de Resend
+          emailFrom = `FinControl <onboarding@resend.dev>`
+        }
+
+        const emailPayload = {
+          to: email,
+          from: emailFrom,
+          subject: `Invitación a ${workspaceName} - FinControl`,
+          html: emailHtml,
+          text: emailText,
+          workspaceName,
+          permissions
+        }
+
+        console.log('📧 [useWorkspace] Enviando email de invitación:', {
+          to: email,
+          from: emailPayload.from,
+          subject: emailPayload.subject,
+          htmlLength: emailHtml.length,
+          textLength: emailText.length
+        })
         
+        console.log('📧 [useWorkspace] Llamando a /api/send-invitation...')
         const response = await fetch('/api/send-invitation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            to: email,
-            from: user.email || 'FinControl <onboarding@resend.dev>',
-            subject: `Invitación a ${workspaceName} - FinControl`,
-            html: emailHtml,
-            text: emailText,
-            workspaceName,
-            permissions
-          })
+          body: JSON.stringify(emailPayload)
+        })
+
+        console.log('📧 [useWorkspace] Response recibida:', {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
         })
 
         const result = await response.json()
+        console.log('📧 [useWorkspace] Resultado parseado:', result)
         
         if (!response.ok) {
-          throw new Error(result.error || 'Error al enviar correo')
+          const errorMessage = result.error || result.details || 'Error al enviar correo'
+          console.error('❌ [useWorkspace] Error en respuesta:', {
+            status: response.status,
+            error: errorMessage,
+            details: result.details,
+            fullResult: result
+          })
+          throw new Error(errorMessage)
         }
 
         console.log('✅ [useWorkspace] Correo enviado exitosamente:', result)
-      } catch (emailError) {
-        console.error('❌ [useWorkspace] Error al enviar correo:', emailError)
+      } catch (emailError: any) {
+        console.error('❌ [useWorkspace] Error al enviar correo:', {
+          error: emailError,
+          errorMessage: emailError?.message,
+          errorStack: emailError?.stack,
+          errorType: emailError?.constructor?.name
+        })
         // No fallar la invitación si el email falla, la invitación ya está creada
         // El usuario puede ver la invitación en la app aunque no reciba el email
       }

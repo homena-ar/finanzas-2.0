@@ -4,12 +4,24 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
+  console.log('📧 [API] POST /api/send-invitation - Iniciando...')
+  
   try {
     const body = await request.json()
+    console.log('📧 [API] Body recibido:', {
+      to: body.to,
+      from: body.from,
+      subject: body.subject,
+      hasHtml: !!body.html,
+      hasText: !!body.text,
+      workspaceName: body.workspaceName
+    })
+
     const { to, from, subject, html, text, workspaceName, permissions } = body
 
     // Validar que tenemos los datos necesarios
     if (!to || !subject || !html) {
+      console.error('❌ [API] Faltan campos requeridos:', { to: !!to, subject: !!subject, html: !!html })
       return NextResponse.json(
         { error: 'Faltan campos requeridos: to, subject, html' },
         { status: 400 }
@@ -17,37 +29,121 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar que tenemos la API key
-    if (!process.env.RESEND_API_KEY) {
-      console.error('❌ RESEND_API_KEY no está configurada')
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      console.error('❌ [API] RESEND_API_KEY no está configurada')
       return NextResponse.json(
         { error: 'Configuración de correo no disponible' },
         { status: 500 }
       )
     }
 
-    // Enviar el correo usando Resend
-    const { data, error } = await resend.emails.send({
-      from: from || 'FinControl <onboarding@resend.dev>', // Usar el dominio de Resend por defecto
-      to: Array.isArray(to) ? to : [to],
+    console.log('📧 [API] API Key configurada:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NO ENCONTRADA')
+
+    // Preparar el email payload
+    // Resend requiere que 'from' use un dominio verificado o el dominio por defecto
+    const emailFrom = from || 'FinControl <onboarding@resend.dev>'
+    
+    // Validar formato del email 'from'
+    if (!emailFrom.includes('<') || !emailFrom.includes('>')) {
+      console.warn('⚠️ [API] Formato de "from" puede ser inválido, usando formato por defecto')
+    }
+    
+    // Validar que 'to' es un email válido
+    const emailTo = Array.isArray(to) ? to : [to]
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const invalidEmails = emailTo.filter((email: string) => !emailRegex.test(email))
+    if (invalidEmails.length > 0) {
+      console.error('❌ [API] Emails inválidos:', invalidEmails)
+      return NextResponse.json(
+        { error: `Emails inválidos: ${invalidEmails.join(', ')}` },
+        { status: 400 }
+      )
+    }
+    
+    const emailText = text || html.replace(/<[^>]*>/g, '')
+
+    console.log('📧 [API] Preparando email:', {
+      from: emailFrom,
+      to: emailTo,
       subject: subject,
-      html: html,
-      text: text || html.replace(/<[^>]*>/g, ''), // Convertir HTML a texto si no se proporciona
+      htmlLength: html.length,
+      textLength: emailText.length,
+      apiKeyPrefix: apiKey?.substring(0, 7)
     })
 
-    if (error) {
-      console.error('❌ Error enviando correo con Resend:', error)
+    // Validar que Resend está inicializado correctamente
+    if (!resend) {
+      console.error('❌ [API] Resend no está inicializado')
       return NextResponse.json(
-        { error: 'Error al enviar correo', details: error },
+        { error: 'Servicio de correo no disponible' },
         { status: 500 }
       )
     }
 
-    console.log('✅ Correo enviado exitosamente:', data)
-    return NextResponse.json({ success: true, data })
+    // Enviar el correo usando Resend
+    console.log('📧 [API] Llamando a resend.emails.send...')
+    let data, error
+    try {
+      const result = await resend.emails.send({
+        from: emailFrom,
+        to: emailTo,
+        subject: subject,
+        html: html,
+        text: emailText,
+      })
+      data = result.data
+      error = result.error
+    } catch (sendError: any) {
+      console.error('❌ [API] Excepción al llamar resend.emails.send:', {
+        error: sendError,
+        message: sendError?.message,
+        stack: sendError?.stack
+      })
+      error = sendError
+    }
+
+    if (error) {
+      console.error('❌ [API] Error enviando correo con Resend:', {
+        error,
+        errorType: typeof error,
+        errorString: JSON.stringify(error, null, 2)
+      })
+      return NextResponse.json(
+        { 
+          error: 'Error al enviar correo', 
+          details: error,
+          errorMessage: typeof error === 'object' ? JSON.stringify(error) : String(error)
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ [API] Correo enviado exitosamente:', {
+      data,
+      dataType: typeof data,
+      dataString: JSON.stringify(data, null, 2)
+    })
+    
+    return NextResponse.json({ 
+      success: true, 
+      data,
+      message: 'Correo enviado correctamente'
+    })
   } catch (error: any) {
-    console.error('❌ Error en API route send-invitation:', error)
+    console.error('❌ [API] Error en API route send-invitation:', {
+      error,
+      errorMessage: error?.message,
+      errorStack: error?.stack,
+      errorString: JSON.stringify(error, null, 2)
+    })
     return NextResponse.json(
-      { error: 'Error interno del servidor', details: error.message },
+      { 
+        error: 'Error interno del servidor', 
+        details: error.message,
+        errorType: error?.constructor?.name,
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      },
       { status: 500 }
     )
   }
