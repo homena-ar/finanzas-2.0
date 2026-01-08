@@ -375,6 +375,55 @@ export default function ConfigPage() {
     }
   }
 
+  // Guardar todos los cambios pendientes de permisos de una vez
+  const saveAllPendingPermissions = async () => {
+    if (Object.keys(pendingPermissions).length === 0) return
+
+    // Agrupar cambios por miembro
+    const changesByMember: Record<string, Partial<WorkspacePermissions>> = {}
+    
+    Object.entries(pendingPermissions).forEach(([key, value]) => {
+      const [memberId, section] = key.split('_')
+      if (!changesByMember[memberId]) {
+        changesByMember[memberId] = {}
+      }
+      changesByMember[memberId][section as keyof WorkspacePermissions] = value as any
+    })
+
+    // Aplicar todos los cambios
+    const promises = Object.entries(changesByMember).map(async ([memberId, newPermissions]) => {
+      const member = members.find(m => m.id === memberId)
+      if (!member) return
+
+      const updatedPermissions = {
+        ...member.permissions,
+        ...newPermissions
+      }
+
+      return updateMemberPermissions(memberId, updatedPermissions)
+    })
+
+    const results = await Promise.all(promises)
+    const hasError = results.some(r => r.error)
+
+    if (hasError) {
+      setAlertData({
+        title: 'Error',
+        message: 'Algunos permisos no se pudieron actualizar',
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: '¡Permisos actualizados!',
+        message: 'Todos los cambios se guardaron correctamente',
+        variant: 'success'
+      })
+      setPendingPermissions({}) // Limpiar todos los cambios pendientes
+    }
+
+    setShowAlert(true)
+  }
+
   const handleRemoveMember = async (memberId: string, memberEmail: string) => {
     if (!confirm(`¿Eliminar a ${memberEmail} del workspace?`)) {
       return
@@ -629,33 +678,34 @@ export default function ConfigPage() {
                                   return (
                                     <div key={section} className="flex flex-col">
                                       <label className="text-[10px] uppercase font-bold text-slate-500 mb-1">{section}</label>
-                                      <div className="flex gap-1">
-                                        <select
-                                          className={`input input-sm text-xs w-full ${hasChange ? 'border-indigo-500 bg-indigo-50' : ''}`}
-                                          value={pendingValue || currentValue}
-                                          onChange={(e) => handlePermissionChange(member.id, section, e.target.value)}
-                                          disabled={member.user_id === user?.uid} // El dueño no se edita a sí mismo
-                                        >
-                                          {permissionOptions.map(opt => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                          ))}
-                                        </select>
-                                        {hasChange && (
-                                          <button 
-                                            onClick={() => savePermission(member.id, section as keyof WorkspacePermissions, member)}
-                                            className="bg-indigo-600 text-white p-1 rounded hover:bg-indigo-700 flex items-center justify-center min-w-[28px]"
-                                            title="Guardar cambio"
-                                          >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                          </button>
-                                        )}
-                                      </div>
+                                      <select
+                                        className={`input input-sm text-xs w-full ${hasChange ? 'border-indigo-500 bg-indigo-50' : ''}`}
+                                        value={pendingValue || currentValue}
+                                        onChange={(e) => handlePermissionChange(member.id, section, e.target.value)}
+                                        disabled={member.user_id === user?.uid} // El dueño no se edita a sí mismo
+                                      >
+                                        {permissionOptions.map(opt => (
+                                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                      </select>
                                     </div>
                                   )
                                 })}
                               </div>
                             </div>
                           ))}
+                          {/* Botón para guardar todos los cambios pendientes */}
+                          {Object.keys(pendingPermissions).length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-slate-200">
+                              <button
+                                onClick={saveAllPendingPermissions}
+                                className="btn btn-primary w-full justify-center"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                Guardar todos los cambios ({Object.keys(pendingPermissions).length})
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="text-center text-slate-500 text-sm py-4">
@@ -1037,14 +1087,14 @@ export default function ConfigPage() {
       {/* Modal Invitar Usuario */}
       {showInviteModal && (
         <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="modal max-w-md w-full" onClick={e => e.stopPropagation()}>
+          <div className="modal max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">Invitar Usuario</h3>
               <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
               <div>
                 <label className="label">Email del usuario</label>
                 <input
@@ -1062,7 +1112,7 @@ export default function ConfigPage() {
               <div className="space-y-3 pt-2">
                 <h4 className="font-semibold text-sm text-slate-700">Configurar Permisos</h4>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => (
                     <div key={section}>
                       <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
@@ -1084,11 +1134,11 @@ export default function ConfigPage() {
               </div>
 
             </div>
-            <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">
-              <button onClick={() => setShowInviteModal(false)} className="btn btn-secondary">
+            <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <button onClick={() => setShowInviteModal(false)} className="btn btn-secondary order-2 sm:order-1">
                 Cancelar
               </button>
-              <button onClick={handleInviteUser} className="btn btn-primary">
+              <button onClick={handleInviteUser} className="btn btn-primary order-1 sm:order-2">
                 Enviar Invitación
               </button>
             </div>

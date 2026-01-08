@@ -85,6 +85,8 @@ export interface Meta {
   completada: boolean
   fecha_limite?: string
   created_at: string
+  created_by?: string // ID del usuario que creó la meta (en workspace)
+  workspace_id?: string
 }
 
 export interface MovimientoAhorro {
@@ -94,6 +96,8 @@ export interface MovimientoAhorro {
   monto: number
   descripcion?: string
   fecha: string
+  created_by?: string // ID del usuario que creó el movimiento (en workspace)
+  workspace_id?: string
 }
 
 export interface MedioPago {

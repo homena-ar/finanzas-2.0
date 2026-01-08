@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { formatMoney, fetchDolar } from '@/lib/utils'
 import { Plus, Minus, Target, X, Edit2, Trash2, Download, TrendingUp } from 'lucide-react'
 import confetti from 'canvas-confetti'
@@ -35,10 +36,19 @@ ChartJS.register(
 export default function AhorrosPage() {
   console.log('🟢🟢🟢 [AhorrosPage] COMPONENT RENDER')
 
-  const { profile, updateProfile } = useAuth()
+  const { profile, updateProfile, user } = useAuth()
   const { metas, movimientos, addMeta, updateMeta, deleteMeta, addMovimiento, updateMovimiento, deleteMovimiento } = useData()
+  const { currentWorkspace, members } = useWorkspace()
 
   console.log('🟢🟢🟢 [AhorrosPage] addMovimiento function reference:', addMovimiento)
+
+  // Helper para obtener el nombre del usuario que creó un elemento
+  const getCreatorName = (createdBy?: string) => {
+    if (!createdBy || !currentWorkspace) return null
+    if (createdBy === currentWorkspace.owner_id) return 'Propietario'
+    const member = members.find(m => m.user_id === createdBy && m.workspace_id === currentWorkspace.id)
+    return member ? member.user_email.split('@')[0] : null
+  }
 
   const [dolar, setDolar] = useState(1050)
   const [showMetaModal, setShowMetaModal] = useState(false)
@@ -551,17 +561,26 @@ export default function AhorrosPage() {
             </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {movimientos.filter(m => m.tipo === 'pesos').length > 0 ? (
-                movimientos.filter(m => m.tipo === 'pesos').slice(0, 3).map(m => (
+                movimientos.filter(m => m.tipo === 'pesos').slice(0, 3).map(m => {
+                  const creatorName = getCreatorName(m.created_by)
+                  return (
                   <div key={m.id} className="flex justify-between items-center text-sm py-1.5 hover:bg-slate-50 rounded px-2">
                     <div className="flex-1">
-                      <div className="text-slate-500 text-xs">{new Date(m.fecha).toLocaleDateString('es-AR')}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 text-xs">{new Date(m.fecha).toLocaleDateString('es-AR')}</span>
+                        {creatorName && (
+                          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                            {creatorName}
+                          </span>
+                        )}
+                      </div>
                       {m.descripcion && <div className="text-slate-600 text-xs truncate">{m.descripcion}</div>}
                     </div>
                     <span className={`font-medium ${m.monto > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {m.monto > 0 ? '+' : ''}{formatMoney(m.monto)}
                     </span>
                   </div>
-                ))
+                )})
               ) : (
                 <p className="text-slate-400 text-sm text-center py-2">Sin movimientos</p>
               )}
@@ -619,17 +638,26 @@ export default function AhorrosPage() {
             </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {movimientos.filter(m => m.tipo === 'usd').length > 0 ? (
-                movimientos.filter(m => m.tipo === 'usd').slice(0, 3).map(m => (
+                movimientos.filter(m => m.tipo === 'usd').slice(0, 3).map(m => {
+                  const creatorName = getCreatorName(m.created_by)
+                  return (
                   <div key={m.id} className="flex justify-between items-center text-sm py-1.5 hover:bg-slate-50 rounded px-2">
                     <div className="flex-1">
-                      <div className="text-slate-500 text-xs">{new Date(m.fecha).toLocaleDateString('es-AR')}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 text-xs">{new Date(m.fecha).toLocaleDateString('es-AR')}</span>
+                        {creatorName && (
+                          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                            {creatorName}
+                          </span>
+                        )}
+                      </div>
                       {m.descripcion && <div className="text-slate-600 text-xs truncate">{m.descripcion}</div>}
                     </div>
                     <span className={`font-medium ${m.monto > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {m.monto > 0 ? '+' : ''}{formatMoney(m.monto, 'USD')}
                     </span>
                   </div>
-                ))
+                )})
               ) : (
                 <p className="text-slate-400 text-sm text-center py-2">Sin movimientos</p>
               )}
@@ -659,12 +687,20 @@ export default function AhorrosPage() {
               const isDone = pct >= 100
               const desafio = calcularDesafio(m)
               const frase = getFraseMotivacional(m.progreso, m.objetivo)
+              const creatorName = getCreatorName(m.created_by)
 
               return (
                 <div key={m.id} className={`border-2 rounded-xl p-4 ${isDone ? 'bg-emerald-50 border-emerald-300' : 'border-slate-200'}`}>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <div className="text-2xl mb-1">{m.icono}</div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="text-2xl">{m.icono}</div>
+                        {creatorName && (
+                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                            Creada por {creatorName}
+                          </span>
+                        )}
+                      </div>
                       <div className="font-bold">{m.nombre}</div>
                       <div className="text-sm text-slate-500">Meta: {formatMoney(m.objetivo, m.moneda)}</div>
                       {m.fecha_limite && (
@@ -910,10 +946,19 @@ export default function AhorrosPage() {
                     return movFecha.getFullYear() === parseInt(year) &&
                            movFecha.getMonth() === parseInt(month) - 1
                   })
-                  .map(m => (
+                  .map(m => {
+                    const creatorName = getCreatorName(m.created_by)
+                    return (
                   <div key={m.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
                     <div className="flex-1">
-                      <div className="text-sm font-medium">{new Date(m.fecha).toLocaleDateString('es-AR', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium">{new Date(m.fecha).toLocaleDateString('es-AR', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                        {creatorName && (
+                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                            {creatorName}
+                          </span>
+                        )}
+                      </div>
                       {m.descripcion && <div className="text-xs text-slate-600 mt-1">{m.descripcion}</div>}
                     </div>
                     <div className="flex items-center gap-2">
@@ -944,7 +989,7 @@ export default function AhorrosPage() {
                       </button>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           </div>

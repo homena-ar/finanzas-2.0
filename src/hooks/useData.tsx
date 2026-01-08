@@ -211,7 +211,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
             monto: data.monto, 
             user_id: data.user_id, 
             fecha, 
-            descripcion: data.descripcion 
+            descripcion: data.descripcion,
+            created_by: data.created_by,
+            workspace_id: data.workspace_id
           } as MovimientoAhorro
         })
 
@@ -238,7 +240,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
             moneda: data.moneda,
             completada: data.completada || false,
             fecha_limite: data.fecha_limite || null,
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
+            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
+            created_by: data.created_by,
+            workspace_id: data.workspace_id
           }
         }) as Meta[]
 
