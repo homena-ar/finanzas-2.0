@@ -174,6 +174,7 @@ export interface WorkspaceMember {
   workspace_id: string
   user_id: string
   user_email: string
+  display_name?: string // Nombre personalizado para mostrar en etiquetas
   permissions: WorkspacePermissions
   created_at: string
 }

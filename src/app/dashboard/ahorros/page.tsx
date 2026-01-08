@@ -47,7 +47,9 @@ export default function AhorrosPage() {
     if (!createdBy || !currentWorkspace) return null
     if (createdBy === currentWorkspace.owner_id) return 'Propietario'
     const member = members.find(m => m.user_id === createdBy && m.workspace_id === currentWorkspace.id)
-    return member ? member.user_email.split('@')[0] : null
+    if (!member) return null
+    // Usar display_name si existe, sino usar email sin dominio
+    return member.display_name || member.user_email.split('@')[0]
   }
 
   const [dolar, setDolar] = useState(1050)

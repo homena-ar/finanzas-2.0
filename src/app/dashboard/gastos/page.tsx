@@ -55,10 +55,11 @@ export default function GastosPage() {
   const getUserLabel = (userId: string) => {
     if (!currentWorkspace) return null; // No mostrar en modo personal
     if (userId === user?.uid) return 'Tú'; // Si soy yo
+    if (userId === currentWorkspace.owner_id) return 'Propietario';
     
-    const member = members.find(m => m.user_id === userId);
-    // Retornar email (antes del @) o "Desconocido"
-    return member ? member.user_email.split('@')[0] : 'Desconocido';
+    const member = members.find(m => m.user_id === userId && m.workspace_id === currentWorkspace.id);
+    // Usar display_name si existe, sino usar email (antes del @) o "Desconocido"
+    return member ? (member.display_name || member.user_email.split('@')[0]) : 'Desconocido';
   }
 
   // Apply filter from URL query params

@@ -65,6 +65,9 @@ export default function ConfigPage() {
 
   // Estado para gestión de cambios pendientes en permisos (confirmación)
   const [pendingPermissions, setPendingPermissions] = useState<Record<string, string>>({})
+  // Estado para nombres en edición
+  const [editingNames, setEditingNames] = useState<Record<string, boolean>>({})
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({})
 
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
@@ -341,9 +344,10 @@ export default function ConfigPage() {
 
   // --- LÓGICA DE PERMISOS CON CONFIRMACIÓN ---
   const handlePermissionChange = (memberId: string, section: string, newValue: string) => {
+    // Usar un separador único que no aparezca en los IDs
     setPendingPermissions(prev => ({
       ...prev,
-      [`${memberId}_${section}`]: newValue
+      [`${memberId}|||${section}`]: newValue
     }))
   }
 
@@ -383,7 +387,12 @@ export default function ConfigPage() {
     const changesByMember: Record<string, Partial<WorkspacePermissions>> = {}
     
     Object.entries(pendingPermissions).forEach(([key, value]) => {
-      const [memberId, section] = key.split('_')
+      // El formato es "memberId|||section"
+      const [memberId, section] = key.split('|||')
+      if (!memberId || !section) {
+        console.error('❌ [Config] Formato de key inválido:', key)
+        return
+      }
       if (!changesByMember[memberId]) {
         changesByMember[memberId] = {}
       }
@@ -463,6 +472,26 @@ export default function ConfigPage() {
     }
 
     setShowAlert(true)
+  }
+
+  const handleUpdateMemberName = async (memberId: string, displayName: string) => {
+    const result = await updateMemberDisplayName(memberId, displayName || null)
+    
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo actualizar el nombre',
+        variant: 'error'
+      })
+      setShowAlert(true)
+    } else {
+      setAlertData({
+        title: 'Nombre actualizado',
+        message: 'El nombre del colaborador se actualizó correctamente',
+        variant: 'success'
+      })
+      setShowAlert(true)
+    }
   }
 
   const handleEditWorkspace = (workspaceId: string, currentName: string) => {
@@ -665,15 +694,81 @@ export default function ConfigPage() {
 
                       {workspaceMembers.length > 0 ? (
                         <div className="space-y-3">
-                          {workspaceMembers.map(member => (
+                          {workspaceMembers.map(member => {
+                            const isEditingName = editingNames[member.id] || false
+                            const currentDisplayName = displayNames[member.id] !== undefined 
+                              ? displayNames[member.id] 
+                              : (member.display_name || '')
+                            
+                            return (
                             <div key={member.id} className="bg-white rounded-lg p-3 border border-slate-200">
                               <div className="flex items-center justify-between mb-3">
-                                <div>
+                                <div className="flex-1">
                                   <p className="font-medium text-sm flex items-center gap-2">
                                     {member.user_email}
                                     {member.user_id === user?.uid && <span className="text-xs text-slate-400">(Tú)</span>}
                                   </p>
-                                  <p className="text-xs text-slate-500">ID: {member.user_id.slice(0, 8)}...</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {isEditingName ? (
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <input
+                                          type="text"
+                                          className="input input-sm text-xs flex-1"
+                                          placeholder="Nombre para mostrar"
+                                          value={currentDisplayName}
+                                          onChange={(e) => setDisplayNames(prev => ({ ...prev, [member.id]: e.target.value }))}
+                                          onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleUpdateMemberName(member.id, currentDisplayName.trim())
+                                              setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                            }
+                                            if (e.key === 'Escape') {
+                                              setDisplayNames(prev => ({ ...prev, [member.id]: member.display_name || '' }))
+                                              setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                            }
+                                          }}
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            handleUpdateMemberName(member.id, currentDisplayName.trim())
+                                            setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                          }}
+                                          className="text-green-600 hover:text-green-700 p-1"
+                                          title="Guardar"
+                                        >
+                                          <Save className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setDisplayNames(prev => ({ ...prev, [member.id]: member.display_name || '' }))
+                                            setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                          }}
+                                          className="text-slate-600 hover:text-slate-700 p-1"
+                                          title="Cancelar"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-600">
+                                          Nombre: <span className="font-medium">{member.display_name || member.user_email.split('@')[0]}</span>
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            setDisplayNames(prev => ({ ...prev, [member.id]: member.display_name || '' }))
+                                            setEditingNames(prev => ({ ...prev, [member.id]: true }))
+                                          }}
+                                          className="text-indigo-600 hover:text-indigo-700 p-1"
+                                          title="Editar nombre"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-1">ID: {member.user_id.slice(0, 8)}...</p>
                                 </div>
                                 {member.user_id !== user?.uid && (
                                   <button
@@ -688,7 +783,7 @@ export default function ConfigPage() {
                               {/* Permission Selectors */}
                               <div className="grid grid-cols-2 gap-2">
                                 {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => {
-                                  const pendingValue = pendingPermissions[`${member.id}_${section}`]
+                                  const pendingValue = pendingPermissions[`${member.id}|||${section}`]
                                   const currentValue = member.permissions[section as keyof WorkspacePermissions]
                                   const hasChange = pendingValue && pendingValue !== currentValue
 
@@ -710,7 +805,7 @@ export default function ConfigPage() {
                                 })}
                               </div>
                             </div>
-                          ))}
+                          )})}
                           {/* Botón para guardar todos los cambios pendientes */}
                           {Object.keys(pendingPermissions).length > 0 && (
                             <div className="mt-4 pt-4 border-t border-slate-200">

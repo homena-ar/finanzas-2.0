@@ -32,6 +32,7 @@ interface WorkspaceContextType {
 
   inviteUser: (workspaceId: string, email: string, permissions: WorkspacePermissions) => Promise<{ error: any }>
   updateMemberPermissions: (memberId: string, permissions: WorkspacePermissions) => Promise<{ error: any }>
+  updateMemberDisplayName: (memberId: string, displayName: string | null) => Promise<{ error: any }>
   removeMember: (memberId: string) => Promise<{ error: any }>
 
   acceptInvitation: (invitationId: string) => Promise<{ error: any }>
@@ -120,6 +121,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspace_id: doc.data().workspace_id,
         user_id: doc.data().user_id,
         user_email: doc.data().user_email,
+        display_name: doc.data().display_name,
         permissions: doc.data().permissions,
         created_at: doc.data().created_at instanceof Timestamp
           ? doc.data().created_at.toDate().toISOString()
@@ -145,6 +147,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               workspace_id: doc.data().workspace_id,
               user_id: doc.data().user_id,
               user_email: doc.data().user_email,
+              display_name: doc.data().display_name,
               permissions: doc.data().permissions,
               created_at: doc.data().created_at instanceof Timestamp
                 ? doc.data().created_at.toDate().toISOString()
@@ -346,6 +349,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try { await updateDoc(doc(db, 'workspace_members', mid), { permissions: p }); await fetchAll(); return { error: null } } catch (e) { return { error: e } }
   }, [fetchAll])
 
+  const updateMemberDisplayName = useCallback(async (mid: string, displayName: string | null) => {
+    try {
+      const updateData: any = {}
+      if (displayName) {
+        updateData.display_name = displayName
+      } else {
+        // Si es null, eliminar el campo (usar FieldValue.delete() si es necesario)
+        updateData.display_name = null
+      }
+      await updateDoc(doc(db, 'workspace_members', mid), updateData)
+      await fetchAll()
+      return { error: null }
+    } catch (e) {
+      return { error: e }
+    }
+  }, [fetchAll])
+
   const removeMember = useCallback(async (mid: string) => {
     try { await deleteDoc(doc(db, 'workspace_members', mid)); await fetchAll(); return { error: null } } catch (e) { return { error: e } }
   }, [fetchAll])
@@ -383,7 +403,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const value = {
     workspaces, currentWorkspace, members, invitations, loading,
     setCurrentWorkspace, createWorkspace, updateWorkspace, deleteWorkspace,
-    inviteUser, updateMemberPermissions, removeMember, acceptInvitation, rejectInvitation, fetchAll
+    inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, acceptInvitation, rejectInvitation, fetchAll
   }
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
