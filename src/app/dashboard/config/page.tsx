@@ -536,8 +536,8 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
-  const handleUpdateMemberName = async (memberId: string, displayName: string) => {
-    const result = await updateMemberDisplayName(memberId, displayName || null)
+  const handleUpdateMemberName = async (memberId: string, displayName: string | null) => {
+    const result = await updateMemberDisplayName(memberId, displayName)
     
     if (result.error) {
       setAlertData({
