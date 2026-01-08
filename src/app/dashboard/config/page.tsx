@@ -22,6 +22,7 @@ export default function ConfigPage() {
     inviteUser,
     members,
     invitations,
+    sentInvitations,
     acceptInvitation,
     rejectInvitation,
     updateMemberPermissions,
@@ -748,6 +749,48 @@ export default function ConfigPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* INVITACIONES ENVIADAS - Solo visible para el dueño */}
+                  {isOwner && isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <h5 className="font-semibold mb-3 text-sm">Invitaciones Enviadas</h5>
+                      {sentInvitations.filter(inv => inv.workspace_id === ws.id).length > 0 ? (
+                        <div className="space-y-2 mb-4">
+                          {sentInvitations
+                            .filter(inv => inv.workspace_id === ws.id)
+                            .map(inv => {
+                              const statusColors = {
+                                pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                                accepted: 'bg-green-50 text-green-700 border-green-200',
+                                rejected: 'bg-red-50 text-red-700 border-red-200',
+                                cancelled: 'bg-gray-50 text-gray-700 border-gray-200'
+                              }
+                              const statusLabels = {
+                                pending: '⏳ Pendiente',
+                                accepted: '✅ Aceptada',
+                                rejected: '❌ Rechazada',
+                                cancelled: '🚫 Cancelada'
+                              }
+                              return (
+                                <div key={inv.id} className="bg-white rounded-lg p-3 border border-slate-200 flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium">{inv.email}</p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      Permisos: {Object.values(inv.permissions).join(', ')}
+                                    </p>
+                                  </div>
+                                  <span className={`text-xs px-2 py-1 rounded border font-medium ${statusColors[inv.status] || statusColors.pending}`}>
+                                    {statusLabels[inv.status] || '⏳ Pendiente'}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 mb-4">No hay invitaciones enviadas</p>
+                      )}
+                    </div>
+                  )}
 
                   {/* GESTIÓN DE MIEMBROS - Solo visible para el dueño */}
                   {isOwner && isExpanded && (

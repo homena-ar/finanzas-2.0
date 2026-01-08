@@ -22,7 +22,8 @@ interface WorkspaceContextType {
   workspaces: Workspace[]
   currentWorkspace: Workspace | null
   members: WorkspaceMember[]
-  invitations: WorkspaceInvitation[]
+  invitations: WorkspaceInvitation[] // Invitaciones recibidas (pendientes)
+  sentInvitations: WorkspaceInvitation[] // Invitaciones enviadas
   loading: boolean
 
   setCurrentWorkspace: (workspace: Workspace | null) => void
@@ -48,7 +49,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null)
   const [members, setMembers] = useState<WorkspaceMember[]>([])
-  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([])
+  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]) // Invitaciones recibidas
+  const [sentInvitations, setSentInvitations] = useState<WorkspaceInvitation[]>([]) // Invitaciones enviadas
   const [loading, setLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
@@ -169,7 +171,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.log('🏢 [useWorkspace] Total miembros cargados:', allMembersData.length)
       setMembers(allMembersData)
 
-      // 4. Mis invitaciones pendientes
+      // 4. Mis invitaciones pendientes (recibidas)
       const invitationsRef = collection(db, 'workspace_invitations')
       const invitationsQuery = query(
         invitationsRef, 
@@ -181,6 +183,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         id: doc.id,
         ...doc.data()
       })) as WorkspaceInvitation[])
+
+      // 5. Invitaciones enviadas (para workspaces donde soy dueño)
+      const sentInvitationsList: WorkspaceInvitation[] = []
+      
+      if (ownedWorkspaceIds.length > 0) {
+        // Cargar todas las invitaciones de los workspaces que poseo
+        for (const wsId of ownedWorkspaceIds) {
+          try {
+            const sentQuery = query(
+              collection(db, 'workspace_invitations'),
+              where('workspace_id', '==', wsId)
+            )
+            const sentSnap = await getDocs(sentQuery)
+            sentInvitationsList.push(...sentSnap.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            })) as WorkspaceInvitation[])
+          } catch (e) {
+            console.warn(`Error cargando invitaciones enviadas para workspace ${wsId}:`, e)
+          }
+        }
+      }
+      
+      setSentInvitations(sentInvitationsList)
 
       setLoading(false)
     } catch (error) {
@@ -196,6 +222,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setCurrentWorkspace(null)
       setMembers([])
       setInvitations([])
+      setSentInvitations([])
       setLoading(false)
     }
   }, [user, fetchAll]) // Agregamos fetchAll a las dependencias
@@ -280,9 +307,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const workspace = workspaces.find(w => w.id === workspaceId)
       const workspaceName = workspace?.name || 'Workspace'
       
+      // Crear la invitación con toda la información necesaria
       await addDoc(collection(db, 'workspace_invitations'), {
         workspace_id: workspaceId,
         email,
+        inviter_email: user.email, // Email de quien envía la invitación
+        workspace_name: workspaceName, // Nombre del workspace
         permissions,
         status: 'pending',
         created_at: serverTimestamp()
@@ -336,6 +366,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         // No fallar la invitación si el email falla, la invitación ya está creada
         // El usuario puede ver la invitación en la app aunque no reciba el email
       }
+
+      // Recargar invitaciones para mostrar la nueva invitación enviada
+      await fetchAll()
 
       return { error: null }
     } catch (error) {
@@ -413,7 +446,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [fetchAll])
 
   const value = {
-    workspaces, currentWorkspace, members, invitations, loading,
+    workspaces, currentWorkspace, members, invitations, sentInvitations, loading,
     setCurrentWorkspace, createWorkspace, updateWorkspace, deleteWorkspace,
     inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, acceptInvitation, rejectInvitation, fetchAll
   }
