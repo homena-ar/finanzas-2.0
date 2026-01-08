@@ -69,6 +69,17 @@ export default function ConfigPage() {
   const [editingNames, setEditingNames] = useState<Record<string, boolean>>({})
   const [displayNames, setDisplayNames] = useState<Record<string, string>>({})
 
+  // Inicializar displayNames cuando se cargan los miembros
+  useEffect(() => {
+    const initialDisplayNames: Record<string, string> = {}
+    members.forEach(member => {
+      if (member.display_name) {
+        initialDisplayNames[member.id] = member.display_name
+      }
+    })
+    setDisplayNames(prev => ({ ...prev, ...initialDisplayNames }))
+  }, [members])
+
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
@@ -345,9 +356,11 @@ export default function ConfigPage() {
   // --- LÓGICA DE PERMISOS CON CONFIRMACIÓN ---
   const handlePermissionChange = (memberId: string, section: string, newValue: string) => {
     // Usar un separador único que no aparezca en los IDs
+    const key = `${memberId}|||${section}`
+    console.log('🔍 [Config] handlePermissionChange - memberId:', memberId, 'section:', section, 'key:', key)
     setPendingPermissions(prev => ({
       ...prev,
-      [`${memberId}|||${section}`]: newValue
+      [key]: newValue
     }))
   }
 
@@ -388,23 +401,65 @@ export default function ConfigPage() {
     
     Object.entries(pendingPermissions).forEach(([key, value]) => {
       // El formato es "memberId|||section"
-      const [memberId, section] = key.split('|||')
-      if (!memberId || !section) {
-        console.error('❌ [Config] Formato de key inválido:', key)
+      const parts = key.split('|||')
+      if (parts.length !== 2) {
+        console.error('❌ [Config] Formato de key inválido:', key, 'parts:', parts, 'length:', parts.length)
         return
       }
+      const [memberId, section] = parts
+      if (!memberId || !section) {
+        console.error('❌ [Config] Formato de key inválido - memberId o section vacío:', { key, memberId, section, parts })
+        return
+      }
+      console.log('🔍 [Config] Procesando cambio - key:', key, 'memberId:', memberId, 'section:', section, 'value:', value)
+      console.log('🔍 [Config] Miembros disponibles para comparar:', members.map(m => ({ id: m.id, workspace_id: m.workspace_id, user_id: m.user_id })))
+      
+      // Verificar que el memberId existe en los miembros
+      const memberExists = members.some(m => m.id === memberId)
+      if (!memberExists) {
+        console.error('❌ [Config] MemberId no encontrado en lista de miembros:', memberId)
+        console.error('❌ [Config] IDs disponibles:', members.map(m => m.id))
+        return
+      }
+      
       if (!changesByMember[memberId]) {
         changesByMember[memberId] = {}
       }
       changesByMember[memberId][section as keyof WorkspacePermissions] = value as any
     })
+    
+    console.log('🔍 [Config] Cambios agrupados por miembro:', changesByMember)
+    console.log('🔍 [Config] Total miembros en lista:', members.length)
 
-    // Aplicar todos los cambios
-    const promises = Object.entries(changesByMember).map(async ([memberId, newPermissions]) => {
+    // Filtrar solo los cambios válidos (donde el miembro existe)
+    const validChanges: Array<{memberId: string, newPermissions: Partial<WorkspacePermissions>}> = []
+    Object.entries(changesByMember).forEach(([memberId, newPermissions]) => {
+      const member = members.find(m => m.id === memberId)
+      if (member) {
+        validChanges.push({ memberId, newPermissions })
+      } else {
+        console.error('❌ [Config] Miembro no encontrado, omitiendo cambios:', memberId)
+        console.error('❌ [Config] IDs de miembros disponibles:', members.map(m => m.id))
+      }
+    })
+
+    if (validChanges.length === 0) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se encontraron miembros válidos para actualizar. Por favor recargá la página.',
+        variant: 'error'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    // Aplicar todos los cambios válidos
+    const promises = validChanges.map(async ({ memberId, newPermissions }) => {
       try {
+        console.log('🔍 [Config] Actualizando miembro con ID:', memberId)
         const member = members.find(m => m.id === memberId)
         if (!member) {
-          console.error('❌ [Config] Miembro no encontrado:', memberId)
+          console.error('❌ [Config] Miembro no encontrado (esto no debería pasar):', memberId)
           return { error: new Error('Miembro no encontrado') }
         }
 
@@ -413,7 +468,13 @@ export default function ConfigPage() {
           ...newPermissions
         }
 
-        console.log('💾 [Config] Actualizando permisos para miembro:', memberId, updatedPermissions)
+        console.log('💾 [Config] Actualizando permisos para miembro:', {
+          memberId,
+          memberEmail: member.user_email,
+          currentPermissions: member.permissions,
+          newPermissions,
+          updatedPermissions
+        })
         const result = await updateMemberPermissions(memberId, updatedPermissions)
         
         if (result.error) {
@@ -704,22 +765,27 @@ export default function ConfigPage() {
                             <div key={member.id} className="bg-white rounded-lg p-3 border border-slate-200">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex-1">
-                                  <p className="font-medium text-sm flex items-center gap-2">
-                                    {member.user_email}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <p className="font-medium text-sm">
+                                      {member.user_email}
+                                    </p>
                                     {member.user_id === user?.uid && <span className="text-xs text-slate-400">(Tú)</span>}
-                                  </p>
-                                  <div className="flex items-center gap-2 mt-1">
+                                  </div>
+                                  
+                                  {/* Campo de nombre personalizado - siempre visible y editable */}
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <label className="text-xs text-slate-500 font-medium whitespace-nowrap">Nombre para etiquetas:</label>
                                     {isEditingName ? (
                                       <div className="flex items-center gap-2 flex-1">
                                         <input
                                           type="text"
                                           className="input input-sm text-xs flex-1"
-                                          placeholder="Nombre para mostrar"
+                                          placeholder={member.user_email.split('@')[0]}
                                           value={currentDisplayName}
                                           onChange={(e) => setDisplayNames(prev => ({ ...prev, [member.id]: e.target.value }))}
                                           onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
-                                              handleUpdateMemberName(member.id, currentDisplayName.trim())
+                                              handleUpdateMemberName(member.id, currentDisplayName.trim() || null)
                                               setEditingNames(prev => ({ ...prev, [member.id]: false }))
                                             }
                                             if (e.key === 'Escape') {
@@ -727,11 +793,18 @@ export default function ConfigPage() {
                                               setEditingNames(prev => ({ ...prev, [member.id]: false }))
                                             }
                                           }}
+                                          onBlur={() => {
+                                            // Auto-guardar al perder el foco
+                                            if (currentDisplayName.trim() !== (member.display_name || '')) {
+                                              handleUpdateMemberName(member.id, currentDisplayName.trim() || null)
+                                            }
+                                            setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                          }}
                                           autoFocus
                                         />
                                         <button
                                           onClick={() => {
-                                            handleUpdateMemberName(member.id, currentDisplayName.trim())
+                                            handleUpdateMemberName(member.id, currentDisplayName.trim() || null)
                                             setEditingNames(prev => ({ ...prev, [member.id]: false }))
                                           }}
                                           className="text-green-600 hover:text-green-700 p-1"
@@ -751,9 +824,9 @@ export default function ConfigPage() {
                                         </button>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-slate-600">
-                                          Nombre: <span className="font-medium">{member.display_name || member.user_email.split('@')[0]}</span>
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded">
+                                          {member.display_name || member.user_email.split('@')[0]}
                                         </span>
                                         <button
                                           onClick={() => {
@@ -768,7 +841,7 @@ export default function ConfigPage() {
                                       </div>
                                     )}
                                   </div>
-                                  <p className="text-xs text-slate-500 mt-1">ID: {member.user_id.slice(0, 8)}...</p>
+                                  <p className="text-xs text-slate-500">ID: {member.user_id.slice(0, 8)}...</p>
                                 </div>
                                 {member.user_id !== user?.uid && (
                                   <button
@@ -783,7 +856,14 @@ export default function ConfigPage() {
                               {/* Permission Selectors */}
                               <div className="grid grid-cols-2 gap-2">
                                 {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => {
-                                  const pendingValue = pendingPermissions[`${member.id}|||${section}`]
+                                  // Asegurarse de que member.id es válido
+                                  if (!member.id || typeof member.id !== 'string') {
+                                    console.error('❌ [Config] member.id inválido:', member.id, 'member:', member)
+                                    return null
+                                  }
+                                  
+                                  const key = `${member.id}|||${section}`
+                                  const pendingValue = pendingPermissions[key]
                                   const currentValue = member.permissions[section as keyof WorkspacePermissions]
                                   const hasChange = pendingValue && pendingValue !== currentValue
 
@@ -793,7 +873,10 @@ export default function ConfigPage() {
                                       <select
                                         className={`input input-sm text-xs w-full ${hasChange ? 'border-indigo-500 bg-indigo-50' : ''}`}
                                         value={pendingValue || currentValue}
-                                        onChange={(e) => handlePermissionChange(member.id, section, e.target.value)}
+                                        onChange={(e) => {
+                                          console.log('🔍 [Config] onChange - member.id:', member.id, 'member.id type:', typeof member.id, 'section:', section, 'value:', e.target.value, 'key será:', `${member.id}|||${section}`)
+                                          handlePermissionChange(member.id, section, e.target.value)
+                                        }}
                                         disabled={member.user_id === user?.uid} // El dueño no se edita a sí mismo
                                       >
                                         {permissionOptions.map(opt => (
