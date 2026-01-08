@@ -46,12 +46,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     // 4. Colaborador: Verificar permisos en la lista de miembros
     console.log('🔒 [Layout] Buscando miembro - workspace:', currentWorkspace.id, 'usuario:', user?.uid, 'total miembros:', members.length)
-    console.log('🔒 [Layout] Miembros disponibles:', members.map(m => ({ workspace_id: m.workspace_id, user_id: m.user_id })))
+    console.log('🔒 [Layout] Miembros disponibles:', members.map(m => ({ workspace_id: m.workspace_id, user_id: m.user_id, permissions: m.permissions })))
     
     const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
     
     if (!member) {
       console.log('🔒 [Layout] ❌ No se encontró miembro para workspace', currentWorkspace.id, 'usuario', user?.uid)
+      console.log('🔒 [Layout] Miembros en lista:', members.map(m => ({ id: m.id, workspace_id: m.workspace_id, user_id: m.user_id })))
+      // Si no hay miembros cargados pero el workspace está activo, asumir acceso temporal
+      if (members.length === 0) {
+        console.log('🔒 [Layout] ⚠️ Lista de miembros vacía, acceso temporal a', section)
+        return true
+      }
       return false 
     }
 
