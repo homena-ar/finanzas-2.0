@@ -393,7 +393,7 @@ export default function ConfigPage() {
     // Aplicar todos los cambios
     const promises = Object.entries(changesByMember).map(async ([memberId, newPermissions]) => {
       const member = members.find(m => m.id === memberId)
-      if (!member) return
+      if (!member) return { error: new Error('Miembro no encontrado') }
 
       const updatedPermissions = {
         ...member.permissions,
@@ -404,7 +404,7 @@ export default function ConfigPage() {
     })
 
     const results = await Promise.all(promises)
-    const hasError = results.some(r => r.error)
+    const hasError = results.some(r => r && r.error)
 
     if (hasError) {
       setAlertData({
