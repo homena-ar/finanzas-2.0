@@ -482,7 +482,10 @@ service cloud.firestore {
       // Allow authenticated users to create email documents
       allow create: if request.auth != null;
 
-      // Allow the extension to read and update email status
+      // NOTA: La extensión Trigger Email usa service accounts con permisos administrativos
+      // Las reglas de seguridad NO se aplican a las extensiones de Firebase
+      // Solo usuarios autenticados pueden crear documentos de correo
+      // La extensión puede leer/actualizar/eliminar sin restricciones de reglas
       allow read, update, delete: if request.auth != null;
     }
   }
