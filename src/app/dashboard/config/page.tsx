@@ -392,24 +392,41 @@ export default function ConfigPage() {
 
     // Aplicar todos los cambios
     const promises = Object.entries(changesByMember).map(async ([memberId, newPermissions]) => {
-      const member = members.find(m => m.id === memberId)
-      if (!member) return { error: new Error('Miembro no encontrado') }
+      try {
+        const member = members.find(m => m.id === memberId)
+        if (!member) {
+          console.error('❌ [Config] Miembro no encontrado:', memberId)
+          return { error: new Error('Miembro no encontrado') }
+        }
 
-      const updatedPermissions = {
-        ...member.permissions,
-        ...newPermissions
+        const updatedPermissions = {
+          ...member.permissions,
+          ...newPermissions
+        }
+
+        console.log('💾 [Config] Actualizando permisos para miembro:', memberId, updatedPermissions)
+        const result = await updateMemberPermissions(memberId, updatedPermissions)
+        
+        if (result.error) {
+          console.error('❌ [Config] Error actualizando permisos:', result.error)
+        }
+        
+        return result
+      } catch (error) {
+        console.error('❌ [Config] Excepción al actualizar permisos:', error)
+        return { error: error instanceof Error ? error : new Error('Error desconocido') }
       }
-
-      return updateMemberPermissions(memberId, updatedPermissions)
     })
 
     const results = await Promise.all(promises)
-    const hasError = results.some(r => r && r.error)
+    const errors = results.filter(r => r && r.error)
+    const hasError = errors.length > 0
 
     if (hasError) {
+      console.error('❌ [Config] Errores al actualizar permisos:', errors)
       setAlertData({
         title: 'Error',
-        message: 'Algunos permisos no se pudieron actualizar',
+        message: `${errors.length} de ${results.length} permisos no se pudieron actualizar. Por favor intentá nuevamente.`,
         variant: 'error'
       })
     } else {

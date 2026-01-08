@@ -78,39 +78,67 @@ export default function AhorrosPage() {
       .catch(err => console.error('Error al obtener cotización del dólar:', err))
   }, [])
 
-  const ahorroPesos = profile?.ahorro_pesos || 0
-  const ahorroUsd = profile?.ahorro_usd || 0
-  const patrimonioEnPesos = ahorroPesos + (ahorroUsd * dolar)
-  const patrimonioEnUsd = (ahorroPesos / dolar) + ahorroUsd
+  // Calcular patrimonio: si está en workspace, calcular desde movimientos; si no, usar perfil personal
+  const calcularPatrimonio = () => {
+    if (currentWorkspace) {
+      // En workspace: calcular desde movimientos del workspace
+      const movimientosWorkspace = movimientos.filter(m => m.workspace_id === currentWorkspace.id)
+      const ahorroPesos = movimientosWorkspace
+        .filter(m => m.tipo === 'pesos')
+        .reduce((sum, m) => sum + m.monto, 0)
+      const ahorroUsd = movimientosWorkspace
+        .filter(m => m.tipo === 'usd')
+        .reduce((sum, m) => sum + m.monto, 0)
+      
+      return {
+        ahorroPesos,
+        ahorroUsd,
+        patrimonioEnPesos: ahorroPesos + (ahorroUsd * dolar),
+        patrimonioEnUsd: (ahorroPesos / dolar) + ahorroUsd
+      }
+    } else {
+      // En espacio personal: usar perfil
+      const ahorroPesos = profile?.ahorro_pesos || 0
+      const ahorroUsd = profile?.ahorro_usd || 0
+      return {
+        ahorroPesos,
+        ahorroUsd,
+        patrimonioEnPesos: ahorroPesos + (ahorroUsd * dolar),
+        patrimonioEnUsd: (ahorroPesos / dolar) + ahorroUsd
+      }
+    }
+  }
+
+  const { ahorroPesos, ahorroUsd, patrimonioEnPesos, patrimonioEnUsd } = calcularPatrimonio()
 
   const handleAddSavings = async (tipo: 'pesos' | 'usd', isAdd: boolean) => {
-    console.log('🟢 [AhorrosPage] handleAddSavings CALLED - tipo:', tipo, 'isAdd:', isAdd)
-    console.log('🟢 [AhorrosPage] handleAddSavings - addMovimiento function:', typeof addMovimiento, addMovimiento)
+    console.log('🟢 [AhorrosPage] handleAddSavings CALLED - tipo:', tipo, 'isAdd:', isAdd, 'workspace:', currentWorkspace?.id)
 
     const input = tipo === 'pesos' ? inputPesos : inputUsd
     const amount = parseFloat(input)
-    console.log('🟢 [AhorrosPage] handleAddSavings - input:', input, 'amount:', amount)
 
     if (!amount || amount <= 0) {
       console.log('🟢 [AhorrosPage] handleAddSavings - Invalid amount, returning')
       return
     }
 
-    console.log('🟢 [AhorrosPage] Validation passed, calculating values...')
     const finalAmount = isAdd ? amount : -amount
-    const field = tipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
-    const currentValue = tipo === 'pesos' ? ahorroPesos : ahorroUsd
-    const newValue = Math.max(0, currentValue + finalAmount)
-    console.log('🟢 [AhorrosPage] Calculated - field:', field, 'currentValue:', currentValue, 'newValue:', newValue)
-
-    console.log('🟢 [AhorrosPage] Calling updateProfile...')
-    await updateProfile({ [field]: newValue })
-    console.log('🟢 [AhorrosPage] updateProfile completed')
-
-    console.log('🟢 [AhorrosPage] Calling addMovimiento...')
     const descripcion = tipo === 'pesos' ? descPesos : descUsd
-    await addMovimiento(tipo, finalAmount, descripcion || undefined)
-    console.log('🟢 [AhorrosPage] addMovimiento completed')
+
+    if (currentWorkspace) {
+      // En workspace: solo agregar movimiento, NO actualizar perfil personal
+      console.log('🟢 [AhorrosPage] Workspace mode - solo agregando movimiento')
+      await addMovimiento(tipo, finalAmount, descripcion || undefined)
+    } else {
+      // En espacio personal: actualizar perfil Y agregar movimiento
+      console.log('🟢 [AhorrosPage] Personal mode - actualizando perfil y agregando movimiento')
+      const field = tipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
+      const currentValue = tipo === 'pesos' ? (profile?.ahorro_pesos || 0) : (profile?.ahorro_usd || 0)
+      const newValue = Math.max(0, currentValue + finalAmount)
+      
+      await updateProfile({ [field]: newValue })
+      await addMovimiento(tipo, finalAmount, descripcion || undefined)
+    }
 
     if (tipo === 'pesos') {
       setInputPesos('')
@@ -281,28 +309,35 @@ export default function AhorrosPage() {
   const handleDeleteMovimiento = async () => {
     if (!movimientoToDelete) return
 
-    // Actualizar el patrimonio restando el monto del movimiento
-    const field = movimientoToDelete.tipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
-    const currentValue = movimientoToDelete.tipo === 'pesos' ? ahorroPesos : ahorroUsd
-    const newValue = Math.max(0, currentValue - movimientoToDelete.monto)
+    // Solo actualizar perfil si NO está en workspace
+    if (!currentWorkspace) {
+      const field = movimientoToDelete.tipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
+      const currentValue = movimientoToDelete.tipo === 'pesos' ? (profile?.ahorro_pesos || 0) : (profile?.ahorro_usd || 0)
+      const newValue = Math.max(0, currentValue - movimientoToDelete.monto)
+      await updateProfile({ [field]: newValue })
+    }
 
-    await updateProfile({ [field]: newValue })
     await deleteMovimiento(movimientoToDelete.id)
     setMovimientoToDelete(null)
   }
 
   const handleDeleteAll = async () => {
-    const movimientosToDelete = movimientos.filter(m => m.tipo === currentTipo)
+    const movimientosToDelete = movimientos.filter(m => {
+      const matchesTipo = m.tipo === currentTipo
+      const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+      return matchesTipo && matchesWorkspace
+    })
     const total = movimientosToDelete.length
 
     setIsDeleting(true)
     setDeleteProgress(0)
 
-    const field = currentTipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
-
-    // Al eliminar TODOS los movimientos, poner patrimonio en 0
-    // Esto corrige cualquier desincronización entre profile y movimientos
-    await updateProfile({ [field]: 0 })
+    // Solo actualizar perfil si NO está en workspace
+    if (!currentWorkspace) {
+      const field = currentTipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
+      // Al eliminar TODOS los movimientos, poner patrimonio en 0
+      await updateProfile({ [field]: 0 })
+    }
 
     // Eliminar todos los movimientos con progreso
     for (let i = 0; i < movimientosToDelete.length; i++) {
@@ -322,7 +357,11 @@ export default function AhorrosPage() {
 
   const exportToExcel = () => {
     const filteredMovimientos = movimientos
-      .filter(m => m.tipo === currentTipo)
+      .filter(m => {
+        const matchesTipo = m.tipo === currentTipo
+        const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+        return matchesTipo && matchesWorkspace
+      })
       .filter(m => {
         if (!filterFecha) return true
         const movFecha = new Date(m.fecha)
@@ -348,11 +387,19 @@ export default function AhorrosPage() {
 
   const prepareChartData = () => {
     const movimientosPesos = movimientos
-      .filter(m => m.tipo === 'pesos')
+      .filter(m => {
+        const matchesTipo = m.tipo === 'pesos'
+        const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+        return matchesTipo && matchesWorkspace
+      })
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
 
     const movimientosUsd = movimientos
-      .filter(m => m.tipo === 'usd')
+      .filter(m => {
+        const matchesTipo = m.tipo === 'usd'
+        const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+        return matchesTipo && matchesWorkspace
+      })
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
 
     let balancePesos = 0
@@ -556,12 +603,24 @@ export default function AhorrosPage() {
                 onClick={() => { setCurrentTipo('pesos'); setShowMovimientosModal(true) }}
                 className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
               >
-                {movimientos.filter(m => m.tipo === 'pesos').length > 3 ? 'Ver todos' : 'Ver historial'}
+                {movimientos.filter(m => {
+                  const matchesTipo = m.tipo === 'pesos'
+                  const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                  return matchesTipo && matchesWorkspace
+                }).length > 3 ? 'Ver todos' : 'Ver historial'}
               </button>
             </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
-              {movimientos.filter(m => m.tipo === 'pesos').length > 0 ? (
-                movimientos.filter(m => m.tipo === 'pesos').slice(0, 3).map(m => {
+              {movimientos.filter(m => {
+                const matchesTipo = m.tipo === 'pesos'
+                const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                return matchesTipo && matchesWorkspace
+              }).length > 0 ? (
+                movimientos.filter(m => {
+                  const matchesTipo = m.tipo === 'pesos'
+                  const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                  return matchesTipo && matchesWorkspace
+                }).slice(0, 3).map(m => {
                   const creatorName = getCreatorName(m.created_by)
                   return (
                   <div key={m.id} className="flex justify-between items-center text-sm py-1.5 hover:bg-slate-50 rounded px-2">
@@ -633,12 +692,24 @@ export default function AhorrosPage() {
                 onClick={() => { setCurrentTipo('usd'); setShowMovimientosModal(true) }}
                 className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
               >
-                {movimientos.filter(m => m.tipo === 'usd').length > 3 ? 'Ver todos' : 'Ver historial'}
+                {movimientos.filter(m => {
+                  const matchesTipo = m.tipo === 'usd'
+                  const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                  return matchesTipo && matchesWorkspace
+                }).length > 3 ? 'Ver todos' : 'Ver historial'}
               </button>
             </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
-              {movimientos.filter(m => m.tipo === 'usd').length > 0 ? (
-                movimientos.filter(m => m.tipo === 'usd').slice(0, 3).map(m => {
+              {movimientos.filter(m => {
+                const matchesTipo = m.tipo === 'usd'
+                const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                return matchesTipo && matchesWorkspace
+              }).length > 0 ? (
+                movimientos.filter(m => {
+                  const matchesTipo = m.tipo === 'usd'
+                  const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                  return matchesTipo && matchesWorkspace
+                }).slice(0, 3).map(m => {
                   const creatorName = getCreatorName(m.created_by)
                   return (
                   <div key={m.id} className="flex justify-between items-center text-sm py-1.5 hover:bg-slate-50 rounded px-2">
@@ -682,7 +753,10 @@ export default function AhorrosPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {metas.map(m => {
+            {metas.filter(m => {
+              const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+              return matchesWorkspace
+            }).map(m => {
               const pct = Math.min((m.progreso / m.objetivo) * 100, 100)
               const isDone = pct >= 100
               const desafio = calcularDesafio(m)
@@ -925,7 +999,11 @@ export default function AhorrosPage() {
                   )}
                 </div>
               </div>
-              {movimientos.filter(m => m.tipo === currentTipo).length > 0 && (
+              {movimientos.filter(m => {
+                const matchesTipo = m.tipo === currentTipo
+                const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                return matchesTipo && matchesWorkspace
+              }).length > 0 && (
                 <button
                   onClick={() => setShowDeleteAllModal(true)}
                   className="btn btn-danger text-sm w-full justify-center"
@@ -938,7 +1016,11 @@ export default function AhorrosPage() {
             <div className="p-4 max-h-96 overflow-y-auto">
               <div className="space-y-2">
                 {movimientos
-                  .filter(m => m.tipo === currentTipo)
+                  .filter(m => {
+                    const matchesTipo = m.tipo === currentTipo
+                    const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                    return matchesTipo && matchesWorkspace
+                  })
                   .filter(m => {
                     if (!filterFecha) return true
                     const movFecha = new Date(m.fecha)
@@ -1121,7 +1203,11 @@ export default function AhorrosPage() {
                     ⚠️ Eliminar TODOS los movimientos
                   </h3>
                   <p className="text-sm text-slate-500 mb-4 text-center">
-                    Estás por eliminar <strong>{movimientos.filter(m => m.tipo === currentTipo).length} movimientos</strong> de {currentTipo === 'pesos' ? 'Pesos' : 'Dólares'}.
+                    Estás por eliminar <strong>{movimientos.filter(m => {
+                      const matchesTipo = m.tipo === currentTipo
+                      const matchesWorkspace = currentWorkspace ? m.workspace_id === currentWorkspace.id : !m.workspace_id
+                      return matchesTipo && matchesWorkspace
+                    }).length} movimientos</strong> de {currentTipo === 'pesos' ? 'Pesos' : 'Dólares'}.
                   </p>
                   <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-4">
                     <p className="text-sm text-red-800 font-semibold mb-2">
