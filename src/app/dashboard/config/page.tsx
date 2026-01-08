@@ -25,6 +25,7 @@ export default function ConfigPage() {
     acceptInvitation,
     rejectInvitation,
     updateMemberPermissions,
+    updateMemberDisplayName,
     removeMember
   } = useWorkspace()
 
