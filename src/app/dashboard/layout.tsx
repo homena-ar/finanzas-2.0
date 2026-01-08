@@ -64,12 +64,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
 
   // Build navigation items based on permissions
+  // Para ingresos: en espacio personal requiere ingresos_habilitado, en workspace solo requiere permisos
+  const showIngresos = currentWorkspace 
+    ? hasAccess('ingresos') // En workspace: solo verificar permisos
+    : (profile?.ingresos_habilitado && hasAccess('ingresos')) // En espacio personal: verificar configuración y permisos
+  
   const navItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Resumen' }, // Siempre visible
     
     ...(hasAccess('gastos') ? [{ href: '/dashboard/gastos', icon: ArrowDownCircle, label: 'Gastos' }] : []),
     
-    ...(profile?.ingresos_habilitado && hasAccess('ingresos') ? [{ href: '/dashboard/ingresos', icon: ArrowUpCircle, label: 'Ingresos' }] : []),
+    ...(showIngresos ? [{ href: '/dashboard/ingresos', icon: ArrowUpCircle, label: 'Ingresos' }] : []),
     
     ...(hasAccess('tarjetas') ? [{ href: '/dashboard/tarjetas', icon: Wallet, label: 'Cuentas' }] : []),
     
