@@ -399,7 +399,9 @@ export default function GastosPage() {
         const result = await response.json()
 
         if (!response.ok || !result.success) {
-          throw new Error(result.error || 'Error al procesar la imagen')
+          const errorMessage = result.error || 'Error al procesar el archivo'
+          const errorDetails = result.details ? `\n\nDetalles: ${result.details}` : ''
+          throw new Error(`${errorMessage}${errorDetails}`)
         }
 
         setExtractedData(result.data)
@@ -415,7 +417,16 @@ export default function GastosPage() {
       reader.readAsDataURL(file)
     } catch (error: any) {
       setProcessingImage(false)
-      setGastoError(error.message || 'Error al procesar la imagen')
+      console.error('Error procesando archivo:', error)
+      
+      let errorMessage = error.message || 'Error al procesar el archivo'
+      
+      // Si el error viene del servidor con detalles
+      if (error.message && error.message.includes('Detalles:')) {
+        errorMessage = error.message
+      }
+      
+      setGastoError(errorMessage)
     }
   }
 

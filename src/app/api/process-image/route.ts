@@ -6,6 +6,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { imageBase64, type, mimeType } = body // type: 'gasto' | 'ingreso' | 'resumen'
 
+    console.log('📄 [API] Procesando archivo - type:', type, 'mimeType:', mimeType)
+
     if (!imageBase64) {
       return NextResponse.json(
         { error: 'No se proporcionó archivo' },
@@ -15,7 +17,9 @@ export async function POST(request: NextRequest) {
 
     // Determinar si es PDF o imagen
     const isPDF = mimeType === 'application/pdf' || imageBase64.includes('data:application/pdf')
-    const isImage = imageBase64.includes('data:image/') || !isPDF
+    const isImage = imageBase64.includes('data:image/') || (!isPDF && mimeType?.startsWith('image/'))
+    
+    console.log('📄 [API] Tipo detectado - isPDF:', isPDF, 'isImage:', isImage)
 
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY
     if (!apiKey) {
@@ -75,18 +79,38 @@ Responde solo con el JSON, sin texto adicional.`
     let detectedMimeType: string
 
     if (isPDF) {
-      // Para PDFs
-      fileData = imageBase64.replace(/^data:application\/pdf;base64,/, '')
+      // Para PDFs - extraer solo el base64 sin el prefijo data URL
+      fileData = imageBase64.replace(/^data:application\/pdf;base64,/, '').replace(/^data:application\/pdf,/, '')
       detectedMimeType = 'application/pdf'
+      
+      // Calcular tamaño aproximado del archivo (base64 es ~33% más grande que el original)
+      const approxFileSizeMB = (fileData.length * 3) / 4 / 1024 / 1024
+      console.log('📄 [API] PDF detectado - tamaño base64:', fileData.length, 'chars (~', approxFileSizeMB.toFixed(2), 'MB)')
+      
+      // Validar que el base64 sea válido
+      if (!fileData || fileData.length === 0) {
+        throw new Error('El PDF está vacío o no se pudo extraer el contenido base64')
+      }
+      
+      // Gemini tiene un límite de ~20MB para archivos
+      if (approxFileSizeMB > 20) {
+        throw new Error(`El PDF es demasiado grande (${approxFileSizeMB.toFixed(2)} MB). El límite es 20 MB. Intenta comprimir el PDF o dividirlo en páginas.`)
+      }
+      
+      if (approxFileSizeMB > 10) {
+        console.warn('⚠️ [API] PDF grande detectado - puede tardar más en procesarse')
+      }
     } else {
       // Para imágenes
       const imageMatch = imageBase64.match(/data:image\/(\w+);base64,/)
       fileData = imageBase64.replace(/^data:image\/\w+;base64,/, '')
       detectedMimeType = imageMatch ? `image/${imageMatch[1]}` : 'image/jpeg'
+      console.log('🖼️ [API] Imagen detectada - mimeType:', detectedMimeType)
     }
 
     // Usar el mimeType proporcionado o el detectado
     const finalMimeType = mimeType || detectedMimeType
+    console.log('📄 [API] MimeType final:', finalMimeType)
 
     const filePart = {
       inlineData: {
@@ -95,10 +119,12 @@ Responde solo con el JSON, sin texto adicional.`
       }
     }
 
+    console.log('📄 [API] Enviando a Gemini...')
     // Llamar a Gemini
     const result = await model.generateContent([prompt, filePart])
     const response = await result.response
     const text = response.text()
+    console.log('📄 [API] Respuesta de Gemini recibida - longitud:', text.length)
 
     // Intentar extraer JSON de la respuesta
     let extractedData
@@ -111,13 +137,14 @@ Responde solo con el JSON, sin texto adicional.`
         // Si no hay JSON, intentar parsear toda la respuesta
         extractedData = JSON.parse(text)
       }
-    } catch (parseError) {
-      console.error('Error parsing Gemini response:', parseError)
-      console.error('Response text:', text)
+    } catch (parseError: any) {
+      console.error('❌ [API] Error parsing Gemini response:', parseError)
+      console.error('❌ [API] Response text (primeros 500 chars):', text.substring(0, 500))
       return NextResponse.json(
         { 
-          error: 'No se pudo extraer información estructurada de la imagen',
-          rawResponse: text 
+          error: 'No se pudo extraer información estructurada del documento',
+          details: parseError.message || 'Error al parsear la respuesta de la IA',
+          rawResponse: text.substring(0, 1000) // Solo primeros 1000 caracteres para no exceder límites
         },
         { status: 500 }
       )
@@ -188,10 +215,33 @@ Responde solo con el JSON, sin texto adicional.`
 
   } catch (error: any) {
     console.error('❌ [API] Error procesando archivo:', error)
+    console.error('❌ [API] Error stack:', error.stack)
+    console.error('❌ [API] Error name:', error.name)
+    console.error('❌ [API] Error message:', error.message)
+    
+    // Detectar errores específicos de Gemini
+    let errorMessage = 'Error al procesar el archivo'
+    let errorDetails = error.message || 'Error desconocido'
+    
+    if (error.message?.includes('API key')) {
+      errorMessage = 'Error de autenticación con Google Gemini'
+      errorDetails = 'Verifica que la API Key de Google Gemini esté configurada correctamente'
+    } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
+      errorMessage = 'Límite de cuota excedido'
+      errorDetails = 'Has alcanzado el límite de uso de la API de Google Gemini. Verifica tu cuota en Google Cloud Console.'
+    } else if (error.message?.includes('size') || error.message?.includes('large')) {
+      errorMessage = 'Archivo demasiado grande'
+      errorDetails = 'El archivo es demasiado grande para procesar. Intenta con un archivo más pequeño o comprime el PDF.'
+    } else if (error.message?.includes('PDF') || error.message?.includes('pdf')) {
+      errorMessage = 'Error procesando PDF'
+      errorDetails = error.message
+    }
+    
     return NextResponse.json(
       {
-        error: 'Error al procesar el archivo',
-        details: error.message
+        error: errorMessage,
+        details: errorDetails,
+        errorType: error.name || 'UnknownError'
       },
       { status: 500 }
     )
