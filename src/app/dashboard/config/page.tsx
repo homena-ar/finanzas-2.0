@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2 } from 'lucide-react'
-import { AlertModal } from '@/components/Modal'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info } from 'lucide-react'
+import { AlertModal, ConfirmModal } from '@/components/Modal'
 import type { WorkspacePermissions } from '@/types'
 
 export default function ConfigPage() {
@@ -47,6 +47,12 @@ export default function ConfigPage() {
   // Modal states
   const [showAlert, setShowAlert] = useState(false)
   const [alertData, setAlertData] = useState({ title: '', message: '', variant: 'success' as 'success' | 'error' | 'warning' | 'info' })
+  
+  // Confirm modal states para eliminación
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
+  const [invitationToDelete, setInvitationToDelete] = useState<{ id: string; email: string } | null>(null)
+  const [workspaceToDeleteAll, setWorkspaceToDeleteAll] = useState<string | null>(null)
 
   // Categoría modal states
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
@@ -599,14 +605,39 @@ export default function ConfigPage() {
 
   const commonIcons = ['🍔', '🏠', '🚗', '🎮', '👕', '💊', '📚', '✈️', '🎬', '🏋️', '🐕', '💰', '🔧', '📱', '💡']
 
-  // Permisos disponibles para el selector
+  // Permisos disponibles para el selector con explicaciones
   const permissionOptions = [
-    { value: 'ninguno', label: 'Sin Acceso' },
-    { value: 'solo_lectura', label: 'Solo Lectura' },
-    { value: 'solo_propios', label: 'Solo sus datos' },
-    { value: 'ver_todo_agregar_propio', label: 'Ver todo + Agregar' },
-    { value: 'admin', label: 'Administrador Total' },
+    { 
+      value: 'ninguno', 
+      label: 'Sin Acceso',
+      description: 'No puede ver ni modificar nada en esta sección'
+    },
+    { 
+      value: 'solo_lectura', 
+      label: 'Solo Lectura',
+      description: 'Puede ver todos los datos pero no puede agregar, editar ni eliminar nada'
+    },
+    { 
+      value: 'solo_propios', 
+      label: 'Solo sus Propios Datos',
+      description: 'Solo puede ver y gestionar los datos que él mismo creó. No ve los datos de otros miembros'
+    },
+    { 
+      value: 'ver_todo_agregar_propio', 
+      label: 'Ver Todo + Agregar Propios',
+      description: 'Puede ver todos los datos del workspace y agregar nuevos, pero solo puede editar o eliminar los que él creó'
+    },
+    { 
+      value: 'admin', 
+      label: 'Administrador Total',
+      description: 'Acceso completo: puede ver, agregar, editar y eliminar cualquier dato en esta sección'
+    },
   ]
+
+  // Función para obtener la descripción de un permiso
+  const getPermissionDescription = (value: string) => {
+    return permissionOptions.find(opt => opt.value === value)?.description || ''
+  }
 
   return (
     <div className="space-y-6">
@@ -761,24 +792,9 @@ export default function ConfigPage() {
                         <h5 className="font-semibold text-sm">Invitaciones Enviadas</h5>
                         {sentInvitations.filter(inv => inv.workspace_id === ws.id).length > 0 && (
                           <button
-                            onClick={async () => {
-                              if (confirm('¿Estás seguro de que deseas eliminar todo el historial de invitaciones? Esta acción no se puede deshacer.')) {
-                                const result = await deleteAllInvitations(ws.id)
-                                if (result.error) {
-                                  setAlertData({
-                                    title: 'Error',
-                                    message: 'No se pudo eliminar el historial de invitaciones',
-                                    variant: 'error'
-                                  })
-                                } else {
-                                  setAlertData({
-                                    title: 'Historial eliminado',
-                                    message: 'Se eliminó todo el historial de invitaciones del workspace.',
-                                    variant: 'success'
-                                  })
-                                }
-                                setShowAlert(true)
-                              }
+                            onClick={() => {
+                              setWorkspaceToDeleteAll(ws.id)
+                              setShowDeleteAllConfirm(true)
                             }}
                             className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition flex items-center gap-1"
                             title="Eliminar todo el historial"
@@ -809,9 +825,26 @@ export default function ConfigPage() {
                                 <div key={inv.id} className="bg-white rounded-lg p-3 border border-slate-200 flex items-center justify-between">
                                   <div className="flex-1">
                                     <p className="text-sm font-medium">{inv.email}</p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                      Permisos: {Object.values(inv.permissions).join(', ')}
-                                    </p>
+                                    <div className="text-xs text-slate-500 mt-1 space-y-1">
+                                      <div className="flex flex-wrap gap-2">
+                                        {Object.entries(inv.permissions).map(([section, perm]) => (
+                                          <div key={section} className="flex items-center gap-1 group relative">
+                                            <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">
+                                              {section}: {permissionOptions.find(o => o.value === perm)?.label || perm}
+                                            </span>
+                                            {getPermissionDescription(perm) && (
+                                              <>
+                                                <HelpCircle className="w-3 h-3 text-slate-400 cursor-help" />
+                                                <div className="absolute left-0 top-full mt-1 w-64 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                                                  <p className="font-semibold mb-1">{section}: {permissionOptions.find(o => o.value === perm)?.label}</p>
+                                                  <p className="text-slate-200">{getPermissionDescription(perm)}</p>
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className={`text-xs px-2 py-1 rounded border font-medium ${statusColors[inv.status as keyof typeof statusColors] || statusColors.pending}`}>
@@ -843,24 +876,9 @@ export default function ConfigPage() {
                                       </button>
                                     )}
                                     <button
-                                      onClick={async () => {
-                                        if (confirm(`¿Estás seguro de que deseas eliminar esta invitación a ${inv.email}? Esta acción no se puede deshacer.`)) {
-                                          const result = await deleteInvitation(inv.id)
-                                          if (result.error) {
-                                            setAlertData({
-                                              title: 'Error',
-                                              message: 'No se pudo eliminar la invitación',
-                                              variant: 'error'
-                                            })
-                                          } else {
-                                            setAlertData({
-                                              title: 'Invitación eliminada',
-                                              message: 'La invitación fue eliminada del historial.',
-                                              variant: 'success'
-                                            })
-                                          }
-                                          setShowAlert(true)
-                                        }
+                                      onClick={() => {
+                                        setInvitationToDelete({ id: inv.id, email: inv.email })
+                                        setShowDeleteConfirm(true)
                                       }}
                                       className="text-xs px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
                                       title="Eliminar invitación del historial"
@@ -1435,26 +1453,58 @@ export default function ConfigPage() {
 
               {/* SELECTORES DE PERMISOS */}
               <div className="space-y-3 pt-2">
-                <h4 className="font-semibold text-sm text-slate-700">Configurar Permisos</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold text-sm text-slate-700">Configurar Permisos</h4>
+                  <div className="group relative">
+                    <Info className="w-4 h-4 text-slate-400 cursor-help" />
+                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      <p className="font-semibold mb-2">Niveles de Permisos:</p>
+                      <ul className="space-y-1.5 text-slate-200">
+                        {permissionOptions.map(opt => (
+                          <li key={opt.value}>
+                            <span className="font-medium">{opt.label}:</span> {opt.description}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => (
-                    <div key={section}>
-                      <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
-                      <select
-                        value={invitePermissions[section as keyof WorkspacePermissions]}
-                        onChange={(e) => setInvitePermissions(p => ({
-                          ...p,
-                          [section]: e.target.value
-                        }))}
-                        className="input input-sm text-xs w-full"
-                      >
-                        {permissionOptions.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                  {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => {
+                    const currentPermission = invitePermissions[section as keyof WorkspacePermissions]
+                    const currentDescription = getPermissionDescription(currentPermission)
+                    return (
+                      <div key={section} className="relative">
+                        <div className="flex items-center gap-1 mb-1">
+                          <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
+                          {currentDescription && (
+                            <div className="group relative">
+                              <HelpCircle className="w-3 h-3 text-slate-400 cursor-help" />
+                              <div className="absolute left-0 top-full mt-1 w-56 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                                {currentDescription}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <select
+                          value={currentPermission}
+                          onChange={(e) => setInvitePermissions(p => ({
+                            ...p,
+                            [section]: e.target.value
+                          }))}
+                          className="input input-sm text-xs w-full"
+                        >
+                          {permissionOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                        {currentDescription && (
+                          <p className="text-[10px] text-slate-500 mt-1 italic">{currentDescription}</p>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -1478,6 +1528,76 @@ export default function ConfigPage() {
         title={alertData.title}
         message={alertData.message}
         variant={alertData.variant}
+      />
+
+      {/* Confirm Modal - Eliminar Invitación Individual */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setInvitationToDelete(null)
+        }}
+        onConfirm={async () => {
+          if (invitationToDelete) {
+            const result = await deleteInvitation(invitationToDelete.id)
+            if (result.error) {
+              setAlertData({
+                title: 'Error',
+                message: 'No se pudo eliminar la invitación',
+                variant: 'error'
+              })
+            } else {
+              setAlertData({
+                title: 'Invitación eliminada',
+                message: `La invitación a ${invitationToDelete.email} fue eliminada del historial.`,
+                variant: 'success'
+              })
+            }
+            setShowAlert(true)
+            setShowDeleteConfirm(false)
+            setInvitationToDelete(null)
+          }
+        }}
+        title="Eliminar Invitación"
+        message={invitationToDelete ? `¿Estás seguro de que deseas eliminar esta invitación a ${invitationToDelete.email}?\n\nEsta acción no se puede deshacer y la invitación será eliminada permanentemente del historial.` : ''}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirm Modal - Eliminar Todo el Historial */}
+      <ConfirmModal
+        isOpen={showDeleteAllConfirm}
+        onClose={() => {
+          setShowDeleteAllConfirm(false)
+          setWorkspaceToDeleteAll(null)
+        }}
+        onConfirm={async () => {
+          if (workspaceToDeleteAll) {
+            const result = await deleteAllInvitations(workspaceToDeleteAll)
+            if (result.error) {
+              setAlertData({
+                title: 'Error',
+                message: 'No se pudo eliminar el historial de invitaciones',
+                variant: 'error'
+              })
+            } else {
+              setAlertData({
+                title: 'Historial eliminado',
+                message: 'Se eliminó todo el historial de invitaciones del workspace.',
+                variant: 'success'
+              })
+            }
+            setShowAlert(true)
+            setShowDeleteAllConfirm(false)
+            setWorkspaceToDeleteAll(null)
+          }
+        }}
+        title="Eliminar Todo el Historial"
+        message="¿Estás seguro de que deseas eliminar todo el historial de invitaciones de este workspace?\n\nEsta acción eliminará permanentemente todas las invitaciones (pendientes, aceptadas, rechazadas y canceladas) y no se puede deshacer."
+        confirmText="Eliminar Todo"
+        cancelText="Cancelar"
+        variant="danger"
       />
     </div>
   )
