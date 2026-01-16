@@ -6,6 +6,7 @@ Esta aplicación utiliza **Google Gemini Vision API** para leer automáticamente
 
 - ✅ Lectura automática de resúmenes bancarios
 - ✅ Extracción de datos de comprobantes y tickets
+- ✅ **Soporte para imágenes (JPG, PNG, WEBP) y PDFs**
 - ✅ Soporte para ingresos y gastos
 - ✅ Vista previa con confirmación antes de guardar
 - ✅ Edición de datos extraídos antes de confirmar
@@ -70,11 +71,11 @@ GOOGLE_GEMINI_API_KEY=AIzaSyD6h56r_qY5pTQSIKupTrQfcJ_c6IEc2yY
 
 1. Haz clic en **"Nuevo Ingreso"**
 2. En el modal, verás un botón **"📸 Leer con IA desde imagen"**
-3. Haz clic en **"Subir"** y selecciona una imagen de:
-   - Resumen bancario
-   - Extracto de cuenta
-   - Comprobante de depósito
-   - Transferencia recibida
+3. Haz clic en **"Subir"** y selecciona una imagen o PDF de:
+   - Resumen bancario (PDF o imagen)
+   - Extracto de cuenta (PDF o imagen)
+   - Comprobante de depósito (PDF o imagen)
+   - Transferencia recibida (PDF o imagen)
 4. La IA procesará la imagen y extraerá:
    - Descripción
    - Monto
@@ -91,11 +92,11 @@ GOOGLE_GEMINI_API_KEY=AIzaSyD6h56r_qY5pTQSIKupTrQfcJ_c6IEc2yY
 
 1. Haz clic en **"Agregar Gasto"**
 2. En el modal, verás un botón **"📸 Leer con IA desde imagen"**
-3. Haz clic en **"Subir"** y selecciona una imagen de:
-   - Ticket de compra
-   - Factura
-   - Comprobante de pago
-   - Resumen de tarjeta
+3. Haz clic en **"Subir"** y selecciona una imagen o PDF de:
+   - Ticket de compra (imagen o PDF)
+   - Factura (PDF o imagen)
+   - Comprobante de pago (PDF o imagen)
+   - Resumen de tarjeta (PDF o imagen)
 4. La IA procesará la imagen y extraerá:
    - Descripción
    - Monto
@@ -110,11 +111,16 @@ GOOGLE_GEMINI_API_KEY=AIzaSyD6h56r_qY5pTQSIKupTrQfcJ_c6IEc2yY
 
 ## 💡 Consejos para Mejores Resultados
 
-1. **Calidad de imagen**: Usa imágenes claras y bien iluminadas
+1. **Calidad de archivo**: 
+   - Para imágenes: Usa imágenes claras y bien iluminadas
+   - Para PDFs: Asegúrate de que el PDF sea de texto (no escaneado como imagen) cuando sea posible
 2. **Orientación**: Asegúrate de que el texto esté derecho
-3. **Enfoque**: La imagen debe estar enfocada y legible
-4. **Formato**: Se aceptan JPG, PNG, WEBP
-5. **Tamaño**: Imágenes muy grandes pueden tardar más en procesarse
+3. **Enfoque**: Las imágenes deben estar enfocadas y legibles
+4. **Formato**: Se aceptan:
+   - **Imágenes**: JPG, PNG, WEBP
+   - **Documentos**: PDF
+5. **Tamaño**: Archivos muy grandes pueden tardar más en procesarse
+6. **PDFs**: Los PDFs son especialmente útiles para resúmenes bancarios que vienen en formato digital
 
 ## 🔒 Seguridad
 

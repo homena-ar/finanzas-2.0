@@ -242,11 +242,12 @@ export default function IngresosPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validar que sea una imagen
-    if (!file.type.startsWith('image/')) {
+    // Validar que sea una imagen o PDF
+    const isValidFile = file.type.startsWith('image/') || file.type === 'application/pdf'
+    if (!isValidFile) {
       setAlertData({
         title: 'Error',
-        message: 'Por favor, selecciona una imagen válida',
+        message: 'Por favor, selecciona una imagen o PDF válido',
         variant: 'error'
       })
       setShowAlert(true)
@@ -268,7 +269,8 @@ export default function IngresosPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBase64: base64,
-            type: 'ingreso'
+            type: 'ingreso',
+            mimeType: file.type
           })
         })
 
@@ -517,7 +519,7 @@ export default function IngresosPage() {
                   <label className="text-sm font-semibold text-purple-900 cursor-pointer">
                     📸 Leer con IA desde imagen
                   </label>
-                  <p className="text-xs text-purple-700">Sube una foto de tu resumen bancario o comprobante</p>
+                  <p className="text-xs text-purple-700">Sube una imagen o PDF de tu resumen bancario o comprobante</p>
                 </div>
                 <label className="btn btn-primary cursor-pointer relative">
                   {processingImage ? (
@@ -530,7 +532,7 @@ export default function IngresosPage() {
                   )}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     className="hidden"
                     onChange={handleImageUpload}
                     disabled={processingImage}
@@ -730,7 +732,15 @@ export default function IngresosPage() {
             <div className="p-4 space-y-4">
               {previewImage && (
                 <div className="mb-4">
-                  <img src={previewImage} alt="Preview" className="w-full max-h-64 object-contain rounded-lg border border-slate-200" />
+                  {previewImage.includes('data:application/pdf') ? (
+                    <iframe
+                      src={previewImage}
+                      className="w-full h-96 rounded-lg border border-slate-200"
+                      title="Vista previa del PDF"
+                    />
+                  ) : (
+                    <img src={previewImage} alt="Preview" className="w-full max-h-64 object-contain rounded-lg border border-slate-200" />
+                  )}
                 </div>
               )}
               

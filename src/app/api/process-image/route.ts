@@ -4,14 +4,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { imageBase64, type } = body // type: 'gasto' | 'ingreso' | 'resumen'
+    const { imageBase64, type, mimeType } = body // type: 'gasto' | 'ingreso' | 'resumen'
 
     if (!imageBase64) {
       return NextResponse.json(
-        { error: 'No se proporcionó imagen' },
+        { error: 'No se proporcionó archivo' },
         { status: 400 }
       )
     }
+
+    // Determinar si es PDF o imagen
+    const isPDF = mimeType === 'application/pdf' || imageBase64.includes('data:application/pdf')
+    const isImage = imageBase64.includes('data:image/') || !isPDF
 
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY
     if (!apiKey) {
@@ -28,8 +32,9 @@ export async function POST(request: NextRequest) {
 
     // Determinar el prompt según el tipo
     let prompt = ''
+    const documentType = isPDF ? 'documento PDF' : 'imagen'
     if (type === 'gasto' || type === 'comprobante') {
-      prompt = `Analiza esta imagen de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
+      prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
 
 {
   "descripcion": "descripción del producto o servicio comprado",
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
 
 Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea solo el número sin símbolos de moneda ni puntos de miles. La fecha debe estar en formato YYYY-MM-DD.`
     } else if (type === 'ingreso' || type === 'resumen') {
-      prompt = `Analiza esta imagen de un resumen bancario, extracto o comprobante de ingreso y extrae la siguiente información en formato JSON:
+      prompt = `Analiza este ${documentType} de un resumen bancario, extracto o comprobante de ingreso y extrae la siguiente información en formato JSON:
 
 {
   "descripcion": "descripción del ingreso (ej: Salario, Transferencia, Depósito, etc.)",
@@ -66,16 +71,32 @@ Responde solo con el JSON, sin texto adicional.`
     }
 
     // Convertir base64 a formato que Gemini entienda
-    const imageData = imageBase64.replace(/^data:image\/\w+;base64,/, '')
-    const imagePart = {
+    let fileData: string
+    let detectedMimeType: string
+
+    if (isPDF) {
+      // Para PDFs
+      fileData = imageBase64.replace(/^data:application\/pdf;base64,/, '')
+      detectedMimeType = 'application/pdf'
+    } else {
+      // Para imágenes
+      const imageMatch = imageBase64.match(/data:image\/(\w+);base64,/)
+      fileData = imageBase64.replace(/^data:image\/\w+;base64,/, '')
+      detectedMimeType = imageMatch ? `image/${imageMatch[1]}` : 'image/jpeg'
+    }
+
+    // Usar el mimeType proporcionado o el detectado
+    const finalMimeType = mimeType || detectedMimeType
+
+    const filePart = {
       inlineData: {
-        data: imageData,
-        mimeType: imageBase64.match(/data:image\/(\w+);base64/)?.[1] || 'image/jpeg'
+        data: fileData,
+        mimeType: finalMimeType
       }
     }
 
     // Llamar a Gemini
-    const result = await model.generateContent([prompt, imagePart])
+    const result = await model.generateContent([prompt, filePart])
     const response = await result.response
     const text = response.text()
 
@@ -166,10 +187,10 @@ Responde solo con el JSON, sin texto adicional.`
     })
 
   } catch (error: any) {
-    console.error('❌ [API] Error procesando imagen:', error)
+    console.error('❌ [API] Error procesando archivo:', error)
     return NextResponse.json(
       {
-        error: 'Error al procesar la imagen',
+        error: 'Error al procesar el archivo',
         details: error.message
       },
       { status: 500 }
