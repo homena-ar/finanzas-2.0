@@ -5,7 +5,7 @@ import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName } from '@/lib/utils'
-import { Plus, Edit2, Trash2, X, Wallet, Search } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
 
@@ -42,6 +42,12 @@ export default function IngresosPage() {
   const [newTagName, setNewTagName] = useState('')
   const [showNewCategoriaInput, setShowNewCategoriaInput] = useState(false)
   const [newCategoria, setNewCategoria] = useState({ nombre: '', icono: '💵', color: '#3b82f6' })
+
+  // AI Image processing states
+  const [processingImage, setProcessingImage] = useState(false)
+  const [showImagePreview, setShowImagePreview] = useState(false)
+  const [extractedData, setExtractedData] = useState<any>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   // Filters
   const [filters, setFilters] = useState({ search: '', colaborador: '', moneda: '' })
@@ -232,6 +238,101 @@ export default function IngresosPage() {
     }))
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      setAlertData({
+        title: 'Error',
+        message: 'Por favor, selecciona una imagen válida',
+        variant: 'error'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    setProcessingImage(true)
+
+    try {
+      // Convertir a base64
+      const reader = new FileReader()
+      reader.onloadend = async () => {
+        const base64 = reader.result as string
+        setPreviewImage(base64)
+
+        // Llamar a la API
+        const response = await fetch('/api/process-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64,
+            type: 'ingreso'
+          })
+        })
+
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Error al procesar la imagen')
+        }
+
+        setExtractedData(result.data)
+        setShowImagePreview(true)
+        setProcessingImage(false)
+      }
+
+      reader.onerror = () => {
+        setProcessingImage(false)
+        setAlertData({
+          title: 'Error',
+          message: 'Error al leer la imagen',
+          variant: 'error'
+        })
+        setShowAlert(true)
+      }
+
+      reader.readAsDataURL(file)
+    } catch (error: any) {
+      setProcessingImage(false)
+      setAlertData({
+        title: 'Error',
+        message: error.message || 'Error al procesar la imagen',
+        variant: 'error'
+      })
+      setShowAlert(true)
+    }
+  }
+
+  const handleConfirmExtractedData = () => {
+    if (!extractedData) return
+
+    // Llenar el formulario con los datos extraídos
+    setForm(f => ({
+      ...f,
+      descripcion: extractedData.descripcion || f.descripcion,
+      monto: extractedData.monto ? String(extractedData.monto) : f.monto,
+      moneda: extractedData.moneda || f.moneda,
+      fecha: extractedData.fecha || f.fecha
+    }))
+
+    // Si hay una categoría sugerida, intentar encontrarla
+    if (extractedData.categoria) {
+      const categoriaMatch = categoriasIngresos.find(
+        c => c.nombre.toLowerCase().includes(extractedData.categoria.toLowerCase()) ||
+        extractedData.categoria.toLowerCase().includes(c.nombre.toLowerCase())
+      )
+      if (categoriaMatch) {
+        setForm(f => ({ ...f, categoria_id: categoriaMatch.id }))
+      }
+    }
+
+    setShowImagePreview(false)
+    setExtractedData(null)
+    setPreviewImage(null)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -409,6 +510,34 @@ export default function IngresosPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* Botón para subir imagen con IA */}
+              <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
+                <ImageIcon className="w-5 h-5 text-purple-600" />
+                <div className="flex-1">
+                  <label className="text-sm font-semibold text-purple-900 cursor-pointer">
+                    📸 Leer con IA desde imagen
+                  </label>
+                  <p className="text-xs text-purple-700">Sube una foto de tu resumen bancario o comprobante</p>
+                </div>
+                <label className="btn btn-primary cursor-pointer relative">
+                  {processingImage ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Subir
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={processingImage}
+                  />
+                </label>
+              </div>
+
               <div>
                 <label className="label">Descripción *</label>
                 <input
@@ -581,6 +710,112 @@ export default function IngresosPage() {
         message={alertData.message}
         variant={alertData.variant}
       />
+
+      {/* Modal de Vista Previa de Datos Extraídos */}
+      {showImagePreview && extractedData && (
+        <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null) }}>
+          <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-purple-600" />
+                Confirmar Datos Extraídos
+              </h3>
+              <button 
+                onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null) }} 
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {previewImage && (
+                <div className="mb-4">
+                  <img src={previewImage} alt="Preview" className="w-full max-h-64 object-contain rounded-lg border border-slate-200" />
+                </div>
+              )}
+              
+              <div className="bg-slate-50 p-4 rounded-lg space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 uppercase">Descripción</label>
+                  <input
+                    type="text"
+                    className="input mt-1"
+                    value={extractedData.descripcion || ''}
+                    onChange={e => setExtractedData({ ...extractedData, descripcion: e.target.value })}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 uppercase">Monto</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input mt-1"
+                      value={extractedData.monto || ''}
+                      onChange={e => setExtractedData({ ...extractedData, monto: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 uppercase">Moneda</label>
+                    <select
+                      className="input mt-1"
+                      value={extractedData.moneda || 'ARS'}
+                      onChange={e => setExtractedData({ ...extractedData, moneda: e.target.value })}
+                    >
+                      <option value="ARS">ARS</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 uppercase">Fecha</label>
+                  <input
+                    type="date"
+                    className="input mt-1"
+                    value={extractedData.fecha || ''}
+                    onChange={e => setExtractedData({ ...extractedData, fecha: e.target.value })}
+                  />
+                </div>
+                
+                {extractedData.categoria && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 uppercase">Categoría Sugerida</label>
+                    <div className="mt-1 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg">
+                      {extractedData.categoria}
+                    </div>
+                  </div>
+                )}
+                
+                {extractedData.origen && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 uppercase">Origen</label>
+                    <div className="mt-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg">
+                      {extractedData.origen}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmExtractedData}
+                  className="btn btn-primary flex-1"
+                >
+                  ✓ Usar estos datos
+                </button>
+                <button
+                  onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null) }}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

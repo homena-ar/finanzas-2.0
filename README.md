@@ -17,6 +17,7 @@ Sistema de control financiero familiar con autenticación, múltiples usuarios, 
 - ✅ Presupuesto mensual con alertas
 - ✅ Tags personalizados
 - ✅ Exportación a Excel
+- ✅ **🤖 Lectura automática con IA** - Sube imágenes de resúmenes bancarios y comprobantes para extraer datos automáticamente
 - ✅ Diseño responsive
 
 ## 📦 Instalación Local
@@ -79,7 +80,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://yzhmctutglxnamzgwyrp.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 RESEND_API_KEY=tu_resend_api_key
 RESEND_FROM_EMAIL=noreply@fin.nexuno.com.ar  # Opcional: Email desde el cual se envían las invitaciones (por defecto: noreply@fin.nexuno.com.ar)
+GOOGLE_GEMINI_API_KEY=tu_google_gemini_api_key  # Opcional: Para funcionalidad de lectura automática con IA
 ```
+
+> 📖 **Nota**: Para usar la funcionalidad de lectura automática con IA, consulta [CONFIGURACION_IA_GOOGLE.md](./CONFIGURACION_IA_GOOGLE.md)
 
 ## 📱 Estructura del Proyecto
 
