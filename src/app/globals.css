@@ -99,6 +99,21 @@ body {
   .modal {
     @apply bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto;
   }
+  
+  @keyframes progressBar {
+    0% { 
+      background-position: 200% 0;
+    }
+    100% { 
+      background-position: -200% 0;
+    }
+  }
+  
+  .progress-bar-animated {
+    background: linear-gradient(90deg, rgb(139, 92, 246) 0%, rgb(124, 58, 237) 50%, rgb(139, 92, 246) 100%);
+    background-size: 200% 100%;
+    animation: progressBar 2s ease-in-out infinite;
+  }
 }
 
 /* Mejoras de responsive */

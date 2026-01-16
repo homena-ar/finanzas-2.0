@@ -58,6 +58,8 @@ export default function GastosPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set())
   const [includeTotal, setIncludeTotal] = useState(false)
+  const [selectedTarjetaId, setSelectedTarjetaId] = useState<string>('')
+  const [detectedTarjeta, setDetectedTarjeta] = useState<any>(null)
 
   // Función para obtener el nombre del usuario que creó el gasto
   const getUserLabel = (userId: string) => {
@@ -407,6 +409,26 @@ export default function GastosPage() {
         }
 
         setExtractedData(result.data)
+        
+        // Si hay información de tarjeta detectada, configurarla
+        if (result.data.tarjeta) {
+          setDetectedTarjeta(result.data.tarjeta)
+          
+          // Intentar encontrar una tarjeta existente que coincida
+          const bancoMatch = result.data.tarjeta.banco ? 
+            tarjetas.find(t => t.banco && t.banco.toLowerCase().includes(result.data.tarjeta.banco.toLowerCase())) : null
+          
+          if (bancoMatch) {
+            setSelectedTarjetaId(bancoMatch.id)
+          } else {
+            // Si no hay match, usar la tarjeta del formulario si existe, sino dejar vacío
+            setSelectedTarjetaId(gastoForm.tarjeta_id || '')
+          }
+        } else {
+          setDetectedTarjeta(null)
+          setSelectedTarjetaId(gastoForm.tarjeta_id || '')
+        }
+        
         setShowImagePreview(true)
         setProcessingImage(false)
       }
@@ -432,7 +454,7 @@ export default function GastosPage() {
     }
   }
 
-  const handleConfirmExtractedData = () => {
+  const handleConfirmExtractedData = async () => {
     if (!extractedData) return
 
     // Si hay múltiples transacciones (resumen)
@@ -445,6 +467,9 @@ export default function GastosPage() {
         setGastoError('Por favor, selecciona al menos una transacción')
         return
       }
+      
+      // Usar la tarjeta seleccionada en el modal, o la del formulario como fallback
+      const tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
 
       // Agregar cada transacción seleccionada como gasto individual
       const addPromises = transactionsToAdd.map(async (trans: any) => {
@@ -459,16 +484,22 @@ export default function GastosPage() {
           }
         }
         
+        const fecha = trans.fecha || gastoForm.fecha
+        const fechaObj = new Date(fecha)
+        const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
+        
         await addGasto({
           descripcion: trans.descripcion,
           categoria_id: categoriaId,
           monto: trans.monto,
           moneda: trans.moneda || 'ARS',
-          fecha: trans.fecha || gastoForm.fecha,
-          tarjeta_id: gastoForm.tarjeta_id,
-          cuotas: gastoForm.cuotas,
+          fecha: fecha,
+          mes_facturacion: mesFacturacion,
+          tarjeta_id: tarjetaIdToUse,
+          cuotas: parseInt(gastoForm.cuotas) || 1,
+          cuota_actual: 1,
           es_fijo: false,
-          tag_ids: gastoForm.tag_ids,
+          tag_ids: gastoForm.tag_ids || [],
           pagado: gastoForm.pagado,
           comercio: trans.comercio || ''
         })
@@ -476,6 +507,9 @@ export default function GastosPage() {
 
       // Si se solicita, agregar el total también
       if (includeTotal && extractedData.total && extractedData.total.monto) {
+        const fechaObj = new Date(gastoForm.fecha)
+        const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
+        
         addPromises.push(
           addGasto({
             descripcion: `Total del resumen - ${extractedData.total.periodo || 'Período'}`,
@@ -483,29 +517,32 @@ export default function GastosPage() {
             monto: extractedData.total.monto,
             moneda: extractedData.total.moneda || 'ARS',
             fecha: gastoForm.fecha,
-            tarjeta_id: gastoForm.tarjeta_id,
-            cuotas: gastoForm.cuotas,
+            mes_facturacion: mesFacturacion,
+            tarjeta_id: tarjetaIdToUse,
+            cuotas: parseInt(gastoForm.cuotas) || 1,
+            cuota_actual: 1,
             es_fijo: false,
-            tag_ids: gastoForm.tag_ids,
+            tag_ids: gastoForm.tag_ids || [],
             pagado: gastoForm.pagado
           })
         )
       }
 
-      Promise.all(addPromises)
-        .then(() => {
-          setShowImagePreview(false)
-          setExtractedData(null)
-          setPreviewImage(null)
-          setSelectedTransactions(new Set())
-          setIncludeTotal(false)
-          setShowGastoModal(false)
-          resetGastoForm()
-        })
-        .catch((error) => {
-          console.error('Error agregando transacciones:', error)
-          setGastoError('Error al agregar las transacciones. Por favor, intenta nuevamente.')
-        })
+      try {
+        await Promise.all(addPromises)
+        setShowImagePreview(false)
+        setExtractedData(null)
+        setPreviewImage(null)
+        setSelectedTransactions(new Set())
+        setIncludeTotal(false)
+        setDetectedTarjeta(null)
+        setSelectedTarjetaId('')
+        setShowGastoModal(false)
+        resetGastoForm()
+      } catch (error) {
+        console.error('Error agregando transacciones:', error)
+        setGastoError('Error al agregar las transacciones. Por favor, intenta nuevamente.')
+      }
       
       return
     }
@@ -1447,9 +1484,9 @@ export default function GastosPage() {
             <div className="text-center space-y-4">
               <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto" />
               <h3 className="text-xl font-bold text-slate-900">Procesando con IA...</h3>
-              <p className="text-slate-600">Analizando el documento. Esto puede tardar unos segundos.</p>
-              <div className="w-full bg-slate-200 rounded-full h-2 mt-4">
-                <div className="bg-purple-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              <p className="text-slate-600 mb-4">Analizando el documento. Esto puede tardar unos segundos...</p>
+              <div className="w-full bg-slate-200 rounded-full h-2.5 mt-4 overflow-hidden">
+                <div className="progress-bar-animated h-2.5 rounded-full shadow-sm w-full"></div>
               </div>
             </div>
           </div>
@@ -1457,7 +1494,15 @@ export default function GastosPage() {
       )}
 
       {showImagePreview && extractedData && (
-        <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}>
+        <div className="modal-overlay" onClick={() => { 
+          setShowImagePreview(false); 
+          setExtractedData(null); 
+          setPreviewImage(null); 
+          setSelectedTransactions(new Set()); 
+          setIncludeTotal(false);
+          setDetectedTarjeta(null);
+          setSelectedTarjetaId('');
+        }}>
           <div className="modal max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg flex items-center gap-2">
@@ -1465,7 +1510,15 @@ export default function GastosPage() {
                 {extractedData.transacciones ? `Confirmar Transacciones (${extractedData.transacciones.length} encontradas)` : 'Confirmar Datos Extraídos'}
               </h3>
               <button 
-                onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }} 
+                onClick={() => { 
+                  setShowImagePreview(false); 
+                  setExtractedData(null); 
+                  setPreviewImage(null); 
+                  setSelectedTransactions(new Set()); 
+                  setIncludeTotal(false);
+                  setDetectedTarjeta(null);
+                  setSelectedTarjetaId('');
+                }} 
                 className="p-1 hover:bg-slate-100 rounded"
               >
                 <X className="w-5 h-5" />
@@ -1501,6 +1554,85 @@ export default function GastosPage() {
                       Selecciona las que deseas agregar como gastos.
                     </p>
                   </div>
+
+                  {/* Información de tarjeta detectada */}
+                  {detectedTarjeta && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="font-semibold text-purple-900 flex items-center gap-2">
+                          💳 Tarjeta detectada
+                        </h4>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        {detectedTarjeta.banco && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-purple-700 font-medium">Banco:</span>
+                            <span className="text-purple-900">{detectedTarjeta.banco}</span>
+                          </div>
+                        )}
+                        {detectedTarjeta.tipo_tarjeta && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-purple-700 font-medium">Tipo:</span>
+                            <span className="text-purple-900">{detectedTarjeta.tipo_tarjeta}</span>
+                          </div>
+                        )}
+                        {detectedTarjeta.ultimos_digitos && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-purple-700 font-medium">Últimos dígitos:</span>
+                            <span className="text-purple-900">****{detectedTarjeta.ultimos_digitos}</span>
+                          </div>
+                        )}
+                        {detectedTarjeta.nombre_titular && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-purple-700 font-medium">Titular:</span>
+                            <span className="text-purple-900">{detectedTarjeta.nombre_titular}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t border-purple-200">
+                        <label className="block text-xs font-semibold text-purple-700 uppercase mb-2">
+                          Seleccionar tarjeta
+                        </label>
+                        <select
+                          value={selectedTarjetaId}
+                          onChange={(e) => setSelectedTarjetaId(e.target.value)}
+                          className="input w-full text-sm"
+                        >
+                          <option value="">Selecciona una tarjeta o deja vacío</option>
+                          {tarjetas.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-purple-600 mt-2">
+                          💡 Si no encuentras la tarjeta, puedes crearla desde el menú de Tarjetas y luego agregar estos gastos nuevamente.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Si no se detectó tarjeta, mostrar selector opcional */}
+                  {!detectedTarjeta && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <label className="block text-xs font-semibold text-slate-700 uppercase mb-2">
+                        Tarjeta (opcional)
+                      </label>
+                      <select
+                        value={selectedTarjetaId}
+                        onChange={(e) => setSelectedTarjetaId(e.target.value)}
+                        className="input w-full text-sm"
+                      >
+                        <option value="">Sin tarjeta (efectivo)</option>
+                        {tarjetas.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {extractedData.transacciones.map((trans: any, index: number) => (
@@ -1690,7 +1822,15 @@ export default function GastosPage() {
                   ✓ {extractedData.transacciones ? `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}
                 </button>
                 <button
-                  onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}
+                  onClick={() => { 
+                    setShowImagePreview(false); 
+                    setExtractedData(null); 
+                    setPreviewImage(null); 
+                    setSelectedTransactions(new Set()); 
+                    setIncludeTotal(false);
+                    setDetectedTarjeta(null);
+                    setSelectedTarjetaId('');
+                  }}
                   className="btn btn-secondary"
                 >
                   Cancelar

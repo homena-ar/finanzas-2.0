@@ -44,47 +44,107 @@ export async function POST(request: NextRequest) {
     if (type === 'gasto' || type === 'comprobante') {
       if (isResumenMultiple) {
         // Para resúmenes de tarjeta o resúmenes con múltiples consumos
-        prompt = `Analiza este ${documentType} que es un resumen de tarjeta de crédito o resumen bancario con múltiples transacciones. 
+        prompt = `Eres un experto en análisis de documentos financieros bancarios argentinos. Tu tarea es analizar este ${documentType} que es un resumen de tarjeta de crédito o resumen bancario y extraer información de forma precisa y profesional.
 
-IMPORTANTE CRÍTICO SOBRE FORMATO DE NÚMEROS:
-- En Argentina se usa COMA (,) para decimales y PUNTO (.) para miles
-- Ejemplo: "15.179,99" significa quince mil ciento setenta y nueve pesos con 99 centavos = 15179.99 (no 1517999)
-- Ejemplo: "6.647,26" significa seis mil seiscientos cuarenta y siete pesos con 26 centavos = 6647.26 (no 664726)
-- Convierte TODOS los montos a formato numérico estándar usando punto (.) para decimales y SIN puntos de miles
+═══════════════════════════════════════════════════════════════════
+⚠️ REGLA CRÍTICA SOBRE FORMATO DE NÚMEROS EN ARGENTINA ⚠️
+═══════════════════════════════════════════════════════════════════
 
-IMPORTANTE SOBRE FILTRADO:
-- NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS" del mes anterior)
-- NO incluyas saldos anteriores, intereses, comisiones o impuestos como transacciones individuales
-- SOLO extrae CONSUMOS individuales del período actual del resumen
-- Busca la sección de "Consumos" o transacciones individuales del período vigente
+En Argentina el formato numérico es:
+- PUNTO (.) = separador de MILES (miles, millones)
+- COMA (,) = separador de DECIMALES (centavos)
 
-Responde en formato JSON con un array "transacciones" que contenga cada CONSUMO individual encontrado:
+ANÁLISIS PASO A PASO:
+1. Identifica el último carácter decimal (generalmente una coma seguida de 2 dígitos)
+2. Todo lo que está ANTES de la última coma son los enteros (pueden tener puntos de miles)
+3. Los 2 dígitos DESPUÉS de la coma son los centavos
+
+EJEMPLOS DE CONVERSIÓN (LEE CON CUIDADO):
+- "15.179,99" = quince mil ciento setenta y nueve pesos con 99 centavos → 15179.99
+- "1.517.999" = un millón quinientos diecisiete mil novecientos noventa y nueve pesos → 1517999.00
+- "6.647,26" = seis mil seiscientos cuarenta y siete pesos con 26 centavos → 6647.26
+- "664.726" = seiscientos sesenta y cuatro mil setecientos veintiséis pesos → 664726.00
+- "3.600,00" = tres mil seiscientos pesos → 3600.00
+- "13.662,00" = trece mil seiscientos sesenta y dos pesos → 13662.00
+- "1.398,18" = mil trescientos noventa y ocho pesos con 18 centavos → 1398.18
+- "139.818" = ciento treinta y nueve mil ochocientos dieciocho pesos → 139818.00
+- "40.487,43" = cuarenta mil cuatrocientos ochenta y siete pesos con 43 centavos → 40487.43
+
+REGLAS PARA DETECTAR DECIMALES:
+- Si el número termina en ",XX" donde XX son 2 dígitos → la coma es decimal
+- Si no hay coma al final → el número es entero (sin decimales)
+- Si hay puntos internos sin coma al final → son puntos de miles, NO decimales
+
+═══════════════════════════════════════════════════════════════════
+📋 INFORMACIÓN A EXTRAER
+═══════════════════════════════════════════════════════════════════
+
+1. INFORMACIÓN DE LA TARJETA (busca en encabezados, logos, números):
+   - banco: nombre del banco emisor (ej: "BBVA", "Banco Nación", "Galicia")
+   - tipo_tarjeta: tipo si es visible (ej: "Visa", "Mastercard", "Amex", o "CreditCard")
+   - ultimos_digitos: últimos 4-6 dígitos de la tarjeta si están visibles
+   - nombre_titular: nombre del titular si está visible
+
+2. CONSUMOS DEL PERÍODO ACTUAL:
+   - SOLO extrae CONSUMOS individuales del período actual
+   - NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS")
+   - NO incluyas saldos anteriores, intereses, comisiones o impuestos como transacciones
+   - Busca la sección titulada "Consumos", "Detalle de Consumos" o similar
+
+3. TOTALES:
+   - Extrae el total de consumos del período si está visible
+   - Extrae información del período de cierre/vencimiento
+
+═══════════════════════════════════════════════════════════════════
+📤 FORMATO DE RESPUESTA JSON
+═══════════════════════════════════════════════════════════════════
 
 {
+  "tarjeta": {
+    "banco": "nombre del banco o null si no se encuentra",
+    "tipo_tarjeta": "Visa/Mastercard/Amex/CreditCard u otro, o null",
+    "ultimos_digitos": "últimos dígitos visibles o null",
+    "nombre_titular": "nombre del titular si está visible o null"
+  },
   "transacciones": [
     {
-      "descripcion": "descripción del consumo individual (ej: nombre del comercio, descripción del consumo)",
-      "monto": número decimal usando punto (.) como separador decimal, sin puntos de miles (ej: 15179.99, 6647.26, 13662.00),
-      "moneda": "ARS" o "USD",
-      "fecha": "YYYY-MM-DD" (fecha del consumo individual del período actual),
-      "categoria": "categoría sugerida según la descripción (ej: Comida, Transporte, Supermercado, etc.)",
-      "comercio": "nombre del comercio o establecimiento si está disponible"
+      "descripcion": "descripción exacta del consumo (ej: nombre del comercio, descripción del consumo)",
+      "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (ej: 15179.99, 6647.26, 3600.00),
+      "moneda": "ARS" o "USD" según corresponda,
+      "fecha": "YYYY-MM-DD" (fecha del consumo individual del período actual, formato ISO),
+      "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
+      "comercio": "nombre del comercio o establecimiento si está disponible o null"
     }
   ],
   "total": {
-    "monto": número decimal (total de consumos del período si está visible, formato estándar con punto decimal),
+    "monto": número decimal (total de consumos del período si está visible, formato estándar con punto decimal, SIN puntos de miles),
     "moneda": "ARS" o "USD",
-    "periodo": "fecha de cierre o período del resumen"
+    "periodo": "fecha de cierre o período del resumen (ej: '2025-11-20' o 'Noviembre 2025')"
   }
 }
 
-EJEMPLOS DE CONVERSIÓN CORRECTA:
-- "15.179,99" → 15179.99
-- "6.647,26" → 6647.26
-- "3.600,00" → 3600.00
-- "13.662,00" → 13662.00
+═══════════════════════════════════════════════════════════════════
+✅ EJEMPLOS DE CONVERSIÓN CORRECTA
+═══════════════════════════════════════════════════════════════════
 
-Si encuentras múltiples consumos del período actual, inclúyelos todos en el array. NO incluyas pagos de períodos anteriores. Las fechas deben estar en formato YYYY-MM-DD.`
+Entrada en documento: "15.179,99" → Salida en JSON: 15179.99
+Entrada en documento: "6.647,26" → Salida en JSON: 6647.26
+Entrada en documento: "3.600,00" → Salida en JSON: 3600.00
+Entrada en documento: "13.662,00" → Salida en JSON: 13662.00
+Entrada en documento: "1.398,18" → Salida en JSON: 1398.18
+Entrada en documento: "40.487,43" → Salida en JSON: 40487.43
+
+═══════════════════════════════════════════════════════════════════
+🎯 IMPORTANTE
+═══════════════════════════════════════════════════════════════════
+
+- Lee cada número CAREFULMENTE, identificando dónde están los decimales
+- Si el número tiene coma al final con 2 dígitos → es decimal
+- Convierte TODOS los montos a formato estándar (punto decimal, sin puntos de miles)
+- Solo incluye CONSUMOS del período actual, NO pagos ni ajustes anteriores
+- Las fechas deben estar en formato YYYY-MM-DD
+
+Analiza el documento paso a paso y responde SOLO con el JSON, sin texto adicional.`
       } else {
         // Para comprobantes individuales (tickets, facturas)
         prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
@@ -248,6 +308,46 @@ Responde solo con el JSON, sin texto adicional.`
     if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
       console.log('📄 [API] Resumen múltiple detectado - transacciones:', extractedData.transacciones.length)
       
+      // Función mejorada para convertir montos argentinos
+      const parseMontoArgentino = (monto: any): number | null => {
+        if (!monto) return null
+        
+        const montoStr = String(monto).trim()
+        
+        // Si ya es un número válido, devolverlo
+        if (typeof monto === 'number' && !isNaN(monto)) {
+          return monto
+        }
+        
+        // Remover símbolos de moneda y espacios
+        let cleaned = montoStr.replace(/[^\d,.-]/g, '').trim()
+        
+        // Detectar si tiene coma decimal (formato argentino: 15.179,99)
+        if (cleaned.includes(',')) {
+          // Separar por coma
+          const parts = cleaned.split(',')
+          if (parts.length === 2) {
+            // La coma es decimal, quitar puntos de miles y usar punto decimal
+            const enteros = parts[0].replace(/\./g, '')
+            const decimales = parts[1].padEnd(2, '0').substring(0, 2) // Asegurar 2 decimales
+            return parseFloat(`${enteros}.${decimales}`)
+          }
+        }
+        
+        // Si no tiene coma pero tiene puntos, pueden ser miles (formato: 1517999 o 1.517.999)
+        if (cleaned.includes('.')) {
+          // Contar puntos - si hay muchos, probablemente son miles
+          const puntos = (cleaned.match(/\./g) || []).length
+          if (puntos > 0) {
+            // Quitar puntos y tratar como número entero
+            cleaned = cleaned.replace(/\./g, '')
+          }
+        }
+        
+        const result = parseFloat(cleaned)
+        return isNaN(result) ? null : result
+      }
+      
       // Procesar cada transacción individual
       const cleanedTransactions = extractedData.transacciones.map((trans: any, index: number) => {
         const cleaned: any = {}
@@ -257,11 +357,7 @@ Responde solo con el JSON, sin texto adicional.`
         }
         
         if (trans.monto) {
-          const montoStr = String(trans.monto)
-            .replace(/[^\d,.-]/g, '')
-            .replace(/\./g, '')
-            .replace(',', '.')
-          cleaned.monto = parseFloat(montoStr) || null
+          cleaned.monto = parseMontoArgentino(trans.monto)
         }
         
         if (trans.moneda) {
@@ -310,11 +406,7 @@ Responde solo con el JSON, sin texto adicional.`
       const cleanedTotal: any = {}
       if (extractedData.total) {
         if (extractedData.total.monto) {
-          const montoStr = String(extractedData.total.monto)
-            .replace(/[^\d,.-]/g, '')
-            .replace(/\./g, '')
-            .replace(',', '.')
-          cleanedTotal.monto = parseFloat(montoStr) || null
+          cleanedTotal.monto = parseMontoArgentino(extractedData.total.monto)
         }
         if (extractedData.total.moneda) {
           const moneda = String(extractedData.total.moneda).toUpperCase()
@@ -325,11 +417,29 @@ Responde solo con el JSON, sin texto adicional.`
         }
       }
       
+      // Procesar información de tarjeta si existe
+      const cleanedTarjeta: any = {}
+      if (extractedData.tarjeta) {
+        if (extractedData.tarjeta.banco) {
+          cleanedTarjeta.banco = String(extractedData.tarjeta.banco).trim()
+        }
+        if (extractedData.tarjeta.tipo_tarjeta) {
+          cleanedTarjeta.tipo_tarjeta = String(extractedData.tarjeta.tipo_tarjeta).trim()
+        }
+        if (extractedData.tarjeta.ultimos_digitos) {
+          cleanedTarjeta.ultimos_digitos = String(extractedData.tarjeta.ultimos_digitos).trim()
+        }
+        if (extractedData.tarjeta.nombre_titular) {
+          cleanedTarjeta.nombre_titular = String(extractedData.tarjeta.nombre_titular).trim()
+        }
+      }
+      
       return NextResponse.json({
         success: true,
         data: {
           transacciones: cleanedTransactions,
           total: Object.keys(cleanedTotal).length > 0 ? cleanedTotal : null,
+          tarjeta: Object.keys(cleanedTarjeta).length > 0 ? cleanedTarjeta : null,
           esResumen: true
         },
         rawResponse: text
