@@ -2,12 +2,16 @@
 
 import { useState } from 'react'
 import { useData } from '@/hooks/useData'
+import { useWorkspace } from '@/hooks/useWorkspace'
+import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName } from '@/lib/utils'
-import { Plus, Edit2, Trash2, X, Wallet } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Wallet, Search } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
 
 export default function IngresosPage() {
+  const { user } = useAuth()
+  const { currentWorkspace, members } = useWorkspace()
   const {
     ingresos, categoriasIngresos, tagsIngresos,
     currentMonth, monthKey, getIngresosMes,
@@ -39,7 +43,32 @@ export default function IngresosPage() {
   const [showNewCategoriaInput, setShowNewCategoriaInput] = useState(false)
   const [newCategoria, setNewCategoria] = useState({ nombre: '', icono: '💵', color: '#3b82f6' })
 
-  const ingresosMes = getIngresosMes(monthKey)
+  // Filters
+  const [filters, setFilters] = useState({ search: '', colaborador: '', moneda: '' })
+
+  let ingresosMes = getIngresosMes(monthKey)
+
+  // Apply filters
+  if (filters.search) {
+    ingresosMes = ingresosMes.filter(i =>
+      i.descripcion.toLowerCase().includes(filters.search.toLowerCase())
+    )
+  }
+  if (filters.moneda) {
+    ingresosMes = ingresosMes.filter(i => i.moneda === filters.moneda)
+  }
+  if (filters.colaborador && currentWorkspace) {
+    ingresosMes = ingresosMes.filter(i => {
+      const userId = (i as any).created_by || i.user_id
+      if (filters.colaborador === 'yo') {
+        return userId === user?.uid
+      } else if (filters.colaborador === 'propietario') {
+        return userId === currentWorkspace.owner_id
+      } else {
+        return userId === filters.colaborador
+      }
+    })
+  }
 
   // Calculate totals
   const totalARS = ingresosMes.filter(i => i.moneda === 'ARS').reduce((sum, i) => sum + i.monto, 0)
@@ -229,6 +258,57 @@ export default function IngresosPage() {
           <div className="text-2xl font-bold text-emerald-600">{formatMoney(totalUSD, 'USD')}</div>
         </div>
       </div>
+
+      {/* Filters */}
+      {(currentWorkspace && members.length > 0) || filters.search || filters.moneda ? (
+        <div className="card p-4 bg-slate-50 border-b border-slate-200">
+          <div className="flex flex-wrap gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="input pl-9 w-40"
+                value={filters.search}
+                onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+              />
+            </div>
+            <select
+              className="input w-auto"
+              value={filters.moneda}
+              onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
+            >
+              <option value="">Todas las monedas</option>
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+            {currentWorkspace && members.length > 0 && (
+              <select
+                className="input w-auto"
+                value={filters.colaborador}
+                onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
+              >
+                <option value="">Todos los colaboradores</option>
+                <option value="yo">Tú</option>
+                {currentWorkspace.owner_id !== user?.uid && (
+                  <option value="propietario">
+                    {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
+                     members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
+                     'Propietario'}
+                  </option>
+                )}
+                {members
+                  .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
+                  .map(m => (
+                    <option key={m.id} value={m.user_id}>
+                      {m.display_name || m.user_email.split('@')[0]}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Ingresos List */}
       <div className="card">

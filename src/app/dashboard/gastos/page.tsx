@@ -31,7 +31,7 @@ export default function GastosPage() {
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null)
   const [editingImp, setEditingImp] = useState<any>(null)
   const [gastoToMarkPaid, setGastoToMarkPaid] = useState<Gasto | null>(null)
-  const [filters, setFilters] = useState({ search: '', tarjeta: '', moneda: '', tag: '', sort: 'monto-desc' })
+  const [filters, setFilters] = useState({ search: '', tarjeta: '', moneda: '', tag: '', colaborador: '', sort: 'monto-desc' })
   const [gastoError, setGastoError] = useState('')
   const [showNewTagInput, setShowNewTagInput] = useState(false)
   const [newTagName, setNewTagName] = useState('')
@@ -106,6 +106,19 @@ export default function GastosPage() {
   }
   if (filters.tag) {
     gastosMes = gastosMes.filter(g => g.tag_ids?.includes(filters.tag))
+  }
+  if (filters.colaborador && currentWorkspace) {
+    gastosMes = gastosMes.filter(g => {
+      // Filtrar por user_id o created_by si existe
+      const userId = (g as any).created_by || g.user_id
+      if (filters.colaborador === 'yo') {
+        return userId === user?.uid
+      } else if (filters.colaborador === 'propietario') {
+        return userId === currentWorkspace.owner_id
+      } else {
+        return userId === filters.colaborador
+      }
+    })
   }
 
   // Sort
@@ -415,6 +428,30 @@ export default function GastosPage() {
             <option value="">Todas las etiquetas</option>
             {tags.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
           </select>
+          {currentWorkspace && members.length > 0 && (
+            <select
+              className="input w-auto"
+              value={filters.colaborador}
+              onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
+            >
+              <option value="">Todos los colaboradores</option>
+              <option value="yo">Tú</option>
+              {currentWorkspace.owner_id !== user?.uid && (
+                <option value="propietario">
+                  {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
+                   members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
+                   'Propietario'}
+                </option>
+              )}
+              {members
+                .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
+                .map(m => (
+                  <option key={m.id} value={m.user_id}>
+                    {m.display_name || m.user_email.split('@')[0]}
+                  </option>
+                ))}
+            </select>
+          )}
           <select
             className="input w-auto"
             value={filters.sort}

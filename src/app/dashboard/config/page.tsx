@@ -610,27 +610,27 @@ export default function ConfigPage() {
     { 
       value: 'ninguno', 
       label: 'Sin Acceso',
-      description: 'No puede ver ni modificar nada en esta sección'
+      description: 'No tiene acceso a esta sección. No puede visualizar ni modificar ningún dato.'
     },
     { 
       value: 'solo_lectura', 
       label: 'Solo Lectura',
-      description: 'Puede ver todos los datos pero no puede agregar, editar ni eliminar nada'
+      description: 'Puede visualizar todos los datos de la sección, pero no puede crear, modificar ni eliminar registros.'
     },
     { 
       value: 'solo_propios', 
-      label: 'Solo sus Propios Datos',
-      description: 'Solo puede ver y gestionar los datos que él mismo creó. No ve los datos de otros miembros'
+      label: 'Solo Sus Propios Datos',
+      description: 'Solo puede visualizar y gestionar los registros que él mismo ha creado. No tiene acceso a los datos de otros colaboradores.'
     },
     { 
       value: 'ver_todo_agregar_propio', 
-      label: 'Ver Todo + Agregar Propios',
-      description: 'Puede ver todos los datos del workspace y agregar nuevos, pero solo puede editar o eliminar los que él creó'
+      label: 'Ver Todo y Agregar Propios',
+      description: 'Puede visualizar todos los registros del workspace y crear nuevos, pero solo puede modificar o eliminar los registros que él mismo ha creado.'
     },
     { 
       value: 'admin', 
-      label: 'Administrador Total',
-      description: 'Acceso completo: puede ver, agregar, editar y eliminar cualquier dato en esta sección'
+      label: 'Administrador',
+      description: 'Acceso completo a la sección. Puede visualizar, crear, modificar y eliminar cualquier registro, independientemente de quién lo haya creado.'
     },
   ]
 
