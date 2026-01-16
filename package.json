@@ -10,6 +10,7 @@
     "generate-images": "node scripts/generate-images.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
     "canvas-confetti": "^1.9.3",
     "chart.js": "^4.4.2",
