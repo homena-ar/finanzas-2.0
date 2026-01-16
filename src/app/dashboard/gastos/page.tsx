@@ -60,6 +60,10 @@ export default function GastosPage() {
   const [includeTotal, setIncludeTotal] = useState(false)
   const [selectedTarjetaId, setSelectedTarjetaId] = useState<string>('')
   const [detectedTarjeta, setDetectedTarjeta] = useState<any>(null)
+  const [selectedImpuestos, setSelectedImpuestos] = useState<Set<number>>(new Set())
+  const [savingTransactions, setSavingTransactions] = useState(false)
+  const [progressPercent, setProgressPercent] = useState(0)
+  const [processingComplete, setProcessingComplete] = useState(false)
 
   // Función para obtener el nombre del usuario que creó el gasto
   const getUserLabel = (userId: string) => {
@@ -381,66 +385,106 @@ export default function GastosPage() {
     }
 
     setProcessingImage(true)
+    setProgressPercent(0)
+    setProcessingComplete(false)
+
+    let progressInterval: NodeJS.Timeout | null = null
 
     try {
       // Convertir a base64
       const reader = new FileReader()
+      
+      // Simular progreso gradual durante la lectura
+      progressInterval = setInterval(() => {
+        setProgressPercent(prev => {
+          if (prev >= 90) return prev // No llegar a 100% hasta que termine
+          return prev + Math.random() * 8
+        })
+      }, 300)
+      
       reader.onloadend = async () => {
+        if (progressInterval) clearInterval(progressInterval)
+        
         const base64 = reader.result as string
         setPreviewImage(base64)
+        setProgressPercent(25)
 
-        // Llamar a la API
-        const response = await fetch('/api/process-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64,
-            type: 'gasto',
-            mimeType: file.type
+        try {
+          // Llamar a la API
+          const response = await fetch('/api/process-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64,
+              type: 'gasto',
+              mimeType: file.type
+            })
           })
-        })
 
-        const result = await response.json()
+          setProgressPercent(70)
+          const result = await response.json()
+          setProgressPercent(90)
 
-        if (!response.ok || !result.success) {
-          const errorMessage = result.error || 'Error al procesar el archivo'
-          const errorDetails = result.details ? `\n\nDetalles: ${result.details}` : ''
-          throw new Error(`${errorMessage}${errorDetails}`)
-        }
+          if (!response.ok || !result.success) {
+            const errorMessage = result.error || 'Error al procesar el archivo'
+            const errorDetails = result.details ? `\n\nDetalles: ${result.details}` : ''
+            throw new Error(`${errorMessage}${errorDetails}`)
+          }
 
-        setExtractedData(result.data)
-        
-        // Si hay información de tarjeta detectada, configurarla
-        if (result.data.tarjeta) {
-          setDetectedTarjeta(result.data.tarjeta)
+          setExtractedData(result.data)
           
-          // Intentar encontrar una tarjeta existente que coincida
-          const bancoMatch = result.data.tarjeta.banco ? 
-            tarjetas.find(t => t.banco && t.banco.toLowerCase().includes(result.data.tarjeta.banco.toLowerCase())) : null
-          
-          if (bancoMatch) {
-            setSelectedTarjetaId(bancoMatch.id)
+          // Si hay información de tarjeta detectada, configurarla
+          if (result.data.tarjeta) {
+            setDetectedTarjeta(result.data.tarjeta)
+            
+            // Intentar encontrar una tarjeta existente que coincida
+            const bancoMatch = result.data.tarjeta.banco ? 
+              tarjetas.find(t => t.banco && t.banco.toLowerCase().includes(result.data.tarjeta.banco.toLowerCase())) : null
+            
+            if (bancoMatch) {
+              setSelectedTarjetaId(bancoMatch.id)
+            } else {
+              // Si no hay match, usar la tarjeta del formulario si existe, sino dejar vacío
+              setSelectedTarjetaId(gastoForm.tarjeta_id || '')
+            }
           } else {
-            // Si no hay match, usar la tarjeta del formulario si existe, sino dejar vacío
+            setDetectedTarjeta(null)
             setSelectedTarjetaId(gastoForm.tarjeta_id || '')
           }
-        } else {
-          setDetectedTarjeta(null)
-          setSelectedTarjetaId(gastoForm.tarjeta_id || '')
+          
+          setProgressPercent(100)
+          setProcessingComplete(true)
+          
+          // Esperar un momento para mostrar el 100% antes de mostrar resultados
+          setTimeout(() => {
+            setShowImagePreview(true)
+            setProcessingImage(false)
+            setProgressPercent(0)
+            setProcessingComplete(false)
+          }, 500)
+        } catch (apiError: any) {
+          if (progressInterval) clearInterval(progressInterval)
+          setProcessingImage(false)
+          setProgressPercent(0)
+          setProcessingComplete(false)
+          throw apiError
         }
-        
-        setShowImagePreview(true)
-        setProcessingImage(false)
       }
 
       reader.onerror = () => {
+        if (progressInterval) clearInterval(progressInterval)
         setProcessingImage(false)
+        setProgressPercent(0)
+        setProcessingComplete(false)
         setGastoError('Error al leer la imagen')
       }
 
       reader.readAsDataURL(file)
     } catch (error: any) {
+      if (progressInterval) clearInterval(progressInterval)
       setProcessingImage(false)
+      setProgressPercent(0)
+      setProcessingComplete(false)
       console.error('Error procesando archivo:', error)
       
       let errorMessage = error.message || 'Error al procesar el archivo'
@@ -455,7 +499,16 @@ export default function GastosPage() {
   }
 
   const handleConfirmExtractedData = async () => {
-    if (!extractedData) return
+    console.log('🔵 [GastosPage] handleConfirmExtractedData - INICIO')
+    console.log('🔵 [GastosPage] handleConfirmExtractedData - extractedData:', extractedData)
+    console.log('🔵 [GastosPage] handleConfirmExtractedData - selectedTransactions:', selectedTransactions)
+    console.log('🔵 [GastosPage] handleConfirmExtractedData - selectedImpuestos:', selectedImpuestos)
+    console.log('🔵 [GastosPage] handleConfirmExtractedData - selectedTarjetaId:', selectedTarjetaId)
+    
+    if (!extractedData) {
+      console.error('❌ [GastosPage] handleConfirmExtractedData - No extractedData')
+      return
+    }
 
     // Si hay múltiples transacciones (resumen)
     if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
@@ -463,16 +516,25 @@ export default function GastosPage() {
         selectedTransactions.has(index)
       )
       
-      if (transactionsToAdd.length === 0 && !includeTotal) {
-        setGastoError('Por favor, selecciona al menos una transacción')
+      console.log('🔵 [GastosPage] handleConfirmExtractedData - transactionsToAdd:', transactionsToAdd.length)
+      
+      if (transactionsToAdd.length === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) {
+        console.error('❌ [GastosPage] handleConfirmExtractedData - No hay transacciones seleccionadas')
+        setGastoError('Por favor, selecciona al menos una transacción o impuesto')
         return
       }
       
+      setSavingTransactions(true)
+      setGastoError('')
+      
       // Usar la tarjeta seleccionada en el modal, o la del formulario como fallback
       const tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
+      console.log('🔵 [GastosPage] handleConfirmExtractedData - tarjetaIdToUse:', tarjetaIdToUse)
 
       // Agregar cada transacción seleccionada como gasto individual
-      const addPromises = transactionsToAdd.map(async (trans: any) => {
+      const addPromises = transactionsToAdd.map(async (trans: any, index: number) => {
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando transacción ${index + 1}:`, trans)
+        
         let categoriaId = ''
         if (trans.categoria) {
           const categoriaMatch = categorias.find(
@@ -488,7 +550,7 @@ export default function GastosPage() {
         const fechaObj = new Date(fecha)
         const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
         
-        await addGasto({
+        const gastoData = {
           descripcion: trans.descripcion,
           categoria_id: categoriaId,
           monto: trans.monto,
@@ -502,11 +564,23 @@ export default function GastosPage() {
           tag_ids: gastoForm.tag_ids || [],
           pagado: gastoForm.pagado,
           comercio: trans.comercio || ''
-        })
+        }
+        
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Agregando gasto ${index + 1}:`, gastoData)
+        const result = await addGasto(gastoData)
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Resultado gasto ${index + 1}:`, result)
+        
+        if (result.error) {
+          console.error(`❌ [GastosPage] handleConfirmExtractedData - Error agregando gasto ${index + 1}:`, result.error)
+          throw result.error
+        }
+        
+        return result
       })
 
       // Si se solicita, agregar el total también
       if (includeTotal && extractedData.total && extractedData.total.monto) {
+        console.log('🔵 [GastosPage] handleConfirmExtractedData - Agregando total:', extractedData.total)
         const fechaObj = new Date(gastoForm.fecha)
         const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
         
@@ -527,21 +601,55 @@ export default function GastosPage() {
           })
         )
       }
+      
+      // Agregar impuestos seleccionados
+      if (extractedData.impuestos && Array.isArray(extractedData.impuestos) && selectedImpuestos.size > 0) {
+        const impuestosToAdd = extractedData.impuestos.filter((_: any, index: number) => 
+          selectedImpuestos.has(index)
+        )
+        
+        console.log('🔵 [GastosPage] handleConfirmExtractedData - Agregando impuestos:', impuestosToAdd.length)
+        
+        impuestosToAdd.forEach((imp: any, index: number) => {
+          console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando impuesto ${index + 1}:`, imp)
+          
+          const fechaObj = new Date(imp.fecha || gastoForm.fecha)
+          const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
+          
+          addPromises.push(
+            addImpuesto({
+              descripcion: imp.descripcion,
+              monto: imp.monto,
+              tarjeta_id: tarjetaIdToUse,
+              mes: mesFacturacion
+            })
+          )
+        })
+      }
 
       try {
-        await Promise.all(addPromises)
+        console.log('🔵 [GastosPage] handleConfirmExtractedData - Ejecutando Promise.all con', addPromises.length, 'promesas')
+        const results = await Promise.all(addPromises)
+        console.log('🔵 [GastosPage] handleConfirmExtractedData - Promise.all completado. Resultados:', results)
+        console.log('🔵 [GastosPage] handleConfirmExtractedData - Cerrando modal y limpiando estado')
+        
         setShowImagePreview(false)
         setExtractedData(null)
         setPreviewImage(null)
         setSelectedTransactions(new Set())
+        setSelectedImpuestos(new Set())
         setIncludeTotal(false)
         setDetectedTarjeta(null)
         setSelectedTarjetaId('')
+        setSavingTransactions(false)
         setShowGastoModal(false)
         resetGastoForm()
+        
+        console.log('🔵 [GastosPage] handleConfirmExtractedData - COMPLETADO EXITOSAMENTE')
       } catch (error) {
-        console.error('Error agregando transacciones:', error)
-        setGastoError('Error al agregar las transacciones. Por favor, intenta nuevamente.')
+        console.error('❌ [GastosPage] handleConfirmExtractedData - Error en Promise.all:', error)
+        setGastoError(`Error al agregar las transacciones: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+        setSavingTransactions(false)
       }
       
       return
@@ -1484,10 +1592,22 @@ export default function GastosPage() {
             <div className="text-center space-y-4">
               <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto" />
               <h3 className="text-xl font-bold text-slate-900">Procesando con IA...</h3>
-              <p className="text-slate-600 mb-4">Analizando el documento. Esto puede tardar unos segundos...</p>
+              <p className="text-slate-600 mb-4">
+                {processingComplete ? '✅ Análisis completado' : 'Analizando el documento. Esto puede tardar unos segundos...'}
+              </p>
               <div className="w-full bg-slate-200 rounded-full h-2.5 mt-4 overflow-hidden">
-                <div className="progress-bar-animated h-2.5 rounded-full shadow-sm w-full"></div>
+                <div 
+                  className={`h-2.5 rounded-full shadow-sm transition-all duration-300 ${
+                    processingComplete 
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' 
+                      : 'bg-gradient-to-r from-purple-500 to-purple-600'
+                  }`}
+                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                ></div>
               </div>
+              {progressPercent > 0 && progressPercent < 100 && !processingComplete && (
+                <p className="text-xs text-slate-500 mt-2 text-center">{Math.round(progressPercent)}%</p>
+              )}
             </div>
           </div>
         </div>
@@ -1687,6 +1807,81 @@ export default function GastosPage() {
                     ))}
                   </div>
 
+                  {/* Impuestos detectados */}
+                  {extractedData.impuestos && Array.isArray(extractedData.impuestos) && extractedData.impuestos.length > 0 && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-orange-900 flex items-center gap-2 mb-3">
+                        📝 Impuestos, Comisiones y Cargos detectados
+                      </h4>
+                      <p className="text-sm text-orange-700 mb-3">
+                        Se encontraron {extractedData.impuestos.length} impuesto{extractedData.impuestos.length !== 1 ? 's' : ''}. Selecciona los que deseas agregar.
+                      </p>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {extractedData.impuestos.map((imp: any, index: number) => (
+                          <div 
+                            key={index}
+                            className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                              selectedImpuestos.has(index) 
+                                ? 'border-orange-500 bg-orange-100' 
+                                : 'border-orange-200 hover:border-orange-300 bg-white'
+                            }`}
+                            onClick={() => {
+                              const newSelected = new Set(selectedImpuestos)
+                              if (newSelected.has(index)) {
+                                newSelected.delete(index)
+                              } else {
+                                newSelected.add(index)
+                              }
+                              setSelectedImpuestos(newSelected)
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedImpuestos.has(index)}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  const newSelected = new Set(selectedImpuestos)
+                                  if (newSelected.has(index)) {
+                                    newSelected.delete(index)
+                                  } else {
+                                    newSelected.add(index)
+                                  }
+                                  setSelectedImpuestos(newSelected)
+                                }}
+                                className="mt-1 w-4 h-4 text-orange-600 rounded border-slate-300"
+                              />
+                              <div className="flex-1 space-y-1">
+                                <div className="font-semibold text-slate-900">{imp.descripcion || 'Sin descripción'}</div>
+                                <div className="flex items-center gap-4 text-sm text-slate-600">
+                                  <span className="font-medium">{formatMoney(imp.monto || 0)} {imp.moneda || 'ARS'}</span>
+                                  <span>{imp.fecha || ''}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-orange-200">
+                        <button
+                          onClick={() => {
+                            const allSelected = new Set<number>(extractedData.impuestos.map((_: any, i: number) => i))
+                            setSelectedImpuestos(allSelected)
+                          }}
+                          className="btn btn-secondary text-sm"
+                        >
+                          Seleccionar todos
+                        </button>
+                        <button
+                          onClick={() => setSelectedImpuestos(new Set())}
+                          className="btn btn-secondary text-sm"
+                        >
+                          Deseleccionar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Opción para agregar total */}
                   {extractedData.total && extractedData.total.monto && (
                     <div 
@@ -1725,6 +1920,7 @@ export default function GastosPage() {
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200">
                     <span className="text-sm text-slate-600">
                       {selectedTransactions.size} transacción{selectedTransactions.size !== 1 ? 'es' : ''} seleccionada{selectedTransactions.size !== 1 ? 's' : ''}
+                      {selectedImpuestos.size > 0 && `, ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}`}
                       {includeTotal && extractedData.total && ' + Total'}
                     </span>
                     <div className="flex gap-2">
@@ -1817,9 +2013,19 @@ export default function GastosPage() {
                 <button
                   onClick={handleConfirmExtractedData}
                   className="btn btn-primary flex-1"
-                  disabled={extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal}
+                  disabled={(extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || savingTransactions}
                 >
-                  ✓ {extractedData.transacciones ? `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}
+                  {savingTransactions ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Agregando...
+                    </>
+                  ) : (
+                    <>
+                      ✓ {extractedData.transacciones ? 
+                        `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}${selectedImpuestos.size > 0 ? ` + ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}` : ''}` : 
+                        'Usar estos datos'}
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => { 

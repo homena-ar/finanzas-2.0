@@ -88,8 +88,14 @@ REGLAS PARA DETECTAR DECIMALES:
 2. CONSUMOS DEL PERÍODO ACTUAL:
    - SOLO extrae CONSUMOS individuales del período actual
    - NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS")
-   - NO incluyas saldos anteriores, intereses, comisiones o impuestos como transacciones
+   - NO incluyas saldos anteriores o intereses como transacciones
    - Busca la sección titulada "Consumos", "Detalle de Consumos" o similar
+
+3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
+   - Extrae impuestos, comisiones y cargos del período actual
+   - Busca secciones como "Impuestos, cargos e intereses", "Comisiones", "Cargos" o similar
+   - Ejemplos: "IMPUESTO DE SELLOS", "COMISION CTA PGOLD", "DB IVA", "Intereses", etc.
+   - Estos NO van en "transacciones" sino en "impuestos"
 
 3. TOTALES:
    - Extrae el total de consumos del período si está visible
@@ -114,6 +120,14 @@ REGLAS PARA DETECTAR DECIMALES:
       "fecha": "YYYY-MM-DD" (fecha del consumo individual del período actual, formato ISO),
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
       "comercio": "nombre del comercio o establecimiento si está disponible o null"
+    }
+  ],
+  "impuestos": [
+    {
+      "descripcion": "descripción exacta del impuesto, comisión o cargo (ej: 'IMPUESTO DE SELLOS', 'COMISION CTA PGOLD', 'DB IVA 21%')",
+      "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (ej: 1000.65, 35454.55, 7445.46),
+      "moneda": "ARS" o "USD" según corresponda,
+      "fecha": "YYYY-MM-DD" (fecha del impuesto/comisión si está visible, o fecha de cierre del resumen, formato ISO)"
     }
   ],
   "total": {
@@ -402,6 +416,51 @@ Responde solo con el JSON, sin texto adicional.`
         return cleaned
       }).filter((t: any) => t.descripcion && t.monto) // Filtrar transacciones válidas
       
+      // Procesar impuestos si existen
+      const cleanedImpuestos: any[] = []
+      if (extractedData.impuestos && Array.isArray(extractedData.impuestos)) {
+        cleanedImpuestos = extractedData.impuestos.map((imp: any) => {
+          const cleaned: any = {}
+          
+          if (imp.descripcion) {
+            cleaned.descripcion = String(imp.descripcion).trim()
+          }
+          
+          if (imp.monto) {
+            cleaned.monto = parseMontoArgentino(imp.monto)
+          }
+          
+          if (imp.moneda) {
+            const moneda = String(imp.moneda).toUpperCase()
+            cleaned.moneda = (moneda === 'USD' || moneda === 'ARS') ? moneda : 'ARS'
+          } else {
+            cleaned.moneda = 'ARS'
+          }
+          
+          if (imp.fecha) {
+            const fechaStr = String(imp.fecha)
+            if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              cleaned.fecha = fechaStr
+            } else {
+              try {
+                const fecha = new Date(fechaStr)
+                if (!isNaN(fecha.getTime())) {
+                  cleaned.fecha = fecha.toISOString().split('T')[0]
+                } else {
+                  cleaned.fecha = new Date().toISOString().split('T')[0]
+                }
+              } catch {
+                cleaned.fecha = new Date().toISOString().split('T')[0]
+              }
+            }
+          } else {
+            cleaned.fecha = new Date().toISOString().split('T')[0]
+          }
+          
+          return cleaned
+        }).filter((imp: any) => imp.descripcion && imp.monto) // Filtrar impuestos válidos
+      }
+      
       // Procesar total si existe
       const cleanedTotal: any = {}
       if (extractedData.total) {
@@ -438,6 +497,7 @@ Responde solo con el JSON, sin texto adicional.`
         success: true,
         data: {
           transacciones: cleanedTransactions,
+          impuestos: cleanedImpuestos.length > 0 ? cleanedImpuestos : null,
           total: Object.keys(cleanedTotal).length > 0 ? cleanedTotal : null,
           tarjeta: Object.keys(cleanedTarjeta).length > 0 ? cleanedTarjeta : null,
           esResumen: true
