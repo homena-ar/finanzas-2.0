@@ -64,6 +64,9 @@ export default function GastosPage() {
   const [savingTransactions, setSavingTransactions] = useState(false)
   const [progressPercent, setProgressPercent] = useState(0)
   const [processingComplete, setProcessingComplete] = useState(false)
+  // Estado para transacciones editadas (permite modificar fecha, descripción y monto antes de confirmar)
+  const [editedTransactions, setEditedTransactions] = useState<Map<number, any>>(new Map())
+  const [editedImpuestos, setEditedImpuestos] = useState<Map<number, any>>(new Map())
 
   // Función para obtener el nombre del usuario que creó el gasto
   const getUserLabel = (userId: string) => {
@@ -394,20 +397,37 @@ export default function GastosPage() {
       // Convertir a base64
       const reader = new FileReader()
       
-      // Simular progreso gradual durante la lectura
-      progressInterval = setInterval(() => {
+      // Función para incrementar progreso gradualmente
+      const incrementProgress = () => {
         setProgressPercent(prev => {
-          if (prev >= 90) return prev // No llegar a 100% hasta que termine
-          return prev + Math.random() * 8
+          if (prev >= 99) return 99 // No llegar a 100% hasta que termine
+          // Incremento más gradual y controlado
+          const increment = Math.min(3 + Math.random() * 4, 99 - prev) // Entre 3 y 7, máximo hasta 99%
+          return Math.min(prev + increment, 99)
         })
-      }, 300)
+      }
+      
+      // Simular progreso gradual durante la lectura (más lento)
+      progressInterval = setInterval(incrementProgress, 400)
       
       reader.onloadend = async () => {
+        // Detener el progreso automático, ahora lo controlamos manualmente
         if (progressInterval) clearInterval(progressInterval)
+        progressInterval = null
         
         const base64 = reader.result as string
         setPreviewImage(base64)
-        setProgressPercent(25)
+        
+        // Incremento gradual hasta 40%
+        let currentProgress = 10
+        const loadingProgress = setInterval(() => {
+          currentProgress += 3
+          if (currentProgress <= 40) {
+            setProgressPercent(currentProgress)
+          } else {
+            clearInterval(loadingProgress)
+          }
+        }, 200)
 
         try {
           // Llamar a la API
@@ -421,11 +441,34 @@ export default function GastosPage() {
             })
           })
 
-          setProgressPercent(70)
+          // Incrementar gradualmente hasta 70% durante la respuesta
+          clearInterval(loadingProgress)
+          currentProgress = 40
+          const responseProgress = setInterval(() => {
+            currentProgress += 2
+            if (currentProgress <= 70) {
+              setProgressPercent(currentProgress)
+            } else {
+              clearInterval(responseProgress)
+            }
+          }, 150)
+
           const result = await response.json()
-          setProgressPercent(90)
+          clearInterval(responseProgress)
+
+          // Incrementar gradualmente hasta 99% durante el procesamiento
+          currentProgress = 70
+          const processingProgress = setInterval(() => {
+            currentProgress += 2
+            if (currentProgress <= 99) {
+              setProgressPercent(currentProgress)
+            } else {
+              clearInterval(processingProgress)
+            }
+          }, 200)
 
           if (!response.ok || !result.success) {
+            clearInterval(processingProgress)
             const errorMessage = result.error || 'Error al procesar el archivo'
             const errorDetails = result.details ? `\n\nDetalles: ${result.details}` : ''
             throw new Error(`${errorMessage}${errorDetails}`)
@@ -452,6 +495,11 @@ export default function GastosPage() {
             setSelectedTarjetaId(gastoForm.tarjeta_id || '')
           }
           
+          clearInterval(processingProgress)
+          
+          // Esperar en 99% un momento, luego mostrar 100% y completar
+          setProgressPercent(99)
+          await new Promise(resolve => setTimeout(resolve, 300))
           setProgressPercent(100)
           setProcessingComplete(true)
           
@@ -461,7 +509,10 @@ export default function GastosPage() {
             setProcessingImage(false)
             setProgressPercent(0)
             setProcessingComplete(false)
-          }, 500)
+            // Limpiar ediciones anteriores cuando se procesa una nueva imagen
+            setEditedTransactions(new Map())
+            setEditedImpuestos(new Map())
+          }, 600)
         } catch (apiError: any) {
           if (progressInterval) clearInterval(progressInterval)
           setProcessingImage(false)
@@ -498,6 +549,34 @@ export default function GastosPage() {
     }
   }
 
+  // Función para obtener el valor editado o el original de una transacción
+  const getTransactionValue = (index: number, field: string, originalValue: any) => {
+    const edited = editedTransactions.get(index)
+    return edited && edited[field] !== undefined ? edited[field] : originalValue
+  }
+
+  // Función para obtener el valor editado o el original de un impuesto
+  const getImpuestoValue = (index: number, field: string, originalValue: any) => {
+    const edited = editedImpuestos.get(index)
+    return edited && edited[field] !== undefined ? edited[field] : originalValue
+  }
+
+  // Función para actualizar una transacción editada
+  const updateEditedTransaction = (index: number, field: string, value: any) => {
+    const newEdited = new Map(editedTransactions)
+    const current = newEdited.get(index) || {}
+    newEdited.set(index, { ...current, [field]: value })
+    setEditedTransactions(newEdited)
+  }
+
+  // Función para actualizar un impuesto editado
+  const updateEditedImpuesto = (index: number, field: string, value: any) => {
+    const newEdited = new Map(editedImpuestos)
+    const current = newEdited.get(index) || {}
+    newEdited.set(index, { ...current, [field]: value })
+    setEditedImpuestos(newEdited)
+  }
+
   const handleConfirmExtractedData = async () => {
     console.log('🔵 [GastosPage] handleConfirmExtractedData - INICIO')
     console.log('🔵 [GastosPage] handleConfirmExtractedData - extractedData:', extractedData)
@@ -512,9 +591,22 @@ export default function GastosPage() {
 
     // Si hay múltiples transacciones (resumen)
     if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
-      const transactionsToAdd = extractedData.transacciones.filter((_: any, index: number) => 
-        selectedTransactions.has(index)
-      )
+      // Aplicar ediciones a las transacciones seleccionadas
+      const transactionsToAdd = extractedData.transacciones
+        .map((trans: any, index: number) => {
+          if (!selectedTransactions.has(index)) return null
+          
+          // Aplicar ediciones si existen
+          const edited = editedTransactions.get(index)
+          if (edited) {
+            return {
+              ...trans,
+              ...edited
+            }
+          }
+          return trans
+        })
+        .filter((t: any) => t !== null)
       
       console.log('🔵 [GastosPage] handleConfirmExtractedData - transactionsToAdd:', transactionsToAdd.length)
       
@@ -604,9 +696,22 @@ export default function GastosPage() {
       
       // Agregar impuestos seleccionados
       if (extractedData.impuestos && Array.isArray(extractedData.impuestos) && selectedImpuestos.size > 0) {
-        const impuestosToAdd = extractedData.impuestos.filter((_: any, index: number) => 
-          selectedImpuestos.has(index)
-        )
+        // Aplicar ediciones a los impuestos seleccionados
+        const impuestosToAdd = extractedData.impuestos
+          .map((imp: any, index: number) => {
+            if (!selectedImpuestos.has(index)) return null
+            
+            // Aplicar ediciones si existen
+            const edited = editedImpuestos.get(index)
+            if (edited) {
+              return {
+                ...imp,
+                ...edited
+              }
+            }
+            return imp
+          })
+          .filter((i: any) => i !== null)
         
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Agregando impuestos:', impuestosToAdd.length)
         
@@ -631,6 +736,26 @@ export default function GastosPage() {
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Ejecutando Promise.all con', addPromises.length, 'promesas')
         const results = await Promise.all(addPromises)
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Promise.all completado. Resultados:', results)
+        
+        // Verificar resultados
+        const successCount = results.filter(r => !r.error).length
+        const errorCount = results.filter(r => r.error).length
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Resultados: ${successCount} exitosos, ${errorCount} con error`)
+        
+        if (errorCount > 0) {
+          console.error('❌ [GastosPage] handleConfirmExtractedData - Algunos gastos fallaron al agregarse')
+        }
+        
+        // Mostrar mensaje de éxito
+        if (successCount > 0) {
+          const mensajeGastos = transactionsToAdd.length > 0 ? `${successCount} gasto${successCount !== 1 ? 's' : ''} agregado${successCount !== 1 ? 's' : ''}` : ''
+          const mensajeImpuestos = selectedImpuestos.size > 0 ? `${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''} agregado${selectedImpuestos.size !== 1 ? 's' : ''}` : ''
+          const mensaje = [mensajeGastos, mensajeImpuestos].filter(m => m).join(', ')
+          
+          console.log(`✅ [GastosPage] handleConfirmExtractedData - ${mensaje}`)
+          // No usar alert, solo logs por ahora
+        }
+        
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Cerrando modal y limpiando estado')
         
         setShowImagePreview(false)
@@ -639,13 +764,19 @@ export default function GastosPage() {
         setSelectedTransactions(new Set())
         setSelectedImpuestos(new Set())
         setIncludeTotal(false)
+        setEditedTransactions(new Map())
+        setEditedImpuestos(new Map())
         setDetectedTarjeta(null)
         setSelectedTarjetaId('')
         setSavingTransactions(false)
+        setEditedTransactions(new Map())
+        setEditedImpuestos(new Map())
         setShowGastoModal(false)
         resetGastoForm()
         
+        // Los gastos deberían aparecer automáticamente después de que fetchAll se complete
         console.log('🔵 [GastosPage] handleConfirmExtractedData - COMPLETADO EXITOSAMENTE')
+        console.log(`✅ [GastosPage] handleConfirmExtractedData - Los gastos deberían aparecer en el listado. Si no aparecen, verifica que estés viendo el mes correcto.`)
       } catch (error) {
         console.error('❌ [GastosPage] handleConfirmExtractedData - Error en Promise.all:', error)
         setGastoError(`Error al agregar las transacciones: ${error instanceof Error ? error.message : 'Error desconocido'}`)
@@ -680,6 +811,8 @@ export default function GastosPage() {
     setPreviewImage(null)
     setSelectedTransactions(new Set())
     setIncludeTotal(false)
+    setEditedTransactions(new Map())
+    setEditedImpuestos(new Map())
   }
 
   const toggleFijo = async (g: Gasto) => {
@@ -1593,20 +1726,35 @@ export default function GastosPage() {
               <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto" />
               <h3 className="text-xl font-bold text-slate-900">Procesando con IA...</h3>
               <p className="text-slate-600 mb-4">
-                {processingComplete ? '✅ Análisis completado' : 'Analizando el documento. Esto puede tardar unos segundos...'}
+                {processingComplete ? (
+                  <span className="flex items-center gap-2 justify-center">
+                    <span className="text-emerald-600">✅</span>
+                    <span>Análisis completado</span>
+                  </span>
+                ) : (
+                  `Analizando el documento${progressPercent > 50 ? '...' : '.'} Esto puede tardar unos segundos...`
+                )}
               </p>
               <div className="w-full bg-slate-200 rounded-full h-2.5 mt-4 overflow-hidden">
                 <div 
-                  className={`h-2.5 rounded-full shadow-sm transition-all duration-300 ${
+                  className={`h-2.5 rounded-full shadow-sm transition-all duration-500 ease-out ${
                     processingComplete 
                       ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' 
                       : 'bg-gradient-to-r from-purple-500 to-purple-600'
                   }`}
-                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                  style={{ 
+                    width: `${Math.min(Math.max(progressPercent, 0), 100)}%`,
+                    transition: 'width 0.5s ease-out'
+                  }}
                 ></div>
               </div>
               {progressPercent > 0 && progressPercent < 100 && !processingComplete && (
-                <p className="text-xs text-slate-500 mt-2 text-center">{Math.round(progressPercent)}%</p>
+                <p className="text-xs text-slate-500 mt-2 text-center animate-pulse">
+                  {Math.round(Math.min(Math.max(progressPercent, 0), 99))}%
+                </p>
+              )}
+              {processingComplete && progressPercent >= 100 && (
+                <p className="text-xs text-emerald-600 mt-2 text-center font-semibold">100% - Preparando resultados...</p>
               )}
             </div>
           </div>
@@ -1618,7 +1766,9 @@ export default function GastosPage() {
           setShowImagePreview(false); 
           setExtractedData(null); 
           setPreviewImage(null); 
-          setSelectedTransactions(new Set()); 
+          setSelectedTransactions(new Set());
+          setEditedTransactions(new Map());
+          setEditedImpuestos(new Map()); 
           setIncludeTotal(false);
           setDetectedTarjeta(null);
           setSelectedTarjetaId('');
@@ -1635,9 +1785,12 @@ export default function GastosPage() {
                   setExtractedData(null); 
                   setPreviewImage(null); 
                   setSelectedTransactions(new Set()); 
+                  setSelectedImpuestos(new Set());
                   setIncludeTotal(false);
                   setDetectedTarjeta(null);
                   setSelectedTarjetaId('');
+                  setEditedTransactions(new Map());
+                  setEditedImpuestos(new Map());
                 }} 
                 className="p-1 hover:bg-slate-100 rounded"
               >
@@ -1755,56 +1908,110 @@ export default function GastosPage() {
                   )}
 
                   <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {extractedData.transacciones.map((trans: any, index: number) => (
-                      <div 
-                        key={index}
-                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                          selectedTransactions.has(index) 
-                            ? 'border-purple-500 bg-purple-50' 
-                            : 'border-slate-200 hover:border-purple-300 bg-white'
-                        }`}
-                        onClick={() => {
-                          const newSelected = new Set(selectedTransactions)
-                          if (newSelected.has(index)) {
-                            newSelected.delete(index)
-                          } else {
-                            newSelected.add(index)
-                          }
-                          setSelectedTransactions(newSelected)
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedTransactions.has(index)}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              const newSelected = new Set(selectedTransactions)
-                              if (newSelected.has(index)) {
-                                newSelected.delete(index)
-                              } else {
-                                newSelected.add(index)
-                              }
-                              setSelectedTransactions(newSelected)
-                            }}
-                            className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
-                          />
-                          <div className="flex-1 space-y-1">
-                            <div className="font-semibold text-slate-900">{trans.descripcion || 'Sin descripción'}</div>
-                            <div className="flex items-center gap-4 text-sm text-slate-600">
-                              <span className="font-medium">{formatMoney(trans.monto || 0)} {trans.moneda || 'ARS'}</span>
-                              <span>{trans.fecha || ''}</span>
-                              {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
+                    {extractedData.transacciones.map((trans: any, index: number) => {
+                      const descripcion = getTransactionValue(index, 'descripcion', trans.descripcion)
+                      const monto = getTransactionValue(index, 'monto', trans.monto)
+                      const fecha = getTransactionValue(index, 'fecha', trans.fecha)
+                      const moneda = getTransactionValue(index, 'moneda', trans.moneda || 'ARS')
+                      
+                      return (
+                        <div 
+                          key={index}
+                          className={`border rounded-lg p-4 transition-colors ${
+                            selectedTransactions.has(index) 
+                              ? 'border-purple-500 bg-purple-50' 
+                              : 'border-slate-200 hover:border-purple-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedTransactions.has(index)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                const newSelected = new Set(selectedTransactions)
+                                if (newSelected.has(index)) {
+                                  newSelected.delete(index)
+                                } else {
+                                  newSelected.add(index)
+                                }
+                                setSelectedTransactions(newSelected)
+                              }}
+                              className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
+                            />
+                            <div className="flex-1 space-y-3">
+                              {/* Descripción editable */}
+                              <div>
+                                <label className="text-xs text-slate-500 mb-1 block">Descripción</label>
+                                <input
+                                  type="text"
+                                  value={descripcion || ''}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    updateEditedTransaction(index, 'descripcion', e.target.value)
+                                  }}
+                                  className="input w-full text-sm"
+                                  placeholder="Descripción del gasto"
+                                />
+                              </div>
+                              
+                              {/* Fecha y Monto en fila */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-xs text-slate-500 mb-1 block">Fecha</label>
+                                  <input
+                                    type="date"
+                                    value={fecha || ''}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      updateEditedTransaction(index, 'fecha', e.target.value)
+                                    }}
+                                    className="input w-full text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-slate-500 mb-1 block">Monto</label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={monto || ''}
+                                      onChange={(e) => {
+                                        e.stopPropagation()
+                                        updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)
+                                      }}
+                                      className="input w-full text-sm"
+                                      placeholder="0.00"
+                                    />
+                                    <select
+                                      value={moneda}
+                                      onChange={(e) => {
+                                        e.stopPropagation()
+                                        updateEditedTransaction(index, 'moneda', e.target.value)
+                                      }}
+                                      className="input text-sm w-20"
+                                    >
+                                      <option value="ARS">ARS</option>
+                                      <option value="USD">USD</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Información adicional (solo lectura) */}
+                              <div className="flex items-center gap-4 text-xs text-slate-500">
+                                {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
+                                {trans.categoria && (
+                                  <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
+                                    {trans.categoria}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {trans.categoria && (
-                              <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
-                                {trans.categoria}
-                              </span>
-                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
                   {/* Impuestos detectados */}
@@ -1817,50 +2024,100 @@ export default function GastosPage() {
                         Se encontraron {extractedData.impuestos.length} impuesto{extractedData.impuestos.length !== 1 ? 's' : ''}. Selecciona los que deseas agregar.
                       </p>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {extractedData.impuestos.map((imp: any, index: number) => (
-                          <div 
-                            key={index}
-                            className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                              selectedImpuestos.has(index) 
-                                ? 'border-orange-500 bg-orange-100' 
-                                : 'border-orange-200 hover:border-orange-300 bg-white'
-                            }`}
-                            onClick={() => {
-                              const newSelected = new Set(selectedImpuestos)
-                              if (newSelected.has(index)) {
-                                newSelected.delete(index)
-                              } else {
-                                newSelected.add(index)
-                              }
-                              setSelectedImpuestos(newSelected)
-                            }}
-                          >
-                            <div className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedImpuestos.has(index)}
-                                onChange={(e) => {
-                                  e.stopPropagation()
-                                  const newSelected = new Set(selectedImpuestos)
-                                  if (newSelected.has(index)) {
-                                    newSelected.delete(index)
-                                  } else {
-                                    newSelected.add(index)
-                                  }
-                                  setSelectedImpuestos(newSelected)
-                                }}
-                                className="mt-1 w-4 h-4 text-orange-600 rounded border-slate-300"
-                              />
-                              <div className="flex-1 space-y-1">
-                                <div className="font-semibold text-slate-900">{imp.descripcion || 'Sin descripción'}</div>
-                                <div className="flex items-center gap-4 text-sm text-slate-600">
-                                  <span className="font-medium">{formatMoney(imp.monto || 0)} {imp.moneda || 'ARS'}</span>
-                                  <span>{imp.fecha || ''}</span>
+                        {extractedData.impuestos.map((imp: any, index: number) => {
+                          const descripcion = getImpuestoValue(index, 'descripcion', imp.descripcion)
+                          const monto = getImpuestoValue(index, 'monto', imp.monto)
+                          const fecha = getImpuestoValue(index, 'fecha', imp.fecha)
+                          const moneda = getImpuestoValue(index, 'moneda', imp.moneda || 'ARS')
+                          
+                          return (
+                            <div 
+                              key={index}
+                              className={`border rounded-lg p-4 transition-colors ${
+                                selectedImpuestos.has(index) 
+                                  ? 'border-orange-500 bg-orange-100' 
+                                  : 'border-orange-200 hover:border-orange-300 bg-white'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedImpuestos.has(index)}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    const newSelected = new Set(selectedImpuestos)
+                                    if (newSelected.has(index)) {
+                                      newSelected.delete(index)
+                                    } else {
+                                      newSelected.add(index)
+                                    }
+                                    setSelectedImpuestos(newSelected)
+                                  }}
+                                  className="mt-1 w-4 h-4 text-orange-600 rounded border-slate-300"
+                                />
+                                <div className="flex-1 space-y-3">
+                                  {/* Descripción editable */}
+                                  <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">Descripción</label>
+                                    <input
+                                      type="text"
+                                      value={descripcion || ''}
+                                      onChange={(e) => {
+                                        e.stopPropagation()
+                                        updateEditedImpuesto(index, 'descripcion', e.target.value)
+                                      }}
+                                      className="input w-full text-sm"
+                                      placeholder="Descripción del impuesto"
+                                    />
+                                  </div>
+                                  
+                                  {/* Fecha y Monto en fila */}
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="text-xs text-slate-500 mb-1 block">Fecha</label>
+                                      <input
+                                        type="date"
+                                        value={fecha || ''}
+                                        onChange={(e) => {
+                                          e.stopPropagation()
+                                          updateEditedImpuesto(index, 'fecha', e.target.value)
+                                        }}
+                                        className="input w-full text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-slate-500 mb-1 block">Monto</label>
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={monto || ''}
+                                          onChange={(e) => {
+                                            e.stopPropagation()
+                                            updateEditedImpuesto(index, 'monto', parseFloat(e.target.value) || 0)
+                                          }}
+                                          className="input w-full text-sm"
+                                          placeholder="0.00"
+                                        />
+                                        <select
+                                          value={moneda}
+                                          onChange={(e) => {
+                                            e.stopPropagation()
+                                            updateEditedImpuesto(index, 'moneda', e.target.value)
+                                          }}
+                                          className="input text-sm w-20"
+                                        >
+                                          <option value="ARS">ARS</option>
+                                          <option value="USD">USD</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                       <div className="flex gap-2 mt-3 pt-3 border-t border-orange-200">
                         <button
@@ -2027,16 +2284,19 @@ export default function GastosPage() {
                     </>
                   )}
                 </button>
-                <button
-                  onClick={() => { 
-                    setShowImagePreview(false); 
-                    setExtractedData(null); 
-                    setPreviewImage(null); 
-                    setSelectedTransactions(new Set()); 
-                    setIncludeTotal(false);
-                    setDetectedTarjeta(null);
-                    setSelectedTarjetaId('');
-                  }}
+              <button 
+                onClick={() => { 
+                  setShowImagePreview(false); 
+                  setExtractedData(null); 
+                  setPreviewImage(null); 
+                  setSelectedTransactions(new Set()); 
+                  setSelectedImpuestos(new Set());
+                  setIncludeTotal(false);
+                  setDetectedTarjeta(null);
+                  setSelectedTarjetaId('');
+                  setEditedTransactions(new Map());
+                  setEditedImpuestos(new Map());
+                }}
                   className="btn btn-secondary"
                 >
                   Cancelar
