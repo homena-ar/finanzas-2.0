@@ -39,6 +39,8 @@ interface WorkspaceContextType {
   acceptInvitation: (invitationId: string) => Promise<{ error: any }>
   rejectInvitation: (invitationId: string) => Promise<{ error: any }>
   cancelInvitation: (invitationId: string) => Promise<{ error: any }>
+  deleteInvitation: (invitationId: string) => Promise<{ error: any }>
+  deleteAllInvitations: (workspaceId: string) => Promise<{ error: any }>
 
   fetchAll: () => Promise<void>
 }
@@ -373,10 +375,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
         // Formatear el campo 'from' correctamente para Resend
         // Resend requiere formato: "Nombre <email@domain.com>" o solo "email@domain.com"
-        // Usamos el dominio verificado registro@nexuno.com.ar que permite enviar a cualquier email
+        // IMPORTANTE: El dominio debe estar verificado en Resend Dashboard
+        // Si no está verificado, Resend usará el dominio de prueba (resend.dev) que solo permite enviar a tu propio email
         // Nota: El API route también puede usar RESEND_FROM_EMAIL para configurar el dominio
-        const defaultFromEmail = 'registro@nexuno.com.ar'
+        // Dominio verificado: fin.nexuno.com.ar
+        const defaultFromEmail = 'noreply@fin.nexuno.com.ar'
         let emailFrom = `FinControl <${defaultFromEmail}>`
+        
+        // Validar que no se esté usando el dominio de prueba
+        if (defaultFromEmail.includes('@resend.dev')) {
+          console.error('❌ [useWorkspace] ADVERTENCIA: Se está usando el dominio de prueba resend.dev')
+          console.error('❌ [useWorkspace] El dominio debe estar verificado en Resend Dashboard')
+        }
 
         const emailPayload = {
           to: email,
@@ -420,9 +430,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           
           // Detectar errores específicos
           const errorDetails = typeof result.details === 'string' ? result.details : JSON.stringify(result.details || {})
-          // Nota: Con el dominio verificado, estos errores no deberían ocurrir
-          if (errorDetails.includes('Testing domain restriction') || errorDetails.includes('resend.dev')) {
-            errorMessage = 'Error de configuración del dominio. Verifica que el dominio esté correctamente verificado en Resend. La invitación se creó correctamente y el usuario puede verla en la app.'
+          const errorString = JSON.stringify(result)
+          
+          // Detectar errores de dominio no verificado
+          if (errorDetails.includes('Testing domain restriction') || 
+              errorDetails.includes('resend.dev') ||
+              errorString.includes('resend.dev') ||
+              result.error?.includes('Dominio no verificado')) {
+            errorMessage = '⚠️ El dominio de correo no está verificado en Resend. El correo no se pudo enviar, pero la invitación se creó correctamente y el usuario puede verla en la app. Para enviar correos, verifica tu dominio en https://resend.com/domains'
+            console.error('❌ [useWorkspace] ERROR DE DOMINIO:', {
+              message: 'El dominio no está verificado en Resend',
+              currentFrom: result.currentFrom,
+              resendFromEmail: result.resendFromEmail,
+              help: result.help || 'Ve a https://resend.com/domains para verificar tu dominio'
+            })
           }
           
           console.error('❌ [useWorkspace] Error en respuesta:', {
@@ -438,6 +459,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             console.warn('⚠️ [useWorkspace] Advertencia (invitación creada):', result.warning)
             // No lanzar error, la invitación ya está creada
             return
+          }
+          
+          // Si es un error de dominio, no lanzar excepción pero loguear el problema
+          if (errorMessage.includes('dominio no está verificado')) {
+            console.error('❌ [useWorkspace] El correo no se envió por dominio no verificado, pero la invitación está creada')
+            return // No lanzar error, la invitación ya está creada
           }
           
           throw new Error(errorMessage)
@@ -541,10 +568,49 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (e) { return { error: e } }
   }, [fetchAll])
 
+  const deleteInvitation = useCallback(async (invitationId: string) => {
+    try {
+      await deleteDoc(doc(db, 'workspace_invitations', invitationId))
+      await fetchAll()
+      return { error: null }
+    } catch (e) { 
+      return { error: e } 
+    }
+  }, [fetchAll])
+
+  const deleteAllInvitations = useCallback(async (workspaceId: string) => {
+    if (!user) return { error: new Error('No user') }
+    
+    try {
+      // Verificar que el usuario es dueño del workspace
+      const workspace = workspaces.find(w => w.id === workspaceId)
+      if (!workspace || workspace.owner_id !== user.uid) {
+        return { error: new Error('Solo el administrador puede eliminar invitaciones') }
+      }
+
+      // Obtener todas las invitaciones del workspace
+      const invitationsQuery = query(
+        collection(db, 'workspace_invitations'),
+        where('workspace_id', '==', workspaceId)
+      )
+      const invitationsSnap = await getDocs(invitationsQuery)
+      
+      // Eliminar todas las invitaciones
+      const deletePromises = invitationsSnap.docs.map(doc => deleteDoc(doc.ref))
+      await Promise.all(deletePromises)
+      
+      await fetchAll()
+      return { error: null }
+    } catch (e) { 
+      return { error: e } 
+    }
+  }, [user, workspaces, fetchAll])
+
   const value = {
     workspaces, currentWorkspace, members, invitations, sentInvitations, loading,
     setCurrentWorkspace, createWorkspace, updateWorkspace, deleteWorkspace,
-    inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, acceptInvitation, rejectInvitation, cancelInvitation, fetchAll
+    inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, 
+    acceptInvitation, rejectInvitation, cancelInvitation, deleteInvitation, deleteAllInvitations, fetchAll
   }
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>

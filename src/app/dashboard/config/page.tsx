@@ -26,6 +26,8 @@ export default function ConfigPage() {
     acceptInvitation,
     rejectInvitation,
     cancelInvitation,
+    deleteInvitation,
+    deleteAllInvitations,
     updateMemberPermissions,
     updateMemberDisplayName,
     removeMember
@@ -755,7 +757,37 @@ export default function ConfigPage() {
                   {/* INVITACIONES ENVIADAS - Solo visible para el dueño */}
                   {isOwner && isExpanded && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
-                      <h5 className="font-semibold mb-3 text-sm">Invitaciones Enviadas</h5>
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="font-semibold text-sm">Invitaciones Enviadas</h5>
+                        {sentInvitations.filter(inv => inv.workspace_id === ws.id).length > 0 && (
+                          <button
+                            onClick={async () => {
+                              if (confirm('¿Estás seguro de que deseas eliminar todo el historial de invitaciones? Esta acción no se puede deshacer.')) {
+                                const result = await deleteAllInvitations(ws.id)
+                                if (result.error) {
+                                  setAlertData({
+                                    title: 'Error',
+                                    message: 'No se pudo eliminar el historial de invitaciones',
+                                    variant: 'error'
+                                  })
+                                } else {
+                                  setAlertData({
+                                    title: 'Historial eliminado',
+                                    message: 'Se eliminó todo el historial de invitaciones del workspace.',
+                                    variant: 'success'
+                                  })
+                                }
+                                setShowAlert(true)
+                              }
+                            }}
+                            className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition flex items-center gap-1"
+                            title="Eliminar todo el historial"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Borrar todo
+                          </button>
+                        )}
+                      </div>
                       {sentInvitations.filter(inv => inv.workspace_id === ws.id).length > 0 ? (
                         <div className="space-y-2 mb-4">
                           {sentInvitations
@@ -810,6 +842,31 @@ export default function ConfigPage() {
                                         Cancelar
                                       </button>
                                     )}
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm(`¿Estás seguro de que deseas eliminar esta invitación a ${inv.email}? Esta acción no se puede deshacer.`)) {
+                                          const result = await deleteInvitation(inv.id)
+                                          if (result.error) {
+                                            setAlertData({
+                                              title: 'Error',
+                                              message: 'No se pudo eliminar la invitación',
+                                              variant: 'error'
+                                            })
+                                          } else {
+                                            setAlertData({
+                                              title: 'Invitación eliminada',
+                                              message: 'La invitación fue eliminada del historial.',
+                                              variant: 'success'
+                                            })
+                                          }
+                                          setShowAlert(true)
+                                        }
+                                      }}
+                                      className="text-xs px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
+                                      title="Eliminar invitación del historial"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 </div>
                               )

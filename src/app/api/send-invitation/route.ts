@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
     console.log('📧 [API] API Key configurada:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NO ENCONTRADA')
 
     // Preparar el email payload
-    // Usamos el dominio verificado registro@nexuno.com.ar que permite enviar a cualquier email
+    // Usamos el dominio verificado fin.nexuno.com.ar que permite enviar a cualquier email
     // Se puede configurar mediante la variable de entorno RESEND_FROM_EMAIL
-    const defaultFromEmail = process.env.RESEND_FROM_EMAIL || 'registro@nexuno.com.ar'
+    const defaultFromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@fin.nexuno.com.ar'
     let emailFrom = `FinControl <${defaultFromEmail}>`
     
     // Si se proporciona un 'from', validar formato
@@ -57,7 +57,32 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Extraer el email del formato "Nombre <email@domain.com>" o solo "email@domain.com"
+    const emailMatch = emailFrom.match(/<([^>]+)>/) || emailFrom.match(/([^\s<]+@[^\s>]+)/)
+    const actualEmail = emailMatch ? emailMatch[1] : emailFrom
+    
+    // Validar que NO se esté usando el dominio de prueba de Resend
+    if (actualEmail && actualEmail.includes('@resend.dev')) {
+      console.error('❌ [API] ERROR: Se está intentando usar el dominio de prueba resend.dev')
+      console.error('❌ [API] El dominio configurado no está verificado en Resend')
+      console.error('❌ [API] Email configurado:', emailFrom)
+      console.error('❌ [API] RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL || 'NO CONFIGURADO')
+      
+      return NextResponse.json(
+        { 
+          error: 'Dominio no verificado en Resend',
+          details: `El dominio configurado (${actualEmail}) no está verificado en Resend. Por favor, verifica el dominio en Resend Dashboard o configura RESEND_FROM_EMAIL con un dominio verificado.`,
+          currentFrom: emailFrom,
+          resendFromEmail: process.env.RESEND_FROM_EMAIL || 'NO CONFIGURADO',
+          help: 'Ve a https://resend.com/domains para verificar tu dominio'
+        },
+        { status: 400 }
+      )
+    }
+    
     console.log('📧 [API] Email FROM configurado:', emailFrom)
+    console.log('📧 [API] Email extraído:', actualEmail)
+    console.log('📧 [API] RESEND_FROM_EMAIL env:', process.env.RESEND_FROM_EMAIL || 'NO CONFIGURADO')
     
     // Validar que 'to' es un email válido
     const emailTo = Array.isArray(to) ? to : [to]
@@ -126,9 +151,18 @@ export async function POST(request: NextRequest) {
         : String(error)
       
       let userFriendlyError = 'Error al enviar correo'
-      // Nota: Con el dominio verificado, estos errores no deberían ocurrir
+      let errorDetails = errorMessage
+      
+      // Detectar errores específicos de dominio
       if (errorMessage.includes('Testing domain restriction') || errorMessage.includes('resend.dev')) {
-        userFriendlyError = 'Error de configuración del dominio. Verifica que el dominio esté correctamente verificado en Resend.'
+        userFriendlyError = 'Dominio no verificado en Resend'
+        errorDetails = `El dominio configurado no está verificado en Resend. El dominio de prueba (resend.dev) solo permite enviar a tu propio email. Por favor, verifica tu dominio en https://resend.com/domains`
+      }
+      
+      // Detectar si el error es por dominio no verificado
+      if (errorMessage.includes('domain') && (errorMessage.includes('not verified') || errorMessage.includes('unverified'))) {
+        userFriendlyError = 'Dominio no verificado'
+        errorDetails = `El dominio no está verificado en Resend. Ve a https://resend.com/domains para verificar tu dominio.`
       }
       
       return NextResponse.json(
