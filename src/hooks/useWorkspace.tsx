@@ -373,13 +373,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
         // Formatear el campo 'from' correctamente para Resend
         // Resend requiere formato: "Nombre <email@domain.com>" o solo "email@domain.com"
-        // Si el email del usuario no está verificado en Resend, usar el dominio por defecto
-        let emailFrom = 'FinControl <onboarding@resend.dev>'
-        if (user.email) {
-          // Intentar usar el email del usuario, pero Resend solo permite dominios verificados
-          // Por ahora usamos el dominio por defecto de Resend
-          emailFrom = `FinControl <onboarding@resend.dev>`
-        }
+        // Usamos el dominio verificado registro@nexuno.com.ar que permite enviar a cualquier email
+        // Nota: El API route también puede usar RESEND_FROM_EMAIL para configurar el dominio
+        const defaultFromEmail = 'registro@nexuno.com.ar'
+        let emailFrom = `FinControl <${defaultFromEmail}>`
 
         const emailPayload = {
           to: email,
@@ -419,13 +416,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         console.log('📧 [useWorkspace] Resultado parseado:', result)
         
         if (!response.ok) {
-          const errorMessage = result.error || result.details || 'Error al enviar correo'
+          let errorMessage = result.error || result.details || 'Error al enviar correo'
+          
+          // Detectar errores específicos
+          const errorDetails = typeof result.details === 'string' ? result.details : JSON.stringify(result.details || {})
+          // Nota: Con el dominio verificado, estos errores no deberían ocurrir
+          if (errorDetails.includes('Testing domain restriction') || errorDetails.includes('resend.dev')) {
+            errorMessage = 'Error de configuración del dominio. Verifica que el dominio esté correctamente verificado en Resend. La invitación se creó correctamente y el usuario puede verla en la app.'
+          }
+          
           console.error('❌ [useWorkspace] Error en respuesta:', {
             status: response.status,
             error: errorMessage,
             details: result.details,
+            warning: result.warning,
             fullResult: result
           })
+          
+          // Si hay un warning, no lanzar error (la invitación se creó)
+          if (result.warning) {
+            console.warn('⚠️ [useWorkspace] Advertencia (invitación creada):', result.warning)
+            // No lanzar error, la invitación ya está creada
+            return
+          }
+          
           throw new Error(errorMessage)
         }
 

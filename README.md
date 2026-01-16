@@ -77,6 +77,8 @@ npm run build
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://yzhmctutglxnamzgwyrp.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
+RESEND_API_KEY=tu_resend_api_key
+RESEND_FROM_EMAIL=registro@nexuno.com.ar  # Opcional: Email desde el cual se envían las invitaciones (por defecto: registro@nexuno.com.ar)
 ```
 
 ## 📱 Estructura del Proyecto

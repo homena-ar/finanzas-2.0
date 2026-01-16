@@ -41,13 +41,23 @@ export async function POST(request: NextRequest) {
     console.log('📧 [API] API Key configurada:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NO ENCONTRADA')
 
     // Preparar el email payload
-    // Resend requiere que 'from' use un dominio verificado o el dominio por defecto
-    const emailFrom = from || 'FinControl <onboarding@resend.dev>'
+    // Usamos el dominio verificado registro@nexuno.com.ar que permite enviar a cualquier email
+    // Se puede configurar mediante la variable de entorno RESEND_FROM_EMAIL
+    const defaultFromEmail = process.env.RESEND_FROM_EMAIL || 'registro@nexuno.com.ar'
+    let emailFrom = `FinControl <${defaultFromEmail}>`
     
-    // Validar formato del email 'from'
-    if (!emailFrom.includes('<') || !emailFrom.includes('>')) {
-      console.warn('⚠️ [API] Formato de "from" puede ser inválido, usando formato por defecto')
+    // Si se proporciona un 'from', validar formato
+    if (from) {
+      // Validar que tenga el formato correcto: "Nombre <email@domain.com>"
+      if (from.includes('<') && from.includes('>')) {
+        emailFrom = from
+      } else {
+        // Si solo es un email, agregar formato
+        emailFrom = `FinControl <${from}>`
+      }
     }
+    
+    console.log('📧 [API] Email FROM configurado:', emailFrom)
     
     // Validar que 'to' es un email válido
     const emailTo = Array.isArray(to) ? to : [to]
@@ -109,11 +119,25 @@ export async function POST(request: NextRequest) {
         errorType: typeof error,
         errorString: JSON.stringify(error, null, 2)
       })
+      
+      // Detectar errores específicos
+      const errorMessage = typeof error === 'object' && error !== null
+        ? (error as any).message || JSON.stringify(error)
+        : String(error)
+      
+      let userFriendlyError = 'Error al enviar correo'
+      // Nota: Con el dominio verificado, estos errores no deberían ocurrir
+      if (errorMessage.includes('Testing domain restriction') || errorMessage.includes('resend.dev')) {
+        userFriendlyError = 'Error de configuración del dominio. Verifica que el dominio esté correctamente verificado en Resend.'
+      }
+      
       return NextResponse.json(
         { 
-          error: 'Error al enviar correo', 
+          error: userFriendlyError,
           details: error,
-          errorMessage: typeof error === 'object' ? JSON.stringify(error) : String(error)
+          errorMessage: errorMessage,
+          // No fallar completamente, la invitación ya está creada
+          warning: 'La invitación fue creada pero el correo no se pudo enviar. El usuario puede ver la invitación en la app.'
         },
         { status: 500 }
       )
