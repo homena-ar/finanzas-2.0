@@ -56,6 +56,8 @@ export default function GastosPage() {
   const [showImagePreview, setShowImagePreview] = useState(false)
   const [extractedData, setExtractedData] = useState<any>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set())
+  const [includeTotal, setIncludeTotal] = useState(false)
 
   // Función para obtener el nombre del usuario que creó el gasto
   const getUserLabel = (userId: string) => {
@@ -433,7 +435,76 @@ export default function GastosPage() {
   const handleConfirmExtractedData = () => {
     if (!extractedData) return
 
-    // Llenar el formulario con los datos extraídos
+    // Si hay múltiples transacciones (resumen)
+    if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
+      const transactionsToAdd = extractedData.transacciones.filter((_: any, index: number) => 
+        selectedTransactions.has(index)
+      )
+      
+      if (transactionsToAdd.length === 0 && !includeTotal) {
+        setGastoError('Por favor, selecciona al menos una transacción')
+        return
+      }
+
+      // Agregar cada transacción seleccionada como gasto individual
+      const addPromises = transactionsToAdd.map(async (trans: any) => {
+        let categoriaId = ''
+        if (trans.categoria) {
+          const categoriaMatch = categorias.find(
+            c => c.nombre.toLowerCase().includes(trans.categoria.toLowerCase()) ||
+            trans.categoria.toLowerCase().includes(c.nombre.toLowerCase())
+          )
+          if (categoriaMatch) {
+            categoriaId = categoriaMatch.id
+          }
+        }
+        
+        await addGasto({
+          descripcion: trans.descripcion,
+          categoria_id: categoriaId,
+          monto: trans.monto,
+          moneda: trans.moneda || 'ARS',
+          fecha: trans.fecha || gastoForm.fecha,
+          tarjeta_id: gastoForm.tarjeta_id,
+          cuotas: gastoForm.cuotas,
+          es_fijo: false,
+          tag_ids: gastoForm.tag_ids,
+          pagado: gastoForm.pagado,
+          comercio: trans.comercio || ''
+        })
+      })
+
+      // Si se solicita, agregar el total también
+      if (includeTotal && extractedData.total && extractedData.total.monto) {
+        addPromises.push(
+          addGasto({
+            descripcion: `Total del resumen - ${extractedData.total.periodo || 'Período'}`,
+            categoria_id: '',
+            monto: extractedData.total.monto,
+            moneda: extractedData.total.moneda || 'ARS',
+            fecha: gastoForm.fecha,
+            tarjeta_id: gastoForm.tarjeta_id,
+            cuotas: gastoForm.cuotas,
+            es_fijo: false,
+            tag_ids: gastoForm.tag_ids,
+            pagado: gastoForm.pagado
+          })
+        )
+      }
+
+      Promise.all(addPromises).then(() => {
+        setShowImagePreview(false)
+        setExtractedData(null)
+        setPreviewImage(null)
+        setSelectedTransactions(new Set())
+        setIncludeTotal(false)
+        setShowGastoModal(false)
+      })
+      
+      return
+    }
+
+    // Formato antiguo: transacción única (mantener compatibilidad)
     setGastoForm(f => ({
       ...f,
       descripcion: extractedData.descripcion || f.descripcion,
@@ -456,6 +527,8 @@ export default function GastosPage() {
     setShowImagePreview(false)
     setExtractedData(null)
     setPreviewImage(null)
+    setSelectedTransactions(new Set())
+    setIncludeTotal(false)
   }
 
   const toggleFijo = async (g: Gasto) => {
@@ -1362,15 +1435,15 @@ export default function GastosPage() {
 
       {/* Modal de Vista Previa de Datos Extraídos */}
       {showImagePreview && extractedData && (
-        <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null) }}>
-          <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}>
+          <div className="modal max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <ImageIcon className="w-5 h-5 text-purple-600" />
-                Confirmar Datos Extraídos
+                {extractedData.transacciones ? `Confirmar Transacciones (${extractedData.transacciones.length} encontradas)` : 'Confirmar Datos Extraídos'}
               </h3>
               <button 
-                onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null) }} 
+                onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }} 
                 className="p-1 hover:bg-slate-100 rounded"
               >
                 <X className="w-5 h-5" />
@@ -1391,79 +1464,205 @@ export default function GastosPage() {
                 </div>
               )}
               
-              <div className="bg-slate-50 p-4 rounded-lg space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 uppercase">Descripción</label>
-                  <input
-                    type="text"
-                    className="input mt-1"
-                    value={extractedData.descripcion || ''}
-                    onChange={e => setExtractedData({ ...extractedData, descripcion: e.target.value })}
-                  />
+              {/* Si hay múltiples transacciones (resumen) */}
+              {extractedData.transacciones && Array.isArray(extractedData.transacciones) ? (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Resumen detectado:</strong> Se encontraron {extractedData.transacciones.length} transacciones individuales. 
+                      Selecciona las que deseas agregar como gastos.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {extractedData.transacciones.map((trans: any, index: number) => (
+                      <div 
+                        key={index}
+                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                          selectedTransactions.has(index) 
+                            ? 'border-purple-500 bg-purple-50' 
+                            : 'border-slate-200 hover:border-purple-300 bg-white'
+                        }`}
+                        onClick={() => {
+                          const newSelected = new Set(selectedTransactions)
+                          if (newSelected.has(index)) {
+                            newSelected.delete(index)
+                          } else {
+                            newSelected.add(index)
+                          }
+                          setSelectedTransactions(newSelected)
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedTransactions.has(index)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              const newSelected = new Set(selectedTransactions)
+                              if (newSelected.has(index)) {
+                                newSelected.delete(index)
+                              } else {
+                                newSelected.add(index)
+                              }
+                              setSelectedTransactions(newSelected)
+                            }}
+                            className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
+                          />
+                          <div className="flex-1 space-y-1">
+                            <div className="font-semibold text-slate-900">{trans.descripcion || 'Sin descripción'}</div>
+                            <div className="flex items-center gap-4 text-sm text-slate-600">
+                              <span className="font-medium">{formatMoney(trans.monto || 0)} {trans.moneda || 'ARS'}</span>
+                              <span>{trans.fecha || ''}</span>
+                              {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
+                            </div>
+                            {trans.categoria && (
+                              <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
+                                {trans.categoria}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Opción para agregar total */}
+                  {extractedData.total && extractedData.total.monto && (
+                    <div 
+                      className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                        includeTotal 
+                          ? 'border-purple-500 bg-purple-50' 
+                          : 'border-slate-200 hover:border-purple-300 bg-white'
+                      }`}
+                      onClick={() => setIncludeTotal(!includeTotal)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={includeTotal}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setIncludeTotal(!includeTotal)
+                          }}
+                          className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold text-slate-900">
+                            Total del resumen {extractedData.total.periodo ? `- ${extractedData.total.periodo}` : ''}
+                          </div>
+                          <div className="text-sm text-slate-600 mt-1">
+                            {formatMoney(extractedData.total.monto)} {extractedData.total.moneda || 'ARS'}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            Opcional: Agregar el total del resumen como un gasto adicional
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                    <span className="text-sm text-slate-600">
+                      {selectedTransactions.size} transacción{selectedTransactions.size !== 1 ? 'es' : ''} seleccionada{selectedTransactions.size !== 1 ? 's' : ''}
+                      {includeTotal && extractedData.total && ' + Total'}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const allSelected = new Set(extractedData.transacciones.map((_: any, i: number) => i))
+                          setSelectedTransactions(allSelected)
+                        }}
+                        className="btn btn-secondary text-sm"
+                      >
+                        Seleccionar todas
+                      </button>
+                      <button
+                        onClick={() => setSelectedTransactions(new Set())}
+                        className="btn btn-secondary text-sm"
+                      >
+                        Deseleccionar
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+              ) : (
+                /* Formato antiguo: transacción única (mantener compatibilidad) */
+                <div className="bg-slate-50 p-4 rounded-lg space-y-3">
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 uppercase">Monto</label>
+                    <label className="text-xs font-semibold text-slate-600 uppercase">Descripción</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       className="input mt-1"
-                      value={extractedData.monto || ''}
-                      onChange={e => setExtractedData({ ...extractedData, monto: parseFloat(e.target.value) || 0 })}
+                      value={extractedData.descripcion || ''}
+                      onChange={e => setExtractedData({ ...extractedData, descripcion: e.target.value })}
                     />
                   </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase">Monto</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input mt-1"
+                        value={extractedData.monto || ''}
+                        onChange={e => setExtractedData({ ...extractedData, monto: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase">Moneda</label>
+                      <select
+                        className="input mt-1"
+                        value={extractedData.moneda || 'ARS'}
+                        onChange={e => setExtractedData({ ...extractedData, moneda: e.target.value })}
+                      >
+                        <option value="ARS">ARS</option>
+                        <option value="USD">USD</option>
+                      </select>
+                    </div>
+                  </div>
+                  
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 uppercase">Moneda</label>
-                    <select
+                    <label className="text-xs font-semibold text-slate-600 uppercase">Fecha</label>
+                    <input
+                      type="date"
                       className="input mt-1"
-                      value={extractedData.moneda || 'ARS'}
-                      onChange={e => setExtractedData({ ...extractedData, moneda: e.target.value })}
-                    >
-                      <option value="ARS">ARS</option>
-                      <option value="USD">USD</option>
-                    </select>
+                      value={extractedData.fecha || ''}
+                      onChange={e => setExtractedData({ ...extractedData, fecha: e.target.value })}
+                    />
                   </div>
-                </div>
-                
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 uppercase">Fecha</label>
-                  <input
-                    type="date"
-                    className="input mt-1"
-                    value={extractedData.fecha || ''}
-                    onChange={e => setExtractedData({ ...extractedData, fecha: e.target.value })}
-                  />
-                </div>
-                
-                {extractedData.categoria && (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 uppercase">Categoría Sugerida</label>
-                    <div className="mt-1 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg">
-                      {extractedData.categoria}
+                  
+                  {extractedData.categoria && (
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase">Categoría Sugerida</label>
+                      <div className="mt-1 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg">
+                        {extractedData.categoria}
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {extractedData.comercio && (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 uppercase">Comercio</label>
-                    <div className="mt-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg">
-                      {extractedData.comercio}
+                  )}
+                  
+                  {extractedData.comercio && (
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase">Comercio</label>
+                      <div className="mt-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg">
+                        {extractedData.comercio}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-2 border-t border-slate-200">
                 <button
                   onClick={handleConfirmExtractedData}
                   className="btn btn-primary flex-1"
+                  disabled={extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal}
                 >
-                  ✓ Usar estos datos
+                  ✓ {extractedData.transacciones ? `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}
                 </button>
                 <button
-                  onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null) }}
+                  onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}
                   className="btn btn-secondary"
                 >
                   Cancelar

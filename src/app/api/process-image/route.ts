@@ -37,8 +37,41 @@ export async function POST(request: NextRequest) {
     // Determinar el prompt según el tipo
     let prompt = ''
     const documentType = isPDF ? 'documento PDF' : 'imagen'
+    
+    // Detectar si es un resumen con múltiples transacciones (PDF de resumen bancario/tarjeta)
+    const isResumenMultiple = (type === 'resumen' || (type === 'ingreso' && isPDF)) || (type === 'gasto' && isPDF)
+    
     if (type === 'gasto' || type === 'comprobante') {
-      prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
+      if (isResumenMultiple) {
+        // Para resúmenes de tarjeta o resúmenes con múltiples consumos
+        prompt = `Analiza este ${documentType} que es un resumen de tarjeta de crédito o resumen bancario con múltiples transacciones. 
+
+IMPORTANTE: Extrae CADA TRANSACCIÓN INDIVIDUAL, no solo el total. Busca cada consumo, pago o movimiento individual listado en el documento.
+
+Responde en formato JSON con un array "transacciones" que contenga cada transacción individual encontrada:
+
+{
+  "transacciones": [
+    {
+      "descripcion": "descripción de la transacción individual (ej: nombre del comercio, descripción del consumo)",
+      "monto": número (solo el número, sin símbolos, sin puntos de miles),
+      "moneda": "ARS" o "USD",
+      "fecha": "YYYY-MM-DD" (fecha de la transacción individual, si no está visible usa la fecha del resumen),
+      "categoria": "categoría sugerida según la descripción (ej: Comida, Transporte, Supermercado, etc.)",
+      "comercio": "nombre del comercio o establecimiento si está disponible"
+    }
+  ],
+  "total": {
+    "monto": número (total del resumen si está visible),
+    "moneda": "ARS" o "USD",
+    "periodo": "fecha de cierre o período del resumen"
+  }
+}
+
+Si encuentras múltiples transacciones, inclúyelas todas en el array. NO incluyas solo el total. El monto debe ser solo el número sin símbolos de moneda ni puntos de miles. Las fechas deben estar en formato YYYY-MM-DD.`
+      } else {
+        // Para comprobantes individuales (tickets, facturas)
+        prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
 
 {
   "descripcion": "descripción del producto o servicio comprado",
@@ -50,8 +83,38 @@ export async function POST(request: NextRequest) {
 }
 
 Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea solo el número sin símbolos de moneda ni puntos de miles. La fecha debe estar en formato YYYY-MM-DD.`
+      }
     } else if (type === 'ingreso' || type === 'resumen') {
-      prompt = `Analiza este ${documentType} de un resumen bancario, extracto o comprobante de ingreso y extrae la siguiente información en formato JSON:
+      if (isResumenMultiple) {
+        // Para resúmenes bancarios con múltiples ingresos
+        prompt = `Analiza este ${documentType} que es un resumen bancario, extracto o resumen con múltiples transacciones de ingresos.
+
+IMPORTANTE: Extrae CADA INGRESO INDIVIDUAL, no solo el total. Busca cada transferencia, depósito o ingreso individual listado en el documento.
+
+Responde en formato JSON con un array "transacciones" que contenga cada ingreso individual encontrado:
+
+{
+  "transacciones": [
+    {
+      "descripcion": "descripción del ingreso individual (ej: Salario, Transferencia, Depósito, etc.)",
+      "monto": número (solo el número, sin símbolos, sin puntos de miles),
+      "moneda": "ARS" o "USD",
+      "fecha": "YYYY-MM-DD" (fecha del ingreso individual, si no está visible usa la fecha del resumen),
+      "categoria": "categoría sugerida según la descripción (ej: Salario, Freelance, Inversiones, etc.)",
+      "origen": "origen del ingreso (banco, empresa, persona, etc.)"
+    }
+  ],
+  "total": {
+    "monto": número (total del resumen si está visible),
+    "moneda": "ARS" o "USD",
+    "periodo": "fecha de cierre o período del resumen"
+  }
+}
+
+Si encuentras múltiples ingresos, inclúyelos todos en el array. NO incluyas solo el total. El monto debe ser solo el número sin símbolos de moneda ni puntos de miles. Las fechas deben estar en formato YYYY-MM-DD.`
+      } else {
+        // Para comprobantes individuales de ingreso
+        prompt = `Analiza este ${documentType} de un comprobante de ingreso individual y extrae la siguiente información en formato JSON:
 
 {
   "descripcion": "descripción del ingreso (ej: Salario, Transferencia, Depósito, etc.)",
@@ -63,6 +126,7 @@ Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea 
 }
 
 Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea solo el número sin símbolos de moneda ni puntos de miles. La fecha debe estar en formato YYYY-MM-DD.`
+      }
     } else {
       prompt = `Analiza esta imagen financiera y extrae información relevante en formato JSON. Identifica si es un gasto o ingreso y extrae:
 - descripcion
@@ -150,7 +214,99 @@ Responde solo con el JSON, sin texto adicional.`
       )
     }
 
-    // Validar y limpiar los datos
+    // Si la respuesta contiene un array de transacciones (resumen múltiple)
+    if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
+      console.log('📄 [API] Resumen múltiple detectado - transacciones:', extractedData.transacciones.length)
+      
+      // Procesar cada transacción individual
+      const cleanedTransactions = extractedData.transacciones.map((trans: any, index: number) => {
+        const cleaned: any = {}
+        
+        if (trans.descripcion) {
+          cleaned.descripcion = String(trans.descripcion).trim()
+        }
+        
+        if (trans.monto) {
+          const montoStr = String(trans.monto)
+            .replace(/[^\d,.-]/g, '')
+            .replace(/\./g, '')
+            .replace(',', '.')
+          cleaned.monto = parseFloat(montoStr) || null
+        }
+        
+        if (trans.moneda) {
+          const moneda = String(trans.moneda).toUpperCase()
+          cleaned.moneda = (moneda === 'USD' || moneda === 'ARS') ? moneda : 'ARS'
+        } else {
+          cleaned.moneda = 'ARS'
+        }
+        
+        if (trans.fecha) {
+          const fechaStr = String(trans.fecha)
+          if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            cleaned.fecha = fechaStr
+          } else {
+            try {
+              const fecha = new Date(fechaStr)
+              if (!isNaN(fecha.getTime())) {
+                cleaned.fecha = fecha.toISOString().split('T')[0]
+              } else {
+                cleaned.fecha = new Date().toISOString().split('T')[0]
+              }
+            } catch {
+              cleaned.fecha = new Date().toISOString().split('T')[0]
+            }
+          }
+        } else {
+          cleaned.fecha = new Date().toISOString().split('T')[0]
+        }
+        
+        if (trans.categoria) {
+          cleaned.categoria = String(trans.categoria).trim()
+        }
+        
+        if (trans.comercio) {
+          cleaned.comercio = String(trans.comercio).trim()
+        }
+        
+        if (trans.origen) {
+          cleaned.origen = String(trans.origen).trim()
+        }
+        
+        return cleaned
+      }).filter((t: any) => t.descripcion && t.monto) // Filtrar transacciones válidas
+      
+      // Procesar total si existe
+      const cleanedTotal: any = {}
+      if (extractedData.total) {
+        if (extractedData.total.monto) {
+          const montoStr = String(extractedData.total.monto)
+            .replace(/[^\d,.-]/g, '')
+            .replace(/\./g, '')
+            .replace(',', '.')
+          cleanedTotal.monto = parseFloat(montoStr) || null
+        }
+        if (extractedData.total.moneda) {
+          const moneda = String(extractedData.total.moneda).toUpperCase()
+          cleanedTotal.moneda = (moneda === 'USD' || moneda === 'ARS') ? moneda : 'ARS'
+        }
+        if (extractedData.total.periodo) {
+          cleanedTotal.periodo = String(extractedData.total.periodo).trim()
+        }
+      }
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          transacciones: cleanedTransactions,
+          total: Object.keys(cleanedTotal).length > 0 ? cleanedTotal : null,
+          esResumen: true
+        },
+        rawResponse: text
+      })
+    }
+
+    // Formato antiguo: transacción única (mantener compatibilidad)
     const cleanedData: any = {}
     
     if (extractedData.descripcion) {
