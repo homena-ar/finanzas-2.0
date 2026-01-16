@@ -417,7 +417,7 @@ Responde solo con el JSON, sin texto adicional.`
       }).filter((t: any) => t.descripcion && t.monto) // Filtrar transacciones válidas
       
       // Procesar impuestos si existen
-      const cleanedImpuestos: any[] = []
+      let cleanedImpuestos: any[] = []
       if (extractedData.impuestos && Array.isArray(extractedData.impuestos)) {
         cleanedImpuestos = extractedData.impuestos.map((imp: any) => {
           const cleaned: any = {}
