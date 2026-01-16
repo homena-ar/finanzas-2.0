@@ -46,29 +46,45 @@ export async function POST(request: NextRequest) {
         // Para resúmenes de tarjeta o resúmenes con múltiples consumos
         prompt = `Analiza este ${documentType} que es un resumen de tarjeta de crédito o resumen bancario con múltiples transacciones. 
 
-IMPORTANTE: Extrae CADA TRANSACCIÓN INDIVIDUAL, no solo el total. Busca cada consumo, pago o movimiento individual listado en el documento.
+IMPORTANTE CRÍTICO SOBRE FORMATO DE NÚMEROS:
+- En Argentina se usa COMA (,) para decimales y PUNTO (.) para miles
+- Ejemplo: "15.179,99" significa quince mil ciento setenta y nueve pesos con 99 centavos = 15179.99 (no 1517999)
+- Ejemplo: "6.647,26" significa seis mil seiscientos cuarenta y siete pesos con 26 centavos = 6647.26 (no 664726)
+- Convierte TODOS los montos a formato numérico estándar usando punto (.) para decimales y SIN puntos de miles
 
-Responde en formato JSON con un array "transacciones" que contenga cada transacción individual encontrada:
+IMPORTANTE SOBRE FILTRADO:
+- NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS" del mes anterior)
+- NO incluyas saldos anteriores, intereses, comisiones o impuestos como transacciones individuales
+- SOLO extrae CONSUMOS individuales del período actual del resumen
+- Busca la sección de "Consumos" o transacciones individuales del período vigente
+
+Responde en formato JSON con un array "transacciones" que contenga cada CONSUMO individual encontrado:
 
 {
   "transacciones": [
     {
-      "descripcion": "descripción de la transacción individual (ej: nombre del comercio, descripción del consumo)",
-      "monto": número (solo el número, sin símbolos, sin puntos de miles),
+      "descripcion": "descripción del consumo individual (ej: nombre del comercio, descripción del consumo)",
+      "monto": número decimal usando punto (.) como separador decimal, sin puntos de miles (ej: 15179.99, 6647.26, 13662.00),
       "moneda": "ARS" o "USD",
-      "fecha": "YYYY-MM-DD" (fecha de la transacción individual, si no está visible usa la fecha del resumen),
+      "fecha": "YYYY-MM-DD" (fecha del consumo individual del período actual),
       "categoria": "categoría sugerida según la descripción (ej: Comida, Transporte, Supermercado, etc.)",
       "comercio": "nombre del comercio o establecimiento si está disponible"
     }
   ],
   "total": {
-    "monto": número (total del resumen si está visible),
+    "monto": número decimal (total de consumos del período si está visible, formato estándar con punto decimal),
     "moneda": "ARS" o "USD",
     "periodo": "fecha de cierre o período del resumen"
   }
 }
 
-Si encuentras múltiples transacciones, inclúyelas todas en el array. NO incluyas solo el total. El monto debe ser solo el número sin símbolos de moneda ni puntos de miles. Las fechas deben estar en formato YYYY-MM-DD.`
+EJEMPLOS DE CONVERSIÓN CORRECTA:
+- "15.179,99" → 15179.99
+- "6.647,26" → 6647.26
+- "3.600,00" → 3600.00
+- "13.662,00" → 13662.00
+
+Si encuentras múltiples consumos del período actual, inclúyelos todos en el array. NO incluyas pagos de períodos anteriores. Las fechas deben estar en formato YYYY-MM-DD.`
       } else {
         // Para comprobantes individuales (tickets, facturas)
         prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
@@ -89,7 +105,16 @@ Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea 
         // Para resúmenes bancarios con múltiples ingresos
         prompt = `Analiza este ${documentType} que es un resumen bancario, extracto o resumen con múltiples transacciones de ingresos.
 
-IMPORTANTE: Extrae CADA INGRESO INDIVIDUAL, no solo el total. Busca cada transferencia, depósito o ingreso individual listado en el documento.
+IMPORTANTE CRÍTICO SOBRE FORMATO DE NÚMEROS:
+- En Argentina se usa COMA (,) para decimales y PUNTO (.) para miles
+- Ejemplo: "15.179,99" significa quince mil ciento setenta y nueve pesos con 99 centavos = 15179.99 (no 1517999)
+- Ejemplo: "1.500,50" significa mil quinientos pesos con 50 centavos = 1500.50 (no 150050)
+- Convierte TODOS los montos a formato numérico estándar usando punto (.) para decimales y SIN puntos de miles
+
+IMPORTANTE SOBRE FILTRADO:
+- NO incluyas transferencias o depósitos de meses anteriores
+- SOLO extrae ingresos del período actual del resumen
+- Busca la sección de ingresos o transacciones del período vigente
 
 Responde en formato JSON con un array "transacciones" que contenga cada ingreso individual encontrado:
 
@@ -97,21 +122,26 @@ Responde en formato JSON con un array "transacciones" que contenga cada ingreso 
   "transacciones": [
     {
       "descripcion": "descripción del ingreso individual (ej: Salario, Transferencia, Depósito, etc.)",
-      "monto": número (solo el número, sin símbolos, sin puntos de miles),
+      "monto": número decimal usando punto (.) como separador decimal, sin puntos de miles (ej: 15179.99, 1500.50),
       "moneda": "ARS" o "USD",
-      "fecha": "YYYY-MM-DD" (fecha del ingreso individual, si no está visible usa la fecha del resumen),
+      "fecha": "YYYY-MM-DD" (fecha del ingreso individual del período actual),
       "categoria": "categoría sugerida según la descripción (ej: Salario, Freelance, Inversiones, etc.)",
       "origen": "origen del ingreso (banco, empresa, persona, etc.)"
     }
   ],
   "total": {
-    "monto": número (total del resumen si está visible),
+    "monto": número decimal (total de ingresos del período si está visible, formato estándar con punto decimal),
     "moneda": "ARS" o "USD",
     "periodo": "fecha de cierre o período del resumen"
   }
 }
 
-Si encuentras múltiples ingresos, inclúyelos todos en el array. NO incluyas solo el total. El monto debe ser solo el número sin símbolos de moneda ni puntos de miles. Las fechas deben estar en formato YYYY-MM-DD.`
+EJEMPLOS DE CONVERSIÓN CORRECTA:
+- "15.179,99" → 15179.99
+- "1.500,50" → 1500.50
+- "50.000,00" → 50000.00
+
+Si encuentras múltiples ingresos del período actual, inclúyelos todos en el array. NO incluyas ingresos de períodos anteriores. Las fechas deben estar en formato YYYY-MM-DD.`
       } else {
         // Para comprobantes individuales de ingreso
         prompt = `Analiza este ${documentType} de un comprobante de ingreso individual y extrae la siguiente información en formato JSON:

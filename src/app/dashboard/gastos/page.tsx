@@ -492,14 +492,20 @@ export default function GastosPage() {
         )
       }
 
-      Promise.all(addPromises).then(() => {
-        setShowImagePreview(false)
-        setExtractedData(null)
-        setPreviewImage(null)
-        setSelectedTransactions(new Set())
-        setIncludeTotal(false)
-        setShowGastoModal(false)
-      })
+      Promise.all(addPromises)
+        .then(() => {
+          setShowImagePreview(false)
+          setExtractedData(null)
+          setPreviewImage(null)
+          setSelectedTransactions(new Set())
+          setIncludeTotal(false)
+          setShowGastoModal(false)
+          resetGastoForm()
+        })
+        .catch((error) => {
+          console.error('Error agregando transacciones:', error)
+          setGastoError('Error al agregar las transacciones. Por favor, intenta nuevamente.')
+        })
       
       return
     }
@@ -1434,6 +1440,22 @@ export default function GastosPage() {
       )}
 
       {/* Modal de Vista Previa de Datos Extraídos */}
+      {/* Overlay de carga durante procesamiento de IA */}
+      {processingImage && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="text-center space-y-4">
+              <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto" />
+              <h3 className="text-xl font-bold text-slate-900">Procesando con IA...</h3>
+              <p className="text-slate-600">Analizando el documento. Esto puede tardar unos segundos.</p>
+              <div className="w-full bg-slate-200 rounded-full h-2 mt-4">
+                <div className="bg-purple-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showImagePreview && extractedData && (
         <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}>
           <div className="modal max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -1450,18 +1472,24 @@ export default function GastosPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* PDF/Imagen colapsable - menos prominente */}
               {previewImage && (
-                <div className="mb-4">
-                  {previewImage.includes('data:application/pdf') ? (
-                    <iframe
-                      src={previewImage}
-                      className="w-full h-96 rounded-lg border border-slate-200"
-                      title="Vista previa del PDF"
-                    />
-                  ) : (
-                    <img src={previewImage} alt="Preview" className="w-full max-h-64 object-contain rounded-lg border border-slate-200" />
-                  )}
-                </div>
+                <details className="mb-4 group">
+                  <summary className="cursor-pointer text-sm text-slate-600 hover:text-slate-900 font-semibold pb-2 border-b border-slate-200">
+                    📄 Ver documento ({previewImage.includes('data:application/pdf') ? 'PDF' : 'Imagen'})
+                  </summary>
+                  <div className="mt-3">
+                    {previewImage.includes('data:application/pdf') ? (
+                      <iframe
+                        src={previewImage}
+                        className="w-full h-96 rounded-lg border border-slate-200"
+                        title="Vista previa del PDF"
+                      />
+                    ) : (
+                      <img src={previewImage} alt="Preview" className="w-full max-h-64 object-contain rounded-lg border border-slate-200" />
+                    )}
+                  </div>
+                </details>
               )}
               
               {/* Si hay múltiples transacciones (resumen) */}
