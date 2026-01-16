@@ -458,13 +458,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           if (result.warning) {
             console.warn('⚠️ [useWorkspace] Advertencia (invitación creada):', result.warning)
             // No lanzar error, la invitación ya está creada
-            return
+            // Recargar invitaciones para mostrar la nueva invitación enviada
+            await fetchAll()
+            return { error: null }
           }
           
           // Si es un error de dominio, no lanzar excepción pero loguear el problema
           if (errorMessage.includes('dominio no está verificado')) {
             console.error('❌ [useWorkspace] El correo no se envió por dominio no verificado, pero la invitación está creada')
-            return // No lanzar error, la invitación ya está creada
+            // Recargar invitaciones para mostrar la nueva invitación enviada
+            await fetchAll()
+            return { error: null } // No lanzar error, la invitación ya está creada
           }
           
           throw new Error(errorMessage)
