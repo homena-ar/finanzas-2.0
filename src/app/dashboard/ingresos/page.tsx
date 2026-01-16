@@ -930,7 +930,7 @@ export default function IngresosPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          const allSelected = new Set(extractedData.transacciones.map((_: any, i: number) => i))
+                          const allSelected = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
                           setSelectedTransactions(allSelected)
                         }}
                         className="btn btn-secondary text-sm"
