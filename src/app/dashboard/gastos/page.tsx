@@ -67,6 +67,7 @@ export default function GastosPage() {
   // Estado para transacciones editadas (permite modificar fecha, descripción y monto antes de confirmar)
   const [editedTransactions, setEditedTransactions] = useState<Map<number, any>>(new Map())
   const [editedImpuestos, setEditedImpuestos] = useState<Map<number, any>>(new Map())
+  const [editedTotal, setEditedTotal] = useState<{ descripcion?: string; monto?: number; moneda?: string } | null>(null)
   // Estado para fecha/mes general del documento (aplica a todas las transacciones)
   const [globalDocumentDate, setGlobalDocumentDate] = useState<string | null>(null)
   const [useGlobalDate, setUseGlobalDate] = useState(false)
@@ -558,6 +559,7 @@ export default function GastosPage() {
             // Limpiar ediciones anteriores cuando se procesa una nueva imagen
             setEditedTransactions(new Map())
             setEditedImpuestos(new Map())
+            setEditedTotal(null)
             setGlobalDocumentDate(null)
             setUseGlobalDate(false)
           }, 300)
@@ -668,7 +670,7 @@ export default function GastosPage() {
       
       if (transactionsToAdd.length === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) {
         console.error('❌ [GastosPage] handleConfirmExtractedData - No hay transacciones seleccionadas')
-        setGastoError('Por favor, selecciona al menos una transacción o impuesto')
+        setGastoError('Por favor, selecciona al menos una transacción, impuesto o el total')
         return
       }
       
@@ -730,6 +732,11 @@ export default function GastosPage() {
       if (includeTotal && extractedData.total && extractedData.total.monto) {
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Agregando total:', extractedData.total)
         
+        // Usar valores editados si existen, sino usar los originales
+        const totalDescripcion = editedTotal?.descripcion || `Total del resumen - ${extractedData.total.periodo || 'Período'}`
+        const totalMonto = editedTotal?.monto !== undefined ? editedTotal.monto : extractedData.total.monto
+        const totalMoneda = editedTotal?.moneda || extractedData.total.moneda || 'ARS'
+        
         // Usar fecha global si está disponible, sino usar la del formulario
         const fechaToUse = useGlobalDate && globalDocumentDate ? globalDocumentDate : gastoForm.fecha
         const fechaObj = new Date(fechaToUse)
@@ -737,10 +744,10 @@ export default function GastosPage() {
         
         addPromises.push(
           addGasto({
-            descripcion: `Total del resumen - ${extractedData.total.periodo || 'Período'}`,
+            descripcion: totalDescripcion,
             categoria_id: '',
-            monto: extractedData.total.monto,
-            moneda: extractedData.total.moneda || 'ARS',
+            monto: totalMonto,
+            moneda: totalMoneda,
             fecha: fechaToUse,
             mes_facturacion: mesFacturacion,
             tarjeta_id: tarjetaIdToUse,
@@ -872,6 +879,7 @@ export default function GastosPage() {
     setIncludeTotal(false)
     setEditedTransactions(new Map())
     setEditedImpuestos(new Map())
+    setEditedTotal(null)
     setGlobalDocumentDate(null)
     setUseGlobalDate(false)
   }
@@ -1829,7 +1837,8 @@ export default function GastosPage() {
           setPreviewImage(null); 
           setSelectedTransactions(new Set());
           setEditedTransactions(new Map());
-          setEditedImpuestos(new Map()); 
+          setEditedImpuestos(new Map());
+          setEditedTotal(null);
           setIncludeTotal(false);
           setDetectedTarjeta(null);
           setSelectedTarjetaId('');
@@ -2234,33 +2243,78 @@ export default function GastosPage() {
                   {/* Opción para agregar total */}
                   {extractedData.total && extractedData.total.monto && (
                     <div 
-                      className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                      className={`border rounded-lg p-2.5 transition-colors ${
                         includeTotal 
                           ? 'border-purple-500 bg-purple-50' 
-                          : 'border-slate-200 hover:border-purple-300 bg-white'
+                          : 'border-slate-200 bg-white'
                       }`}
-                      onClick={() => setIncludeTotal(!includeTotal)}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-2.5">
                         <input
                           type="checkbox"
                           checked={includeTotal}
                           onChange={(e) => {
-                            e.stopPropagation()
-                            setIncludeTotal(!includeTotal)
+                            setIncludeTotal(e.target.checked)
                           }}
                           className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
                         />
-                        <div className="flex-1">
-                          <div className="font-semibold text-slate-900">
+                        <div className="flex-1 space-y-2">
+                          <div className="font-semibold text-xs text-slate-900">
                             Total del resumen {extractedData.total.periodo ? `- ${extractedData.total.periodo}` : ''}
                           </div>
-                          <div className="text-sm text-slate-600 mt-1">
-                            {formatMoney(extractedData.total.monto)} {extractedData.total.moneda || 'ARS'}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            Opcional: Agregar el total del resumen como un gasto adicional
-                          </div>
+                          
+                          {includeTotal && (
+                            <div className="space-y-2 pt-1 border-t border-slate-200">
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                  Descripción
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editedTotal?.descripcion || `Total del resumen - ${extractedData.total.periodo || 'Período'}`}
+                                  onChange={(e) => setEditedTotal(prev => ({ ...(prev || {}), descripcion: e.target.value }))}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="input w-full text-xs h-7"
+                                  placeholder="Nombre del gasto"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                    Monto
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editedTotal?.monto !== undefined ? editedTotal.monto : extractedData.total.monto}
+                                    onChange={(e) => setEditedTotal(prev => ({ ...(prev || {}), monto: parseFloat(e.target.value) || 0 }))}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="input w-full text-xs h-7"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                    Moneda
+                                  </label>
+                                  <select
+                                    value={editedTotal?.moneda || extractedData.total.moneda || 'ARS'}
+                                    onChange={(e) => setEditedTotal(prev => ({ ...(prev || {}), moneda: e.target.value }))}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="input w-full text-xs h-7"
+                                  >
+                                    <option value="ARS">ARS</option>
+                                    <option value="USD">USD</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!includeTotal && (
+                            <div className="text-xs text-slate-600 mt-1">
+                              {formatMoney(extractedData.total.monto)} {extractedData.total.moneda || 'ARS'}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2365,7 +2419,7 @@ export default function GastosPage() {
               <button
                 onClick={handleConfirmExtractedData}
                 className="btn btn-primary flex-1 text-sm h-9"
-                disabled={(extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || savingTransactions}
+                disabled={((extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || (!extractedData.transacciones && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0))) || savingTransactions}
               >
                 {savingTransactions ? (
                   <>
