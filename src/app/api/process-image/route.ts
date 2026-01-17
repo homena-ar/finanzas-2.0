@@ -90,6 +90,14 @@ REGLAS PARA DETECTAR DECIMALES:
    - NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS")
    - NO incluyas saldos anteriores o intereses como transacciones
    - Busca la sección titulada "Consumos", "Detalle de Consumos" o similar
+   - IMPORTANTE: DETECTA EL MES DEL RESUMEN basándote en la fecha de vencimiento:
+     * Si el vencimiento es en enero → el resumen es de DICIEMBRE (mes anterior)
+     * Si el vencimiento es en febrero → el resumen es de ENERO (mes anterior)
+     * Si el vencimiento es en marzo → el resumen es de FEBRERO (mes anterior)
+     * Y así sucesivamente...
+   - TODOS los consumos deben tener la MISMA FECHA: el primer día del mes del resumen (ej: si es diciembre 2025, usar "2025-12-01")
+   - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
+   - Si detectas que un consumo es en cuotas, incluye un campo "cuotas" con el número total de cuotas (ej: 3, 6, 12)
 
 3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
    - Extrae impuestos, comisiones y cargos del período actual
@@ -120,9 +128,10 @@ REGLAS PARA DETECTAR DECIMALES:
       "descripcion": "descripción exacta del consumo (ej: nombre del comercio, descripción del consumo)",
       "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (ej: 15179.99, 6647.26, 3600.00),
       "moneda": "ARS" o "USD" según corresponda,
-      "fecha": "YYYY-MM-DD" (fecha del consumo individual del período actual, formato ISO),
+      "fecha": "YYYY-MM-01" (SIEMPRE el primer día del mes del resumen detectado. Si el vencimiento es en enero, el resumen es de diciembre, entonces usar "YYYY-12-01". Si el vencimiento es en febrero, usar "YYYY-01-01", etc. Formato ISO),
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
-      "comercio": "nombre del comercio o establecimiento si está disponible o null"
+      "comercio": "nombre del comercio o establecimiento si está disponible o null",
+      "cuotas": número entero o null (si el consumo es en cuotas, indica el número total de cuotas, ej: 3, 6, 12. Si no es en cuotas, null)
     }
   ],
   "impuestos": [
@@ -136,7 +145,8 @@ REGLAS PARA DETECTAR DECIMALES:
   "total": {
     "monto": número decimal (TOTAL GENERAL del resumen que incluye consumos + impuestos + comisiones, formato estándar con punto decimal, SIN puntos de miles),
     "moneda": "ARS" o "USD",
-    "periodo": "fecha de cierre o período del resumen (ej: '2025-11-20' o 'Noviembre 2025')"
+    "periodo": "fecha de cierre o período del resumen (ej: '2025-11-20' o 'Noviembre 2025')",
+    "mes_resumen": "YYYY-MM" (mes del resumen detectado basándose en el vencimiento. Si vence en enero, es 'YYYY-12'. Si vence en febrero, es 'YYYY-01', etc.)"
   }
 }
 

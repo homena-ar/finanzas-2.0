@@ -518,8 +518,15 @@ export default function GastosPage() {
 
           setExtractedData(result.data)
           
-          // Detectar fecha general del documento (usar la primera fecha encontrada o fecha actual)
-          if (result.data.transacciones && result.data.transacciones.length > 0) {
+          // Detectar fecha general del documento desde el mes del resumen
+          if (result.data.total && result.data.total.mes_resumen) {
+            // Si la IA detectó el mes del resumen, usar el primer día de ese mes
+            const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
+            const fechaResumen = `${mesResumen}-01`
+            setGlobalDocumentDate(fechaResumen)
+            setUseGlobalDate(true)
+          } else if (result.data.transacciones && result.data.transacciones.length > 0) {
+            // Fallback: usar la primera fecha encontrada
             const firstDate = result.data.transacciones[0]?.fecha
             if (firstDate) {
               setGlobalDocumentDate(firstDate)
@@ -703,8 +710,13 @@ export default function GastosPage() {
           }
         }
         
-        const fecha = trans.fecha || gastoForm.fecha
+        // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
+        const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || gastoForm.fecha)
         const mesFacturacion = getMesFacturacion(fecha)
+        
+        // Detectar si es un gasto en cuotas (la IA puede detectar esto)
+        const cuotasDetectadas = trans.cuotas ? parseInt(String(trans.cuotas)) : null
+        const esEnCuotas = cuotasDetectadas && cuotasDetectadas > 1
         
         const gastoData = {
           descripcion: trans.descripcion,
@@ -714,9 +726,9 @@ export default function GastosPage() {
           fecha: fecha,
           mes_facturacion: mesFacturacion,
           tarjeta_id: tarjetaIdToUse,
-          cuotas: parseInt(gastoForm.cuotas) || 1,
+          cuotas: esEnCuotas ? cuotasDetectadas : (parseInt(gastoForm.cuotas) || 1),
           cuota_actual: 1,
-          es_fijo: false,
+          es_fijo: esEnCuotas, // Si es en cuotas, marcarlo como fijo
           tag_ids: gastoForm.tag_ids || [],
           pagado: gastoForm.pagado,
           comercio: trans.comercio || ''
@@ -789,7 +801,8 @@ export default function GastosPage() {
         impuestosToAdd.forEach((imp: any, index: number) => {
           console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando impuesto ${index + 1}:`, imp)
           
-          const fechaImp = imp.fecha || gastoForm.fecha
+          // Usar fecha global del mes del resumen si está disponible, sino usar la fecha del impuesto o del formulario
+          const fechaImp = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (imp.fecha || gastoForm.fecha)
           const mesFacturacion = getMesFacturacion(fechaImp)
           
           addPromises.push(
@@ -1919,11 +1932,11 @@ export default function GastosPage() {
                     <select
                       value={selectedTarjetaId}
                       onChange={(e) => setSelectedTarjetaId(e.target.value)}
-                      className="input w-full text-xs h-8"
+                      className="input w-full text-xs h-8 text-slate-900 bg-white"
                     >
-                      <option value="">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
+                      <option value="" className="text-slate-900">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
                       {tarjetas.map(t => (
-                        <option key={t.id} value={t.id}>
+                        <option key={t.id} value={t.id} className="text-slate-900">
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
                       ))}
@@ -2006,26 +2019,9 @@ export default function GastosPage() {
                     <h4 className="font-semibold text-slate-900 text-xs">
                       Transacciones ({extractedData.transacciones.length})
                     </h4>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => {
-                          const allSelected = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
-                          setSelectedTransactions(allSelected)
-                        }}
-                        className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
-                      >
-                        Todas
-                      </button>
-                      <button
-                        onClick={() => setSelectedTransactions(new Set())}
-                        className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
-                      >
-                        Ninguna
-                      </button>
-                    </div>
                   </div>
 
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {extractedData.transacciones.map((trans: any, index: number) => {
                       const descripcion = getTransactionValue(index, 'descripcion', trans.descripcion)
                       const monto = getTransactionValue(index, 'monto', trans.monto)
@@ -2035,7 +2031,7 @@ export default function GastosPage() {
                       return (
                         <div 
                           key={index}
-                          className={`border rounded-lg p-2.5 transition-all ${
+                          className={`border rounded-lg p-2 transition-all ${
                             selectedTransactions.has(index) 
                               ? 'border-indigo-500 bg-indigo-50' 
                               : 'border-slate-200 hover:border-indigo-300 bg-white'
@@ -2061,7 +2057,7 @@ export default function GastosPage() {
                               }}
                               className="mt-0.5 w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
                             />
-                            <div className="flex-1 space-y-2">
+                            <div className="flex-1 space-y-1.5 min-w-0">
                               <input
                                 type="text"
                                 value={descripcion || ''}
@@ -2107,12 +2103,15 @@ export default function GastosPage() {
                                   </select>
                                 </div>
                               </div>
-                              {(trans.comercio || trans.categoria) && (
-                                <div className="flex items-center gap-2 text-xs">
-                                  {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
-                                  {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{trans.categoria}</span>}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2 text-xs flex-wrap">
+                                {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
+                                {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{trans.categoria}</span>}
+                                {trans.cuotas && trans.cuotas > 1 && (
+                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                                    {trans.cuotas} cuotas
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2122,14 +2121,13 @@ export default function GastosPage() {
 
                   {/* Impuestos detectados */}
                   {extractedData.impuestos && Array.isArray(extractedData.impuestos) && extractedData.impuestos.length > 0 && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-orange-900 flex items-center gap-2 mb-3">
-                        📝 Impuestos, Comisiones y Cargos detectados
-                      </h4>
-                      <p className="text-sm text-orange-700 mb-3">
-                        Se encontraron {extractedData.impuestos.length} impuesto{extractedData.impuestos.length !== 1 ? 's' : ''}. Selecciona los que deseas agregar.
-                      </p>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-orange-900 text-xs flex items-center gap-2">
+                          📝 Impuestos ({extractedData.impuestos.length})
+                        </h4>
+                      </div>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
                         {extractedData.impuestos.map((imp: any, index: number) => {
                           const descripcion = getImpuestoValue(index, 'descripcion', imp.descripcion)
                           const monto = getImpuestoValue(index, 'monto', imp.monto)
@@ -2139,13 +2137,13 @@ export default function GastosPage() {
                           return (
                             <div 
                               key={index}
-                              className={`border rounded-lg p-4 transition-colors ${
+                              className={`border rounded-lg p-2 transition-colors ${
                                 selectedImpuestos.has(index) 
                                   ? 'border-orange-500 bg-orange-100' 
                                   : 'border-orange-200 hover:border-orange-300 bg-white'
                               }`}
                             >
-                              <div className="flex items-start gap-3">
+                              <div className="flex items-start gap-2">
                                 <input
                                   type="checkbox"
                                   checked={selectedImpuestos.has(index)}
@@ -2159,64 +2157,52 @@ export default function GastosPage() {
                                     }
                                     setSelectedImpuestos(newSelected)
                                   }}
-                                  className="mt-1 w-4 h-4 text-orange-600 rounded border-slate-300"
+                                  className="mt-0.5 w-4 h-4 text-orange-600 rounded border-slate-300"
                                 />
-                                <div className="flex-1 space-y-3">
-                                  {/* Descripción editable */}
-                                  <div>
-                                    <label className="text-xs text-slate-500 mb-1 block">Descripción</label>
+                                <div className="flex-1 space-y-1.5 min-w-0">
+                                  <input
+                                    type="text"
+                                    value={descripcion || ''}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      updateEditedImpuesto(index, 'descripcion', e.target.value)
+                                    }}
+                                    className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
+                                    placeholder="Descripción"
+                                  />
+                                  <div className="grid grid-cols-2 gap-2">
                                     <input
-                                      type="text"
-                                      value={descripcion || ''}
+                                      type="date"
+                                      value={fecha || ''}
                                       onChange={(e) => {
                                         e.stopPropagation()
-                                        updateEditedImpuesto(index, 'descripcion', e.target.value)
+                                        updateEditedImpuesto(index, 'fecha', e.target.value)
                                       }}
-                                      className="input w-full text-sm"
-                                      placeholder="Descripción del impuesto"
+                                      className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
                                     />
-                                  </div>
-                                  
-                                  {/* Fecha y Monto en fila */}
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="text-xs text-slate-500 mb-1 block">Fecha</label>
+                                    <div className="flex gap-1">
                                       <input
-                                        type="date"
-                                        value={fecha || ''}
+                                        type="number"
+                                        step="0.01"
+                                        value={monto || ''}
                                         onChange={(e) => {
                                           e.stopPropagation()
-                                          updateEditedImpuesto(index, 'fecha', e.target.value)
+                                          updateEditedImpuesto(index, 'monto', parseFloat(e.target.value) || 0)
                                         }}
-                                        className="input w-full text-sm"
+                                        className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
+                                        placeholder="0.00"
                                       />
-                                    </div>
-                                    <div>
-                                      <label className="text-xs text-slate-500 mb-1 block">Monto</label>
-                                      <div className="flex gap-2">
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          value={monto || ''}
-                                          onChange={(e) => {
-                                            e.stopPropagation()
-                                            updateEditedImpuesto(index, 'monto', parseFloat(e.target.value) || 0)
-                                          }}
-                                          className="input w-full text-sm"
-                                          placeholder="0.00"
-                                        />
-                                        <select
-                                          value={moneda}
-                                          onChange={(e) => {
-                                            e.stopPropagation()
-                                            updateEditedImpuesto(index, 'moneda', e.target.value)
-                                          }}
-                                          className="input text-sm w-20"
-                                        >
-                                          <option value="ARS">ARS</option>
-                                          <option value="USD">USD</option>
-                                        </select>
-                                      </div>
+                                      <select
+                                        value={moneda}
+                                        onChange={(e) => {
+                                          e.stopPropagation()
+                                          updateEditedImpuesto(index, 'moneda', e.target.value)
+                                        }}
+                                        className="input text-xs h-7 w-16 border-slate-300 focus:border-orange-500"
+                                      >
+                                        <option value="ARS">ARS</option>
+                                        <option value="USD">USD</option>
+                                      </select>
                                     </div>
                                   </div>
                                 </div>
@@ -2225,25 +2211,34 @@ export default function GastosPage() {
                           )
                         })}
                       </div>
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-orange-200">
-                        <button
-                          onClick={() => {
-                            const allSelected = new Set<number>(extractedData.impuestos.map((_: any, i: number) => i))
-                            setSelectedImpuestos(allSelected)
-                          }}
-                          className="btn btn-secondary text-sm"
-                        >
-                          Seleccionar todos
-                        </button>
-                        <button
-                          onClick={() => setSelectedImpuestos(new Set())}
-                          className="btn btn-secondary text-sm"
-                        >
-                          Deseleccionar
-                        </button>
-                      </div>
                     </div>
                   )}
+
+                  {/* Botones de selección global */}
+                  <div className="flex gap-2 pt-2 border-t border-slate-200">
+                    <button
+                      onClick={() => {
+                        const allTransactions = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
+                        setSelectedTransactions(allTransactions)
+                        if (extractedData.impuestos && Array.isArray(extractedData.impuestos)) {
+                          const allImpuestos = new Set<number>(extractedData.impuestos.map((_: any, i: number) => i))
+                          setSelectedImpuestos(allImpuestos)
+                        }
+                      }}
+                      className="btn btn-secondary text-xs px-3 py-1.5"
+                    >
+                      Seleccionar todo
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedTransactions(new Set())
+                        setSelectedImpuestos(new Set())
+                      }}
+                      className="btn btn-secondary text-xs px-3 py-1.5"
+                    >
+                      Deseleccionar todo
+                    </button>
+                  </div>
 
                   {/* Opción para agregar total */}
                   {extractedData.total && extractedData.total.monto && (
@@ -2325,30 +2320,6 @@ export default function GastosPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-                    <span className="text-sm text-slate-600">
-                      {selectedTransactions.size} transacción{selectedTransactions.size !== 1 ? 'es' : ''} seleccionada{selectedTransactions.size !== 1 ? 's' : ''}
-                      {selectedImpuestos.size > 0 && `, ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}`}
-                      {includeTotal && extractedData.total && ' + Total'}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          const allSelected = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
-                          setSelectedTransactions(allSelected)
-                        }}
-                        className="btn btn-secondary text-sm"
-                      >
-                        Seleccionar todas
-                      </button>
-                      <button
-                        onClick={() => setSelectedTransactions(new Set())}
-                        className="btn btn-secondary text-sm"
-                      >
-                        Deseleccionar
-                      </button>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 /* Formato antiguo: transacción única (mantener compatibilidad) */
