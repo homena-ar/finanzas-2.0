@@ -9,6 +9,14 @@ import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Gasto } from '@/types'
 
+// Función helper para calcular mes_facturacion desde una fecha en formato YYYY-MM-DD
+// Evita problemas de zona horaria al parsear directamente la cadena
+const getMesFacturacion = (fecha: string): string => {
+  // La fecha viene en formato YYYY-MM-DD, extraemos directamente año y mes
+  const [year, month] = fecha.split('-')
+  return `${year}-${month}`
+}
+
 export default function GastosPage() {
   console.log('🔵🔵🔵 [GastosPage] COMPONENT RENDER')
 
@@ -170,8 +178,7 @@ export default function GastosPage() {
     }
     setGastoError('')
 
-    const fecha = new Date(gastoForm.fecha)
-    const mesFacturacion = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`
+    const mesFacturacion = getMesFacturacion(gastoForm.fecha)
 
     const data = {
       descripcion: gastoForm.descripcion,
@@ -697,8 +704,7 @@ export default function GastosPage() {
         }
         
         const fecha = trans.fecha || gastoForm.fecha
-        const fechaObj = new Date(fecha)
-        const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
+        const mesFacturacion = getMesFacturacion(fecha)
         
         const gastoData = {
           descripcion: trans.descripcion,
@@ -739,8 +745,7 @@ export default function GastosPage() {
         
         // Usar fecha global si está disponible, sino usar la del formulario
         const fechaToUse = useGlobalDate && globalDocumentDate ? globalDocumentDate : gastoForm.fecha
-        const fechaObj = new Date(fechaToUse)
-        const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
+        const mesFacturacion = getMesFacturacion(fechaToUse)
         
         addPromises.push(
           addGasto({
@@ -784,8 +789,8 @@ export default function GastosPage() {
         impuestosToAdd.forEach((imp: any, index: number) => {
           console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando impuesto ${index + 1}:`, imp)
           
-          const fechaObj = new Date(imp.fecha || gastoForm.fecha)
-          const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
+          const fechaImp = imp.fecha || gastoForm.fecha
+          const mesFacturacion = getMesFacturacion(fechaImp)
           
           addPromises.push(
             addImpuesto({
