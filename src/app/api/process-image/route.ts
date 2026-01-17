@@ -97,19 +97,21 @@ REGLAS PARA DETECTAR DECIMALES:
      * Y así sucesivamente...
    - TODOS los consumos deben tener la MISMA FECHA: el primer día del mes del resumen (ej: si es diciembre 2025, usar "2025-12-01")
    - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
-   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EN TODA LA DESCRIPCIÓN):
+   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EN TODA LA DESCRIPCIÓN Y CONTEXTO):
      * Busca palabras clave como "CUOTAS", "X CUOTAS", "SIN INTERÉS", "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", "CUOTA 1/3", "CUOTA 1/6", "CUOTA 1/12", etc.
      * Busca patrones como "CUOTA X/Y" donde Y es el total de cuotas (ej: "CUOTA 1/6" → 6 cuotas, "CUOTA 2/12" → 12 cuotas)
      * Busca números seguidos de "CUOTAS" (ej: "3 CUOTAS", "6 CUOTAS SIN INTERÉS", "12 CUOTAS")
-     * Si un consumo tiene indicación de cuotas, SIEMPRE extrae el número total de cuotas
-     * Si no hay indicación de cuotas, el campo "cuotas" debe ser null o 1
+     * Busca en la descripción del comercio, en el nombre del establecimiento, o en cualquier parte del consumo
+     * Si encuentras "CUOTA" seguido de números, o números seguidos de "CUOTAS", SIEMPRE extrae el número total de cuotas
+     * IMPORTANTE: Si detectas cuotas, el monto del consumo es el MONTO TOTAL, no el monto de una cuota individual
+     * Si no hay indicación de cuotas en ninguna parte, el campo "cuotas" debe ser null o 1
      * Ejemplos: 
-       - "3 CUOTAS SIN INTERÉS" → cuotas: 3
-       - "CUOTA 1/6" → cuotas: 6
-       - "CUOTA 2/12" → cuotas: 12
+       - "MERCADOLIBRE 3 CUOTAS SIN INTERÉS" → cuotas: 3
+       - "FALABELLA CUOTA 1/6" → cuotas: 6
+       - "COTO CUOTA 2/12" → cuotas: 12
        - "6 CUOTAS" → cuotas: 6
        - "12 CUOTAS" → cuotas: 12
-       - Sin indicación → cuotas: null o 1
+       - "PAGO AFIP" o "Pago único" → cuotas: null o 1
 
 3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
    - Extrae impuestos, comisiones y cargos del período actual
@@ -127,6 +129,14 @@ REGLAS PARA DETECTAR DECIMALES:
    - El total debe ser el TOTAL REAL A PAGAR después de descontar saldos a favor
    - Si hay múltiples totales, usa el TOTAL FINAL que incluye todo y considera saldos a favor
    - Extrae información del período de cierre/vencimiento
+   
+4. TIPO DE DOCUMENTO (IMPORTANTE PARA EL NOMBRE):
+   - DETECTA si es un RESUMEN DE TARJETA/CRÉDITO (tiene múltiples consumos, períodos, vencimientos)
+   - DETECTA si es un COMPROBANTE ÚNICO (pago AFIP, factura única, recibo, etc.)
+   - Si es un resumen de tarjeta: el nombre puede ser "Total del resumen" o similar
+   - Si es un comprobante único (pago AFIP, factura, recibo): extrae el nombre específico del documento
+     * Ejemplos: "Pago AFIP", "Factura de luz", "Recibo de sueldo", "Pago de servicios", etc.
+     * NO uses "Total del resumen" para comprobantes únicos, usa el tipo de documento detectado
 
 ═══════════════════════════════════════════════════════════════════
 📤 FORMATO DE RESPUESTA JSON
@@ -164,7 +174,9 @@ REGLAS PARA DETECTAR DECIMALES:
     "periodo": "fecha de cierre o período del resumen (ej: '2025-11-20' o 'Noviembre 2025')",
     "mes_resumen": "YYYY-MM" (mes del resumen detectado basándose en el vencimiento. Si vence en enero, es 'YYYY-12'. Si vence en febrero, es 'YYYY-01', etc.)",
     "saldo_a_favor_ars": número decimal o null (si hay saldo a favor en ARS, indicar el monto. Si no hay, null),
-    "saldo_a_favor_usd": número decimal o null (si hay saldo a favor en USD, indicar el monto. Si no hay, null)
+    "saldo_a_favor_usd": número decimal o null (si hay saldo a favor en USD, indicar el monto. Si no hay, null),
+    "tipo_documento": "resumen_tarjeta" o "comprobante_unico" (detecta si es un resumen con múltiples consumos o un comprobante único como pago AFIP, factura, etc.),
+    "nombre_sugerido": "string" (nombre sugerido para el gasto. Si es resumen_tarjeta: "Total del resumen - [periodo]". Si es comprobante_unico: el tipo de documento detectado, ej: "Pago AFIP", "Factura de luz", etc.)
   }
 }
 

@@ -767,8 +767,12 @@ export default function GastosPage() {
       if (includeTotal && extractedData.total && extractedData.total.monto) {
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Agregando total:', extractedData.total)
         
-        // Usar valores editados si existen, sino usar los originales
-        const totalDescripcion = editedTotal?.descripcion || `Total del resumen - ${extractedData.total.periodo || 'Período'}`
+        // Usar valores editados si existen, sino usar los originales o el nombre sugerido por la IA
+        const nombrePorDefecto = extractedData.total.nombre_sugerido || 
+          (extractedData.total.tipo_documento === 'comprobante_unico' 
+            ? extractedData.total.nombre_sugerido || 'Comprobante'
+            : `Total del resumen - ${extractedData.total.periodo || 'Período'}`)
+        const totalDescripcion = editedTotal?.descripcion || nombrePorDefecto
         const totalMonto = editedTotal?.monto !== undefined ? editedTotal.monto : extractedData.total.monto
         const totalMoneda = editedTotal?.moneda || extractedData.total.moneda || 'ARS'
         
@@ -1882,7 +1886,11 @@ export default function GastosPage() {
             <div className="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shrink-0">
               <h3 className="font-bold text-base flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-indigo-600" />
-                <span>{extractedData.transacciones ? `${extractedData.transacciones.length} transacciones` : 'Datos extraídos'}</span>
+                <span>
+                  {extractedData.total?.tipo_documento === 'resumen_tarjeta' && extractedData.transacciones
+                    ? `${extractedData.transacciones.length} transacciones`
+                    : extractedData.total?.nombre_sugerido || 'Datos extraídos'}
+                </span>
               </h3>
               <button 
                 onClick={() => { 
@@ -1928,11 +1936,13 @@ export default function GastosPage() {
               {/* Si hay múltiples transacciones (resumen) */}
               {extractedData.transacciones && Array.isArray(extractedData.transacciones) ? (
                 <div className="space-y-3">
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
-                    <p className="text-xs text-indigo-800">
-                      <strong>{extractedData.transacciones.length} transacciones</strong> detectadas. Selecciona las que deseas agregar.
-                    </p>
-                  </div>
+                  {extractedData.total?.tipo_documento === 'resumen_tarjeta' && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
+                      <p className="text-xs text-indigo-800">
+                        <strong>{extractedData.transacciones.length} transacciones</strong> detectadas. Selecciona las que deseas agregar.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Información de tarjeta detectada - Compacto */}
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
@@ -2032,11 +2042,13 @@ export default function GastosPage() {
                   </div>
 
                   {/* Lista de Transacciones - Compacta */}
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-slate-900 text-xs">
-                      Transacciones ({extractedData.transacciones.length})
-                    </h4>
-                  </div>
+                  {extractedData.total?.tipo_documento === 'resumen_tarjeta' && (
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-slate-900 text-xs">
+                        Transacciones ({extractedData.transacciones.length})
+                      </h4>
+                    </div>
+                  )}
 
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {extractedData.transacciones.map((trans: any, index: number) => {
@@ -2295,7 +2307,9 @@ export default function GastosPage() {
                         />
                         <div className="flex-1 space-y-2">
                           <div className="font-semibold text-xs text-slate-900">
-                            Total del resumen {extractedData.total.periodo ? `- ${extractedData.total.periodo}` : ''}
+                            {extractedData.total.tipo_documento === 'comprobante_unico' 
+                              ? (extractedData.total.nombre_sugerido || 'Comprobante')
+                              : `Total del resumen ${extractedData.total.periodo ? `- ${extractedData.total.periodo}` : ''}`}
                           </div>
                           
                           {includeTotal && (
@@ -2306,7 +2320,9 @@ export default function GastosPage() {
                                 </label>
                                 <input
                                   type="text"
-                                  value={editedTotal?.descripcion || `Total del resumen - ${extractedData.total.periodo || 'Período'}`}
+                                  value={editedTotal?.descripcion || (extractedData.total.nombre_sugerido || (extractedData.total.tipo_documento === 'comprobante_unico' 
+                                    ? 'Comprobante'
+                                    : `Total del resumen - ${extractedData.total.periodo || 'Período'}`))}
                                   onChange={(e) => setEditedTotal(prev => ({ ...(prev || {}), descripcion: e.target.value }))}
                                   onClick={(e) => e.stopPropagation()}
                                   className="input w-full text-xs h-7"
