@@ -714,8 +714,9 @@ export default function GastosPage() {
         const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || gastoForm.fecha)
         const mesFacturacion = getMesFacturacion(fecha)
         
-        // Detectar si es un gasto en cuotas (la IA puede detectar esto)
-        const cuotasDetectadas = trans.cuotas ? parseInt(String(trans.cuotas)) : null
+        // Detectar si es un gasto en cuotas (la IA puede detectar esto o puede estar editado)
+        const cuotasEditadas = editedTransactions.get(index)?.cuotas
+        const cuotasDetectadas = cuotasEditadas !== undefined ? cuotasEditadas : (trans.cuotas ? parseInt(String(trans.cuotas)) : null)
         const esEnCuotas = cuotasDetectadas && cuotasDetectadas > 1
         
         const gastoData = {
@@ -2027,6 +2028,7 @@ export default function GastosPage() {
                       const monto = getTransactionValue(index, 'monto', trans.monto)
                       const fecha = getTransactionValue(index, 'fecha', trans.fecha)
                       const moneda = getTransactionValue(index, 'moneda', trans.moneda || 'ARS')
+                      const cuotas = getTransactionValue(index, 'cuotas', trans.cuotas)
                       
                       return (
                         <div 
@@ -2103,14 +2105,31 @@ export default function GastosPage() {
                                   </select>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <label className="text-xs text-slate-600">Cuotas:</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={cuotas || 1}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      const numCuotas = parseInt(e.target.value) || 1
+                                      updateEditedTransaction(index, 'cuotas', numCuotas)
+                                    }}
+                                    className="input w-16 text-xs h-6 border-slate-300 focus:border-indigo-500"
+                                    placeholder="1"
+                                  />
+                                </div>
+                                {cuotas && cuotas > 1 && (
+                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                    {cuotas} cuotas (fijo)
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex items-center gap-2 text-xs flex-wrap">
                                 {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
                                 {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{trans.categoria}</span>}
-                                {trans.cuotas && trans.cuotas > 1 && (
-                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
-                                    {trans.cuotas} cuotas
-                                  </span>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -2307,6 +2326,20 @@ export default function GastosPage() {
                                   </select>
                                 </div>
                               </div>
+                              {(extractedData.total.saldo_a_favor_ars || extractedData.total.saldo_a_favor_usd) && (
+                                <div className="text-xs text-slate-600 bg-blue-50 p-2 rounded border border-blue-200">
+                                  <strong>Saldo a favor detectado:</strong>
+                                  {extractedData.total.saldo_a_favor_ars && (
+                                    <div>ARS: {formatMoney(extractedData.total.saldo_a_favor_ars)}</div>
+                                  )}
+                                  {extractedData.total.saldo_a_favor_usd && (
+                                    <div>USD: {formatMoney(extractedData.total.saldo_a_favor_usd)}</div>
+                                  )}
+                                  <div className="mt-1 text-slate-500">
+                                    El total mostrado ya considera este descuento.
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                           

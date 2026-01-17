@@ -97,7 +97,11 @@ REGLAS PARA DETECTAR DECIMALES:
      * Y así sucesivamente...
    - TODOS los consumos deben tener la MISMA FECHA: el primer día del mes del resumen (ej: si es diciembre 2025, usar "2025-12-01")
    - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
-   - Si detectas que un consumo es en cuotas, incluye un campo "cuotas" con el número total de cuotas (ej: 3, 6, 12)
+   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE):
+     * Busca palabras clave como "CUOTAS", "X CUOTAS", "SIN INTERÉS", "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", etc.
+     * Si un consumo tiene indicación de cuotas (ej: "3 CUOTAS SIN INTERÉS", "6 CUOTAS", "CUOTA 1/6"), extrae el número total de cuotas
+     * Si no hay indicación de cuotas, el campo "cuotas" debe ser null
+     * Ejemplos: "3 CUOTAS" → cuotas: 3, "CUOTA 1/12" → cuotas: 12, "6 CUOTAS SIN INTERÉS" → cuotas: 6
 
 3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
    - Extrae impuestos, comisiones y cargos del período actual
@@ -105,11 +109,15 @@ REGLAS PARA DETECTAR DECIMALES:
    - Ejemplos: "IMPUESTO DE SELLOS", "COMISION CTA PGOLD", "DB IVA", "Intereses", etc.
    - Estos NO van en "transacciones" sino en "impuestos"
 
-3. TOTALES:
+3. TOTALES Y SALDOS:
    - Extrae el TOTAL GENERAL del resumen (debe incluir consumos + impuestos + comisiones)
    - Busca secciones como "Total a pagar", "Total general", "Total del resumen" o similar
-   - Este total debe ser la suma de TODOS los conceptos (consumos + impuestos)
-   - Si hay múltiples totales, usa el TOTAL FINAL que incluye todo
+   - IMPORTANTE: DETECTA SALDOS A FAVOR:
+     * Busca secciones como "Saldo a favor", "A favor", "Crédito a favor", "Saldo positivo", etc.
+     * Si hay saldo a favor en ARS o USD, debe restarse del total a pagar
+     * Ejemplo: Si el total es 263.47 USD pero hay 6.15 USD a favor, el total real a pagar es 257.32 USD
+   - El total debe ser el TOTAL REAL A PAGAR después de descontar saldos a favor
+   - Si hay múltiples totales, usa el TOTAL FINAL que incluye todo y considera saldos a favor
    - Extrae información del período de cierre/vencimiento
 
 ═══════════════════════════════════════════════════════════════════
@@ -143,10 +151,12 @@ REGLAS PARA DETECTAR DECIMALES:
     }
   ],
   "total": {
-    "monto": número decimal (TOTAL GENERAL del resumen que incluye consumos + impuestos + comisiones, formato estándar con punto decimal, SIN puntos de miles),
+    "monto": número decimal (TOTAL REAL A PAGAR después de descontar saldos a favor. Si hay saldo a favor, debe restarse del total. Formato estándar con punto decimal, SIN puntos de miles),
     "moneda": "ARS" o "USD",
     "periodo": "fecha de cierre o período del resumen (ej: '2025-11-20' o 'Noviembre 2025')",
-    "mes_resumen": "YYYY-MM" (mes del resumen detectado basándose en el vencimiento. Si vence en enero, es 'YYYY-12'. Si vence en febrero, es 'YYYY-01', etc.)"
+    "mes_resumen": "YYYY-MM" (mes del resumen detectado basándose en el vencimiento. Si vence en enero, es 'YYYY-12'. Si vence en febrero, es 'YYYY-01', etc.)",
+    "saldo_a_favor_ars": número decimal o null (si hay saldo a favor en ARS, indicar el monto. Si no hay, null),
+    "saldo_a_favor_usd": número decimal o null (si hay saldo a favor en USD, indicar el monto. Si no hay, null)
   }
 }
 
