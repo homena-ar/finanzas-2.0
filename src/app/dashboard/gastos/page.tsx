@@ -67,6 +67,9 @@ export default function GastosPage() {
   // Estado para transacciones editadas (permite modificar fecha, descripción y monto antes de confirmar)
   const [editedTransactions, setEditedTransactions] = useState<Map<number, any>>(new Map())
   const [editedImpuestos, setEditedImpuestos] = useState<Map<number, any>>(new Map())
+  // Estado para fecha/mes general del documento (aplica a todas las transacciones)
+  const [globalDocumentDate, setGlobalDocumentDate] = useState<string | null>(null)
+  const [useGlobalDate, setUseGlobalDate] = useState(false)
 
   // Función para obtener el nombre del usuario que creó el gasto
   const getUserLabel = (userId: string) => {
@@ -418,18 +421,37 @@ export default function GastosPage() {
         const base64 = reader.result as string
         setPreviewImage(base64)
         
-        // Incremento gradual hasta 40%
-        let currentProgress = 10
-        const loadingProgress = setInterval(() => {
-          currentProgress += 3
-          if (currentProgress <= 40) {
-            setProgressPercent(currentProgress)
-          } else {
-            clearInterval(loadingProgress)
-          }
-        }, 200)
+        // Iniciar progreso desde 1% y avanzar suavemente
+        setProgressPercent(1)
+        
+        // Función para incrementar progreso suavemente de 1% a 99%
+        const smoothProgress = (targetPercent: number, duration: number) => {
+          return new Promise<void>((resolve) => {
+            const startPercent = progressPercent
+            const startTime = Date.now()
+            
+            const updateProgress = () => {
+              const elapsed = Date.now() - startTime
+              const progress = Math.min(elapsed / duration, 1)
+              const current = Math.floor(startPercent + (targetPercent - startPercent) * progress)
+              
+              if (current < targetPercent) {
+                setProgressPercent(Math.min(current, 99))
+                requestAnimationFrame(updateProgress)
+              } else {
+                setProgressPercent(Math.min(targetPercent, 99))
+                resolve()
+              }
+            }
+            
+            updateProgress()
+          })
+        }
 
         try {
+          // Avanzar a 20% mientras se prepara la petición
+          await smoothProgress(20, 500)
+          
           // Llamar a la API
           const response = await fetch('/api/process-image', {
             method: 'POST',
@@ -441,40 +463,33 @@ export default function GastosPage() {
             })
           })
 
-          // Incrementar gradualmente hasta 70% durante la respuesta
-          clearInterval(loadingProgress)
-          currentProgress = 40
-          const responseProgress = setInterval(() => {
-            currentProgress += 2
-            if (currentProgress <= 70) {
-              setProgressPercent(currentProgress)
-            } else {
-              clearInterval(responseProgress)
-            }
-          }, 150)
+          // Avanzar a 50% mientras se espera la respuesta
+          await smoothProgress(50, 1000)
 
           const result = await response.json()
-          clearInterval(responseProgress)
 
-          // Incrementar gradualmente hasta 99% durante el procesamiento
-          currentProgress = 70
-          const processingProgress = setInterval(() => {
-            currentProgress += 2
-            if (currentProgress <= 99) {
-              setProgressPercent(currentProgress)
-            } else {
-              clearInterval(processingProgress)
-            }
-          }, 200)
+          // Avanzar a 80% mientras se procesa el resultado
+          await smoothProgress(80, 500)
 
           if (!response.ok || !result.success) {
-            clearInterval(processingProgress)
             const errorMessage = result.error || 'Error al procesar el archivo'
             const errorDetails = result.details ? `\n\nDetalles: ${result.details}` : ''
             throw new Error(`${errorMessage}${errorDetails}`)
           }
 
           setExtractedData(result.data)
+          
+          // Detectar fecha general del documento (usar la primera fecha encontrada o fecha actual)
+          if (result.data.transacciones && result.data.transacciones.length > 0) {
+            const firstDate = result.data.transacciones[0]?.fecha
+            if (firstDate) {
+              setGlobalDocumentDate(firstDate)
+              setUseGlobalDate(true)
+            } else {
+              setGlobalDocumentDate(new Date().toISOString().split('T')[0])
+              setUseGlobalDate(false)
+            }
+          }
           
           // Si hay información de tarjeta detectada, configurarla
           if (result.data.tarjeta) {
@@ -495,11 +510,11 @@ export default function GastosPage() {
             setSelectedTarjetaId(gastoForm.tarjeta_id || '')
           }
           
-          clearInterval(processingProgress)
+          // Avanzar a 99% y esperar un momento
+          await smoothProgress(99, 300)
+          await new Promise(resolve => setTimeout(resolve, 200))
           
-          // Esperar en 99% un momento, luego mostrar 100% y completar
-          setProgressPercent(99)
-          await new Promise(resolve => setTimeout(resolve, 300))
+          // Completar suavemente
           setProgressPercent(100)
           setProcessingComplete(true)
           
@@ -512,7 +527,9 @@ export default function GastosPage() {
             // Limpiar ediciones anteriores cuando se procesa una nueva imagen
             setEditedTransactions(new Map())
             setEditedImpuestos(new Map())
-          }, 600)
+            setGlobalDocumentDate(null)
+            setUseGlobalDate(false)
+          }, 400)
         } catch (apiError: any) {
           if (progressInterval) clearInterval(progressInterval)
           setProcessingImage(false)
@@ -552,7 +569,14 @@ export default function GastosPage() {
   // Función para obtener el valor editado o el original de una transacción
   const getTransactionValue = (index: number, field: string, originalValue: any) => {
     const edited = editedTransactions.get(index)
-    return edited && edited[field] !== undefined ? edited[field] : originalValue
+    const editedValue = edited && edited[field] !== undefined ? edited[field] : originalValue
+    
+    // Si es fecha y se usa fecha global, aplicar la fecha global
+    if (field === 'fecha' && useGlobalDate && globalDocumentDate && !edited?.fecha) {
+      return globalDocumentDate
+    }
+    
+    return editedValue
   }
 
   // Función para obtener el valor editado o el original de un impuesto
@@ -598,13 +622,14 @@ export default function GastosPage() {
           
           // Aplicar ediciones si existen
           const edited = editedTransactions.get(index)
-          if (edited) {
-            return {
-              ...trans,
-              ...edited
-            }
+          let finalTrans = edited ? { ...trans, ...edited } : { ...trans }
+          
+          // Si se usa fecha global y no hay fecha editada individualmente, aplicar fecha global
+          if (useGlobalDate && globalDocumentDate && !edited?.fecha) {
+            finalTrans.fecha = globalDocumentDate
           }
-          return trans
+          
+          return finalTrans
         })
         .filter((t: any) => t !== null)
       
@@ -769,8 +794,8 @@ export default function GastosPage() {
         setDetectedTarjeta(null)
         setSelectedTarjetaId('')
         setSavingTransactions(false)
-        setEditedTransactions(new Map())
-        setEditedImpuestos(new Map())
+        setGlobalDocumentDate(null)
+        setUseGlobalDate(false)
         setShowGastoModal(false)
         resetGastoForm()
         
@@ -813,6 +838,8 @@ export default function GastosPage() {
     setIncludeTotal(false)
     setEditedTransactions(new Map())
     setEditedImpuestos(new Map())
+    setGlobalDocumentDate(null)
+    setUseGlobalDate(false)
   }
 
   const toggleFijo = async (g: Gasto) => {
@@ -1791,6 +1818,8 @@ export default function GastosPage() {
                   setSelectedTarjetaId('');
                   setEditedTransactions(new Map());
                   setEditedImpuestos(new Map());
+                  setGlobalDocumentDate(null);
+                  setUseGlobalDate(false);
                 }} 
                 className="p-1 hover:bg-slate-100 rounded"
               >
@@ -1907,7 +1936,144 @@ export default function GastosPage() {
                     </div>
                   )}
 
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {/* Selector de Fecha/Mes General para todo el documento */}
+                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">📅</span>
+                        <div>
+                          <h4 className="font-bold text-indigo-900 text-sm">Fecha General del Documento</h4>
+                          <p className="text-xs text-indigo-600 mt-0.5">
+                            Esta fecha se aplicará a todas las transacciones seleccionadas
+                          </p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useGlobalDate}
+                          onChange={(e) => {
+                            setUseGlobalDate(e.target.checked)
+                            if (e.target.checked && globalDocumentDate) {
+                              // Aplicar fecha global a todas las transacciones
+                              const newEdited = new Map(editedTransactions)
+                              extractedData.transacciones.forEach((_: any, index: number) => {
+                                if (!newEdited.has(index) || !newEdited.get(index)?.fecha) {
+                                  const current = newEdited.get(index) || {}
+                                  newEdited.set(index, { ...current, fecha: globalDocumentDate })
+                                }
+                              })
+                              setEditedTransactions(newEdited)
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    
+                    {useGlobalDate && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <label className="block text-xs font-semibold text-indigo-700 mb-1.5">
+                              Fecha
+                            </label>
+                            <input
+                              type="date"
+                              value={globalDocumentDate || ''}
+                              onChange={(e) => {
+                                const newDate = e.target.value
+                                setGlobalDocumentDate(newDate)
+                                // Aplicar a todas las transacciones seleccionadas
+                                const newEdited = new Map(editedTransactions)
+                                extractedData.transacciones.forEach((_: any, index: number) => {
+                                  if (selectedTransactions.has(index)) {
+                                    const current = newEdited.get(index) || {}
+                                    newEdited.set(index, { ...current, fecha: newDate })
+                                  }
+                                })
+                                setEditedTransactions(newEdited)
+                              }}
+                              className="input w-full text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-semibold text-indigo-700 mb-1.5">
+                              Mes de Facturación
+                            </label>
+                            <input
+                              type="month"
+                              value={globalDocumentDate ? globalDocumentDate.substring(0, 7) : ''}
+                              onChange={(e) => {
+                                const monthValue = e.target.value
+                                // Usar el primer día del mes seleccionado
+                                const newDate = `${monthValue}-01`
+                                setGlobalDocumentDate(newDate)
+                                // Aplicar a todas las transacciones seleccionadas
+                                const newEdited = new Map(editedTransactions)
+                                extractedData.transacciones.forEach((_: any, index: number) => {
+                                  if (selectedTransactions.has(index)) {
+                                    const current = newEdited.get(index) || {}
+                                    newEdited.set(index, { ...current, fecha: newDate })
+                                  }
+                                })
+                                setEditedTransactions(newEdited)
+                              }}
+                              className="input w-full text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-indigo-600 flex items-center gap-1">
+                          <span>💡</span>
+                          <span>La fecha seleccionada se aplicará automáticamente a todas las transacciones. Puedes modificar individualmente cada una si es necesario.</span>
+                        </p>
+                      </div>
+                    )}
+                    
+                    {!useGlobalDate && globalDocumentDate && (
+                      <div className="mt-3 p-2 bg-white/60 rounded-lg border border-indigo-200">
+                        <p className="text-xs text-indigo-700">
+                          <strong>Fecha detectada por IA:</strong> {new Date(globalDocumentDate).toLocaleDateString('es-AR', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                        <p className="text-xs text-indigo-600 mt-1">
+                          Activa el interruptor arriba para aplicar una fecha general a todas las transacciones.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lista de Transacciones */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-slate-900 text-sm">
+                        Transacciones Detectadas ({extractedData.transacciones.length})
+                      </h4>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            const allSelected = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
+                            setSelectedTransactions(allSelected)
+                          }}
+                          className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                        >
+                          Seleccionar todas
+                        </button>
+                        <button
+                          onClick={() => setSelectedTransactions(new Set())}
+                          className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                        >
+                          Deseleccionar todas
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                     {extractedData.transacciones.map((trans: any, index: number) => {
                       const descripcion = getTransactionValue(index, 'descripcion', trans.descripcion)
                       const monto = getTransactionValue(index, 'monto', trans.monto)
@@ -1917,10 +2083,10 @@ export default function GastosPage() {
                       return (
                         <div 
                           key={index}
-                          className={`border rounded-lg p-4 transition-colors ${
+                          className={`border-2 rounded-xl p-4 transition-all duration-200 ${
                             selectedTransactions.has(index) 
-                              ? 'border-purple-500 bg-purple-50' 
-                              : 'border-slate-200 hover:border-purple-300 bg-white'
+                              ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md' 
+                              : 'border-slate-200 hover:border-indigo-300 bg-white hover:shadow-sm'
                           }`}
                         >
                           <div className="flex items-start gap-3">
@@ -1934,15 +2100,22 @@ export default function GastosPage() {
                                   newSelected.delete(index)
                                 } else {
                                   newSelected.add(index)
+                                  // Si se selecciona y hay fecha global activa, aplicar fecha
+                                  if (useGlobalDate && globalDocumentDate) {
+                                    const current = editedTransactions.get(index) || {}
+                                    updateEditedTransaction(index, 'fecha', globalDocumentDate)
+                                  }
                                 }
                                 setSelectedTransactions(newSelected)
                               }}
-                              className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
+                              className="mt-1 w-5 h-5 text-indigo-600 rounded border-slate-300 cursor-pointer focus:ring-2 focus:ring-indigo-500"
                             />
                             <div className="flex-1 space-y-3">
                               {/* Descripción editable */}
                               <div>
-                                <label className="text-xs text-slate-500 mb-1 block">Descripción</label>
+                                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                  Descripción
+                                </label>
                                 <input
                                   type="text"
                                   value={descripcion || ''}
@@ -1950,7 +2123,7 @@ export default function GastosPage() {
                                     e.stopPropagation()
                                     updateEditedTransaction(index, 'descripcion', e.target.value)
                                   }}
-                                  className="input w-full text-sm"
+                                  className="input w-full text-sm border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Descripción del gasto"
                                 />
                               </div>
@@ -1958,7 +2131,11 @@ export default function GastosPage() {
                               {/* Fecha y Monto en fila */}
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label className="text-xs text-slate-500 mb-1 block">Fecha</label>
+                                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                    Fecha {useGlobalDate && globalDocumentDate && (
+                                      <span className="text-indigo-600 text-xs font-normal">(global aplicada)</span>
+                                    )}
+                                  </label>
                                   <input
                                     type="date"
                                     value={fecha || ''}
@@ -1966,11 +2143,13 @@ export default function GastosPage() {
                                       e.stopPropagation()
                                       updateEditedTransaction(index, 'fecha', e.target.value)
                                     }}
-                                    className="input w-full text-sm"
+                                    className="input w-full text-sm border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-xs text-slate-500 mb-1 block">Monto</label>
+                                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                    Monto
+                                  </label>
                                   <div className="flex gap-2">
                                     <input
                                       type="number"
@@ -1980,7 +2159,7 @@ export default function GastosPage() {
                                         e.stopPropagation()
                                         updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)
                                       }}
-                                      className="input w-full text-sm"
+                                      className="input w-full text-sm border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
                                       placeholder="0.00"
                                     />
                                     <select
@@ -1989,7 +2168,7 @@ export default function GastosPage() {
                                         e.stopPropagation()
                                         updateEditedTransaction(index, 'moneda', e.target.value)
                                       }}
-                                      className="input text-sm w-20"
+                                      className="input text-sm w-20 border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
                                     >
                                       <option value="ARS">ARS</option>
                                       <option value="USD">USD</option>
@@ -1999,14 +2178,21 @@ export default function GastosPage() {
                               </div>
                               
                               {/* Información adicional (solo lectura) */}
-                              <div className="flex items-center gap-4 text-xs text-slate-500">
-                                {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
-                                {trans.categoria && (
-                                  <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
-                                    {trans.categoria}
-                                  </span>
-                                )}
-                              </div>
+                              {(trans.comercio || trans.categoria) && (
+                                <div className="flex items-center gap-3 text-xs pt-1 border-t border-slate-200">
+                                  {trans.comercio && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md">
+                                      <span>📍</span>
+                                      <span>{trans.comercio}</span>
+                                    </span>
+                                  )}
+                                  {trans.categoria && (
+                                    <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-md font-medium">
+                                      {trans.categoria}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2296,6 +2482,8 @@ export default function GastosPage() {
                   setSelectedTarjetaId('');
                   setEditedTransactions(new Map());
                   setEditedImpuestos(new Map());
+                  setGlobalDocumentDate(null);
+                  setUseGlobalDate(false);
                 }}
                   className="btn btn-secondary"
                 >
