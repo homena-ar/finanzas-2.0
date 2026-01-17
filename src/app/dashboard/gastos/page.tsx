@@ -427,16 +427,16 @@ export default function GastosPage() {
         // Función para incrementar progreso suavemente con actualización continua
         const smoothProgress = (targetPercent: number, duration: number) => {
           return new Promise<void>((resolve) => {
-            const startPercent = progressPercent
+            let currentPercent = progressPercent
             const startTime = Date.now()
             
             const updateProgress = () => {
               const elapsed = Date.now() - startTime
               const progress = Math.min(elapsed / duration, 1)
-              const current = Math.floor(startPercent + (targetPercent - startPercent) * progress)
+              const newPercent = Math.floor(currentPercent + (targetPercent - currentPercent) * progress)
               
-              if (current < targetPercent) {
-                setProgressPercent(Math.min(current, 99))
+              if (newPercent < targetPercent) {
+                setProgressPercent(Math.min(newPercent, 99))
                 requestAnimationFrame(updateProgress)
               } else {
                 setProgressPercent(Math.min(targetPercent, 99))
@@ -2398,7 +2398,6 @@ export default function GastosPage() {
               >
                 Cancelar
               </button>
-              </div>
             </div>
           </div>
         </div>
