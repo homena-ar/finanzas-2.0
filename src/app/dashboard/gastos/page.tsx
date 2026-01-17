@@ -435,24 +435,27 @@ export default function GastosPage() {
         // Función para incrementar progreso suavemente con actualización continua
         const smoothProgress = (targetPercent: number, duration: number) => {
           return new Promise<void>((resolve) => {
-            let currentPercent = progressPercent
-            const startTime = Date.now()
-            
-            const updateProgress = () => {
-              const elapsed = Date.now() - startTime
-              const progress = Math.min(elapsed / duration, 1)
-              const newPercent = Math.floor(currentPercent + (targetPercent - currentPercent) * progress)
+            setProgressPercent(prev => {
+              const startPercent = prev
+              const startTime = Date.now()
               
-              if (newPercent < targetPercent) {
-                setProgressPercent(Math.min(newPercent, 99))
-                requestAnimationFrame(updateProgress)
-              } else {
-                setProgressPercent(Math.min(targetPercent, 99))
-                resolve()
+              const updateProgress = () => {
+                const elapsed = Date.now() - startTime
+                const progress = Math.min(elapsed / duration, 1)
+                const newPercent = Math.floor(startPercent + (targetPercent - startPercent) * progress)
+                
+                if (progress < 1) {
+                  setProgressPercent(Math.min(newPercent, targetPercent))
+                  requestAnimationFrame(updateProgress)
+                } else {
+                  setProgressPercent(targetPercent)
+                  resolve()
+                }
               }
-            }
-            
-            updateProgress()
+              
+              updateProgress()
+              return startPercent
+            })
           })
         }
 
@@ -461,21 +464,31 @@ export default function GastosPage() {
           return new Promise<void>((resolve) => {
             const startTime = Date.now()
             let lastPercent = startPercent
+            let animationFrameId: number | null = null
             
-            const interval = setInterval(() => {
+            const updateProgress = () => {
               const elapsed = Date.now() - startTime
-              const progress = Math.min(elapsed / estimatedDuration, 0.95) // No llegar al 100% hasta que termine
+              const progress = Math.min(elapsed / estimatedDuration, 1)
               const current = Math.floor(startPercent + (endPercent - startPercent) * progress)
               
               if (current > lastPercent && current < endPercent) {
-                setProgressPercent(Math.min(current, 98))
+                setProgressPercent(Math.min(current, endPercent - 1))
                 lastPercent = current
               }
-            }, 100) // Actualizar cada 100ms
+              
+              if (progress < 1) {
+                animationFrameId = requestAnimationFrame(updateProgress)
+              } else {
+                if (animationFrameId) cancelAnimationFrame(animationFrameId)
+                resolve()
+              }
+            }
             
-            // Resolver cuando se complete
+            updateProgress()
+            
+            // Resolver cuando se complete el tiempo estimado
             setTimeout(() => {
-              clearInterval(interval)
+              if (animationFrameId) cancelAnimationFrame(animationFrameId)
               resolve()
             }, estimatedDuration)
           })
@@ -486,7 +499,7 @@ export default function GastosPage() {
           await smoothProgress(5, 200)
           
           // Iniciar progreso continuo mientras se prepara y envía la petición
-          const progressPromise = simulateContinuousProgress(5, 75, 8000) // 8 segundos estimados
+          const progressPromise = simulateContinuousProgress(5, 70, 10000) // 10 segundos estimados, hasta 70%
           
           // Llamar a la API
           const response = await fetch('/api/process-image', {
@@ -505,10 +518,13 @@ export default function GastosPage() {
             new Promise(resolve => setTimeout(resolve, 100))
           ])
 
+          // Avanzar a 75% cuando llega la respuesta
+          await smoothProgress(75, 200)
+
           const result = await response.json()
 
-          // Avanzar a 85% mientras se procesa el resultado
-          await smoothProgress(85, 300)
+          // Avanzar a 90% mientras se procesa el resultado
+          await smoothProgress(90, 300)
 
           if (!response.ok || !result.success) {
             const errorMessage = result.error || 'Error al procesar el archivo'
@@ -556,12 +572,12 @@ export default function GastosPage() {
             setSelectedTarjetaId(gastoForm.tarjeta_id || '')
           }
           
-          // Avanzar a 99% y esperar un momento
-          await smoothProgress(99, 200)
-          await new Promise(resolve => setTimeout(resolve, 150))
+          // Avanzar a 95% y luego a 100% suavemente
+          await smoothProgress(95, 200)
+          await new Promise(resolve => setTimeout(resolve, 100))
+          await smoothProgress(100, 300)
           
-          // Completar suavemente
-          setProgressPercent(100)
+          // Completar
           setProcessingComplete(true)
           
           // Esperar un momento para mostrar el 100% antes de mostrar resultados
@@ -576,7 +592,7 @@ export default function GastosPage() {
             setEditedTotal(null)
             setGlobalDocumentDate(null)
             setUseGlobalDate(false)
-          }, 300)
+          }, 400)
         } catch (apiError: any) {
           if (progressInterval) clearInterval(progressInterval)
           setProcessingImage(false)
@@ -729,7 +745,7 @@ export default function GastosPage() {
           tarjeta_id: tarjetaIdToUse,
           cuotas: esEnCuotas ? cuotasDetectadas : (parseInt(gastoForm.cuotas) || 1),
           cuota_actual: 1,
-          es_fijo: esEnCuotas, // Si es en cuotas, marcarlo como fijo
+          es_fijo: false, // NO marcar como fijo, las cuotas se distribuyen automáticamente
           tag_ids: gastoForm.tag_ids || [],
           pagado: gastoForm.pagado,
           comercio: trans.comercio || ''
@@ -2123,7 +2139,7 @@ export default function GastosPage() {
                                 </div>
                                 {cuotas && cuotas > 1 && (
                                   <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                    {cuotas} cuotas (fijo)
+                                    {cuotas} cuotas (se distribuirá en {cuotas} meses)
                                   </span>
                                 )}
                               </div>

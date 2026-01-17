@@ -97,11 +97,19 @@ REGLAS PARA DETECTAR DECIMALES:
      * Y así sucesivamente...
    - TODOS los consumos deben tener la MISMA FECHA: el primer día del mes del resumen (ej: si es diciembre 2025, usar "2025-12-01")
    - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
-   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE):
-     * Busca palabras clave como "CUOTAS", "X CUOTAS", "SIN INTERÉS", "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", etc.
-     * Si un consumo tiene indicación de cuotas (ej: "3 CUOTAS SIN INTERÉS", "6 CUOTAS", "CUOTA 1/6"), extrae el número total de cuotas
-     * Si no hay indicación de cuotas, el campo "cuotas" debe ser null
-     * Ejemplos: "3 CUOTAS" → cuotas: 3, "CUOTA 1/12" → cuotas: 12, "6 CUOTAS SIN INTERÉS" → cuotas: 6
+   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EN TODA LA DESCRIPCIÓN):
+     * Busca palabras clave como "CUOTAS", "X CUOTAS", "SIN INTERÉS", "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", "CUOTA 1/3", "CUOTA 1/6", "CUOTA 1/12", etc.
+     * Busca patrones como "CUOTA X/Y" donde Y es el total de cuotas (ej: "CUOTA 1/6" → 6 cuotas, "CUOTA 2/12" → 12 cuotas)
+     * Busca números seguidos de "CUOTAS" (ej: "3 CUOTAS", "6 CUOTAS SIN INTERÉS", "12 CUOTAS")
+     * Si un consumo tiene indicación de cuotas, SIEMPRE extrae el número total de cuotas
+     * Si no hay indicación de cuotas, el campo "cuotas" debe ser null o 1
+     * Ejemplos: 
+       - "3 CUOTAS SIN INTERÉS" → cuotas: 3
+       - "CUOTA 1/6" → cuotas: 6
+       - "CUOTA 2/12" → cuotas: 12
+       - "6 CUOTAS" → cuotas: 6
+       - "12 CUOTAS" → cuotas: 12
+       - Sin indicación → cuotas: null o 1
 
 3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
    - Extrae impuestos, comisiones y cargos del período actual
