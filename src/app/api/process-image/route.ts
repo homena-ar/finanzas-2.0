@@ -98,7 +98,10 @@ REGLAS PARA DETECTAR DECIMALES:
    - Estos NO van en "transacciones" sino en "impuestos"
 
 3. TOTALES:
-   - Extrae el total de consumos del período si está visible
+   - Extrae el TOTAL GENERAL del resumen (debe incluir consumos + impuestos + comisiones)
+   - Busca secciones como "Total a pagar", "Total general", "Total del resumen" o similar
+   - Este total debe ser la suma de TODOS los conceptos (consumos + impuestos)
+   - Si hay múltiples totales, usa el TOTAL FINAL que incluye todo
    - Extrae información del período de cierre/vencimiento
 
 ═══════════════════════════════════════════════════════════════════
@@ -131,7 +134,7 @@ REGLAS PARA DETECTAR DECIMALES:
     }
   ],
   "total": {
-    "monto": número decimal (total de consumos del período si está visible, formato estándar con punto decimal, SIN puntos de miles),
+    "monto": número decimal (TOTAL GENERAL del resumen que incluye consumos + impuestos + comisiones, formato estándar con punto decimal, SIN puntos de miles),
     "moneda": "ARS" o "USD",
     "periodo": "fecha de cierre o período del resumen (ej: '2025-11-20' o 'Noviembre 2025')"
   }

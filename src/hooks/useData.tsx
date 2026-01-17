@@ -107,7 +107,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const monthKey = currentMonth.toISOString().slice(0, 7)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && monthKey) {
       localStorage.setItem('lastViewedMonth', monthKey)
     }
   }, [monthKey])

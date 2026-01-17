@@ -424,7 +424,7 @@ export default function GastosPage() {
         // Iniciar progreso desde 1% y avanzar suavemente
         setProgressPercent(1)
         
-        // Función para incrementar progreso suavemente de 1% a 99%
+        // Función para incrementar progreso suavemente con actualización continua
         const smoothProgress = (targetPercent: number, duration: number) => {
           return new Promise<void>((resolve) => {
             const startPercent = progressPercent
@@ -448,9 +448,37 @@ export default function GastosPage() {
           })
         }
 
+        // Función para simular progreso continuo durante la llamada a la API
+        const simulateContinuousProgress = (startPercent: number, endPercent: number, estimatedDuration: number) => {
+          return new Promise<void>((resolve) => {
+            const startTime = Date.now()
+            let lastPercent = startPercent
+            
+            const interval = setInterval(() => {
+              const elapsed = Date.now() - startTime
+              const progress = Math.min(elapsed / estimatedDuration, 0.95) // No llegar al 100% hasta que termine
+              const current = Math.floor(startPercent + (endPercent - startPercent) * progress)
+              
+              if (current > lastPercent && current < endPercent) {
+                setProgressPercent(Math.min(current, 98))
+                lastPercent = current
+              }
+            }, 100) // Actualizar cada 100ms
+            
+            // Resolver cuando se complete
+            setTimeout(() => {
+              clearInterval(interval)
+              resolve()
+            }, estimatedDuration)
+          })
+        }
+
         try {
-          // Avanzar a 20% mientras se prepara la petición
-          await smoothProgress(20, 500)
+          // Avanzar a 5% rápidamente
+          await smoothProgress(5, 200)
+          
+          // Iniciar progreso continuo mientras se prepara y envía la petición
+          const progressPromise = simulateContinuousProgress(5, 75, 8000) // 8 segundos estimados
           
           // Llamar a la API
           const response = await fetch('/api/process-image', {
@@ -463,13 +491,16 @@ export default function GastosPage() {
             })
           })
 
-          // Avanzar a 50% mientras se espera la respuesta
-          await smoothProgress(50, 1000)
+          // Esperar a que termine el progreso simulado o la respuesta
+          await Promise.race([
+            progressPromise,
+            new Promise(resolve => setTimeout(resolve, 100))
+          ])
 
           const result = await response.json()
 
-          // Avanzar a 80% mientras se procesa el resultado
-          await smoothProgress(80, 500)
+          // Avanzar a 85% mientras se procesa el resultado
+          await smoothProgress(85, 300)
 
           if (!response.ok || !result.success) {
             const errorMessage = result.error || 'Error al procesar el archivo'
@@ -511,8 +542,8 @@ export default function GastosPage() {
           }
           
           // Avanzar a 99% y esperar un momento
-          await smoothProgress(99, 300)
-          await new Promise(resolve => setTimeout(resolve, 200))
+          await smoothProgress(99, 200)
+          await new Promise(resolve => setTimeout(resolve, 150))
           
           // Completar suavemente
           setProgressPercent(100)
@@ -529,7 +560,7 @@ export default function GastosPage() {
             setEditedImpuestos(new Map())
             setGlobalDocumentDate(null)
             setUseGlobalDate(false)
-          }, 400)
+          }, 300)
         } catch (apiError: any) {
           if (progressInterval) clearInterval(progressInterval)
           setProcessingImage(false)
@@ -695,10 +726,13 @@ export default function GastosPage() {
         return result
       })
 
-      // Si se solicita, agregar el total también
+      // Si se solicita, agregar el total también (el total ya debería incluir impuestos según el prompt mejorado)
       if (includeTotal && extractedData.total && extractedData.total.monto) {
         console.log('🔵 [GastosPage] handleConfirmExtractedData - Agregando total:', extractedData.total)
-        const fechaObj = new Date(gastoForm.fecha)
+        
+        // Usar fecha global si está disponible, sino usar la del formulario
+        const fechaToUse = useGlobalDate && globalDocumentDate ? globalDocumentDate : gastoForm.fecha
+        const fechaObj = new Date(fechaToUse)
         const mesFacturacion = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}`
         
         addPromises.push(
@@ -707,7 +741,7 @@ export default function GastosPage() {
             categoria_id: '',
             monto: extractedData.total.monto,
             moneda: extractedData.total.moneda || 'ARS',
-            fecha: gastoForm.fecha,
+            fecha: fechaToUse,
             mes_facturacion: mesFacturacion,
             tarjeta_id: tarjetaIdToUse,
             cuotas: parseInt(gastoForm.cuotas) || 1,
@@ -1800,11 +1834,11 @@ export default function GastosPage() {
           setDetectedTarjeta(null);
           setSelectedTarjetaId('');
         }}>
-          <div className="modal max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 text-purple-600" />
-                {extractedData.transacciones ? `Confirmar Transacciones (${extractedData.transacciones.length} encontradas)` : 'Confirmar Datos Extraídos'}
+          <div className="modal max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shrink-0">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-indigo-600" />
+                <span>{extractedData.transacciones ? `${extractedData.transacciones.length} transacciones` : 'Datos extraídos'}</span>
               </h3>
               <button 
                 onClick={() => { 
@@ -1821,12 +1855,12 @@ export default function GastosPage() {
                   setGlobalDocumentDate(null);
                   setUseGlobalDate(false);
                 }} 
-                className="p-1 hover:bg-slate-100 rounded"
+                className="p-1.5 hover:bg-slate-100 rounded transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
               {/* PDF/Imagen colapsable - menos prominente */}
               {previewImage && (
                 <details className="mb-4 group">
@@ -1849,105 +1883,43 @@ export default function GastosPage() {
               
               {/* Si hay múltiples transacciones (resumen) */}
               {extractedData.transacciones && Array.isArray(extractedData.transacciones) ? (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
-                      <strong>Resumen detectado:</strong> Se encontraron {extractedData.transacciones.length} transacciones individuales. 
-                      Selecciona las que deseas agregar como gastos.
+                <div className="space-y-3">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
+                    <p className="text-xs text-indigo-800">
+                      <strong>{extractedData.transacciones.length} transacciones</strong> detectadas. Selecciona las que deseas agregar.
                     </p>
                   </div>
 
-                  {/* Información de tarjeta detectada */}
-                  {detectedTarjeta && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-semibold text-purple-900 flex items-center gap-2">
-                          💳 Tarjeta detectada
-                        </h4>
+                  {/* Información de tarjeta detectada - Compacto */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      {detectedTarjeta ? '💳 Tarjeta detectada' : '💳 Tarjeta (opcional)'}
+                    </label>
+                    {detectedTarjeta && (
+                      <div className="text-xs text-slate-600 mb-2 space-y-0.5">
+                        {detectedTarjeta.banco && <div><strong>Banco:</strong> {detectedTarjeta.banco}</div>}
+                        {detectedTarjeta.tipo_tarjeta && <div><strong>Tipo:</strong> {detectedTarjeta.tipo_tarjeta}</div>}
+                        {detectedTarjeta.ultimos_digitos && <div><strong>Dígitos:</strong> ****{detectedTarjeta.ultimos_digitos}</div>}
                       </div>
-                      <div className="space-y-2 text-sm">
-                        {detectedTarjeta.banco && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-700 font-medium">Banco:</span>
-                            <span className="text-purple-900">{detectedTarjeta.banco}</span>
-                          </div>
-                        )}
-                        {detectedTarjeta.tipo_tarjeta && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-700 font-medium">Tipo:</span>
-                            <span className="text-purple-900">{detectedTarjeta.tipo_tarjeta}</span>
-                          </div>
-                        )}
-                        {detectedTarjeta.ultimos_digitos && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-700 font-medium">Últimos dígitos:</span>
-                            <span className="text-purple-900">****{detectedTarjeta.ultimos_digitos}</span>
-                          </div>
-                        )}
-                        {detectedTarjeta.nombre_titular && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-700 font-medium">Titular:</span>
-                            <span className="text-purple-900">{detectedTarjeta.nombre_titular}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="mt-4 pt-3 border-t border-purple-200">
-                        <label className="block text-xs font-semibold text-purple-700 uppercase mb-2">
-                          Seleccionar tarjeta
-                        </label>
-                        <select
-                          value={selectedTarjetaId}
-                          onChange={(e) => setSelectedTarjetaId(e.target.value)}
-                          className="input w-full text-sm"
-                        >
-                          <option value="">Selecciona una tarjeta o deja vacío</option>
-                          {tarjetas.map(t => (
-                            <option key={t.id} value={t.id}>
-                              {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-purple-600 mt-2">
-                          💡 Si no encuentras la tarjeta, puedes crearla desde el menú de Tarjetas y luego agregar estos gastos nuevamente.
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                    <select
+                      value={selectedTarjetaId}
+                      onChange={(e) => setSelectedTarjetaId(e.target.value)}
+                      className="input w-full text-xs h-8"
+                    >
+                      <option value="">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
+                      {tarjetas.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {/* Si no se detectó tarjeta, mostrar selector opcional */}
-                  {!detectedTarjeta && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                      <label className="block text-xs font-semibold text-slate-700 uppercase mb-2">
-                        Tarjeta (opcional)
-                      </label>
-                      <select
-                        value={selectedTarjetaId}
-                        onChange={(e) => setSelectedTarjetaId(e.target.value)}
-                        className="input w-full text-sm"
-                      >
-                        <option value="">Sin tarjeta (efectivo)</option>
-                        {tarjetas.map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Selector de Fecha/Mes General para todo el documento */}
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">📅</span>
-                        <div>
-                          <h4 className="font-bold text-indigo-900 text-sm">Fecha General del Documento</h4>
-                          <p className="text-xs text-indigo-600 mt-0.5">
-                            Esta fecha se aplicará a todas las transacciones seleccionadas
-                          </p>
-                        </div>
-                      </div>
+                  {/* Selector de Fecha/Mes General - Compacto */}
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-indigo-900">📅 Fecha General</label>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
@@ -1955,7 +1927,6 @@ export default function GastosPage() {
                           onChange={(e) => {
                             setUseGlobalDate(e.target.checked)
                             if (e.target.checked && globalDocumentDate) {
-                              // Aplicar fecha global a todas las transacciones
                               const newEdited = new Map(editedTransactions)
                               extractedData.transacciones.forEach((_: any, index: number) => {
                                 if (!newEdited.has(index) || !newEdited.get(index)?.fecha) {
@@ -1968,112 +1939,79 @@ export default function GastosPage() {
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                       </label>
                     </div>
                     
-                    {useGlobalDate && (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex gap-3">
-                          <div className="flex-1">
-                            <label className="block text-xs font-semibold text-indigo-700 mb-1.5">
-                              Fecha
-                            </label>
-                            <input
-                              type="date"
-                              value={globalDocumentDate || ''}
-                              onChange={(e) => {
-                                const newDate = e.target.value
-                                setGlobalDocumentDate(newDate)
-                                // Aplicar a todas las transacciones seleccionadas
-                                const newEdited = new Map(editedTransactions)
-                                extractedData.transacciones.forEach((_: any, index: number) => {
-                                  if (selectedTransactions.has(index)) {
-                                    const current = newEdited.get(index) || {}
-                                    newEdited.set(index, { ...current, fecha: newDate })
-                                  }
-                                })
-                                setEditedTransactions(newEdited)
-                              }}
-                              className="input w-full text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="block text-xs font-semibold text-indigo-700 mb-1.5">
-                              Mes de Facturación
-                            </label>
-                            <input
-                              type="month"
-                              value={globalDocumentDate ? globalDocumentDate.substring(0, 7) : ''}
-                              onChange={(e) => {
-                                const monthValue = e.target.value
-                                // Usar el primer día del mes seleccionado
-                                const newDate = `${monthValue}-01`
-                                setGlobalDocumentDate(newDate)
-                                // Aplicar a todas las transacciones seleccionadas
-                                const newEdited = new Map(editedTransactions)
-                                extractedData.transacciones.forEach((_: any, index: number) => {
-                                  if (selectedTransactions.has(index)) {
-                                    const current = newEdited.get(index) || {}
-                                    newEdited.set(index, { ...current, fecha: newDate })
-                                  }
-                                })
-                                setEditedTransactions(newEdited)
-                              }}
-                              className="input w-full text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-xs text-indigo-600 flex items-center gap-1">
-                          <span>💡</span>
-                          <span>La fecha seleccionada se aplicará automáticamente a todas las transacciones. Puedes modificar individualmente cada una si es necesario.</span>
-                        </p>
+                    {useGlobalDate ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={globalDocumentDate || ''}
+                          onChange={(e) => {
+                            const newDate = e.target.value
+                            setGlobalDocumentDate(newDate)
+                            const newEdited = new Map(editedTransactions)
+                            extractedData.transacciones.forEach((_: any, index: number) => {
+                              if (selectedTransactions.has(index)) {
+                                const current = newEdited.get(index) || {}
+                                newEdited.set(index, { ...current, fecha: newDate })
+                              }
+                            })
+                            setEditedTransactions(newEdited)
+                          }}
+                          className="input w-full text-xs h-8 border-indigo-300 focus:border-indigo-500"
+                        />
+                        <input
+                          type="month"
+                          value={globalDocumentDate ? globalDocumentDate.substring(0, 7) : ''}
+                          onChange={(e) => {
+                            const newDate = `${e.target.value}-01`
+                            setGlobalDocumentDate(newDate)
+                            const newEdited = new Map(editedTransactions)
+                            extractedData.transacciones.forEach((_: any, index: number) => {
+                              if (selectedTransactions.has(index)) {
+                                const current = newEdited.get(index) || {}
+                                newEdited.set(index, { ...current, fecha: newDate })
+                              }
+                            })
+                            setEditedTransactions(newEdited)
+                          }}
+                          className="input w-full text-xs h-8 border-indigo-300 focus:border-indigo-500"
+                        />
                       </div>
-                    )}
-                    
-                    {!useGlobalDate && globalDocumentDate && (
-                      <div className="mt-3 p-2 bg-white/60 rounded-lg border border-indigo-200">
-                        <p className="text-xs text-indigo-700">
-                          <strong>Fecha detectada por IA:</strong> {new Date(globalDocumentDate).toLocaleDateString('es-AR', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })}
-                        </p>
-                        <p className="text-xs text-indigo-600 mt-1">
-                          Activa el interruptor arriba para aplicar una fecha general a todas las transacciones.
-                        </p>
-                      </div>
+                    ) : globalDocumentDate && (
+                      <p className="text-xs text-indigo-700">
+                        Detectada: {new Date(globalDocumentDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
                     )}
                   </div>
 
-                  {/* Lista de Transacciones */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-slate-900 text-sm">
-                        Transacciones Detectadas ({extractedData.transacciones.length})
-                      </h4>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            const allSelected = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
-                            setSelectedTransactions(allSelected)
-                          }}
-                          className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
-                        >
-                          Seleccionar todas
-                        </button>
-                        <button
-                          onClick={() => setSelectedTransactions(new Set())}
-                          className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
-                        >
-                          Deseleccionar todas
-                        </button>
-                      </div>
+                  {/* Lista de Transacciones - Compacta */}
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-slate-900 text-xs">
+                      Transacciones ({extractedData.transacciones.length})
+                    </h4>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => {
+                          const allSelected = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
+                          setSelectedTransactions(allSelected)
+                        }}
+                        className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                      >
+                        Todas
+                      </button>
+                      <button
+                        onClick={() => setSelectedTransactions(new Set())}
+                        className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                      >
+                        Ninguna
+                      </button>
                     </div>
                   </div>
 
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                     {extractedData.transacciones.map((trans: any, index: number) => {
                       const descripcion = getTransactionValue(index, 'descripcion', trans.descripcion)
                       const monto = getTransactionValue(index, 'monto', trans.monto)
@@ -2083,13 +2021,13 @@ export default function GastosPage() {
                       return (
                         <div 
                           key={index}
-                          className={`border-2 rounded-xl p-4 transition-all duration-200 ${
+                          className={`border rounded-lg p-2.5 transition-all ${
                             selectedTransactions.has(index) 
-                              ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md' 
-                              : 'border-slate-200 hover:border-indigo-300 bg-white hover:shadow-sm'
+                              ? 'border-indigo-500 bg-indigo-50' 
+                              : 'border-slate-200 hover:border-indigo-300 bg-white'
                           }`}
                         >
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-start gap-2">
                             <input
                               type="checkbox"
                               checked={selectedTransactions.has(index)}
@@ -2100,7 +2038,6 @@ export default function GastosPage() {
                                   newSelected.delete(index)
                                 } else {
                                   newSelected.add(index)
-                                  // Si se selecciona y hay fecha global activa, aplicar fecha
                                   if (useGlobalDate && globalDocumentDate) {
                                     const current = editedTransactions.get(index) || {}
                                     updateEditedTransaction(index, 'fecha', globalDocumentDate)
@@ -2108,89 +2045,58 @@ export default function GastosPage() {
                                 }
                                 setSelectedTransactions(newSelected)
                               }}
-                              className="mt-1 w-5 h-5 text-indigo-600 rounded border-slate-300 cursor-pointer focus:ring-2 focus:ring-indigo-500"
+                              className="mt-0.5 w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
                             />
-                            <div className="flex-1 space-y-3">
-                              {/* Descripción editable */}
-                              <div>
-                                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                                  Descripción
-                                </label>
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                value={descripcion || ''}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  updateEditedTransaction(index, 'descripcion', e.target.value)
+                                }}
+                                className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
+                                placeholder="Descripción"
+                              />
+                              <div className="grid grid-cols-2 gap-2">
                                 <input
-                                  type="text"
-                                  value={descripcion || ''}
+                                  type="date"
+                                  value={fecha || ''}
                                   onChange={(e) => {
                                     e.stopPropagation()
-                                    updateEditedTransaction(index, 'descripcion', e.target.value)
+                                    updateEditedTransaction(index, 'fecha', e.target.value)
                                   }}
-                                  className="input w-full text-sm border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                  placeholder="Descripción del gasto"
+                                  className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
                                 />
-                              </div>
-                              
-                              {/* Fecha y Monto en fila */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                                    Fecha {useGlobalDate && globalDocumentDate && (
-                                      <span className="text-indigo-600 text-xs font-normal">(global aplicada)</span>
-                                    )}
-                                  </label>
+                                <div className="flex gap-1">
                                   <input
-                                    type="date"
-                                    value={fecha || ''}
+                                    type="number"
+                                    step="0.01"
+                                    value={monto || ''}
                                     onChange={(e) => {
                                       e.stopPropagation()
-                                      updateEditedTransaction(index, 'fecha', e.target.value)
+                                      updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)
                                     }}
-                                    className="input w-full text-sm border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                    className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
+                                    placeholder="0.00"
                                   />
-                                </div>
-                                <div>
-                                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                                    Monto
-                                  </label>
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={monto || ''}
-                                      onChange={(e) => {
-                                        e.stopPropagation()
-                                        updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)
-                                      }}
-                                      className="input w-full text-sm border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                      placeholder="0.00"
-                                    />
-                                    <select
-                                      value={moneda}
-                                      onChange={(e) => {
-                                        e.stopPropagation()
-                                        updateEditedTransaction(index, 'moneda', e.target.value)
-                                      }}
-                                      className="input text-sm w-20 border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                    >
-                                      <option value="ARS">ARS</option>
-                                      <option value="USD">USD</option>
-                                    </select>
-                                  </div>
+                                  <select
+                                    value={moneda}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      updateEditedTransaction(index, 'moneda', e.target.value)
+                                    }}
+                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500"
+                                  >
+                                    <option value="ARS">ARS</option>
+                                    <option value="USD">USD</option>
+                                  </select>
                                 </div>
                               </div>
-                              
-                              {/* Información adicional (solo lectura) */}
                               {(trans.comercio || trans.categoria) && (
-                                <div className="flex items-center gap-3 text-xs pt-1 border-t border-slate-200">
-                                  {trans.comercio && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md">
-                                      <span>📍</span>
-                                      <span>{trans.comercio}</span>
-                                    </span>
-                                  )}
-                                  {trans.categoria && (
-                                    <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-md font-medium">
-                                      {trans.categoria}
-                                    </span>
-                                  )}
+                                <div className="flex items-center gap-2 text-xs">
+                                  {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
+                                  {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{trans.categoria}</span>}
                                 </div>
                               )}
                             </div>
@@ -2452,24 +2358,27 @@ export default function GastosPage() {
                 </div>
               )}
               
-              <div className="flex gap-2 pt-2 border-t border-slate-200">
-                <button
-                  onClick={handleConfirmExtractedData}
-                  className="btn btn-primary flex-1"
-                  disabled={(extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || savingTransactions}
-                >
-                  {savingTransactions ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Agregando...
-                    </>
-                  ) : (
-                    <>
-                      ✓ {extractedData.transacciones ? 
-                        `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}${selectedImpuestos.size > 0 ? ` + ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}` : ''}` : 
-                        'Usar estos datos'}
-                    </>
-                  )}
-                </button>
+            </div>
+            
+            {/* Footer fijo con botón de confirmación */}
+            <div className="p-3 border-t border-slate-200 bg-white sticky bottom-0 z-10 shrink-0 flex gap-2">
+              <button
+                onClick={handleConfirmExtractedData}
+                className="btn btn-primary flex-1 text-sm h-9"
+                disabled={(extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || savingTransactions}
+              >
+                {savingTransactions ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Agregando...
+                  </>
+                ) : (
+                  <>
+                    ✓ {extractedData.transacciones ? 
+                      `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}${selectedImpuestos.size > 0 ? ` + ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}` : ''}` : 
+                      'Usar estos datos'}
+                  </>
+                )}
+              </button>
               <button 
                 onClick={() => { 
                   setShowImagePreview(false); 
@@ -2485,10 +2394,10 @@ export default function GastosPage() {
                   setGlobalDocumentDate(null);
                   setUseGlobalDate(false);
                 }}
-                  className="btn btn-secondary"
-                >
-                  Cancelar
-                </button>
+                className="btn btn-secondary text-sm h-9 px-4"
+              >
+                Cancelar
+              </button>
               </div>
             </div>
           </div>
