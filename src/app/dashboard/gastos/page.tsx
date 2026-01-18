@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy y
 import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Gasto } from '@/types'
+import { ConfirmModal } from '@/components/Modal'
 
 // Función helper para calcular mes_facturacion desde una fecha en formato YYYY-MM-DD
 // Evita problemas de zona horaria al parsear directamente la cadena
@@ -58,6 +59,8 @@ export default function GastosPage() {
     banco: '',
     digitos: ''
   })
+  const [selectedGastos, setSelectedGastos] = useState<Set<string>>(new Set())
+  const [showDeleteMasivoModal, setShowDeleteMasivoModal] = useState(false)
 
   // AI Image processing states
   const [processingImage, setProcessingImage] = useState(false)
@@ -737,8 +740,19 @@ export default function GastosPage() {
         
         // Detectar si es un gasto en cuotas (la IA puede detectar esto o puede estar editado)
         const cuotasEditadas = editedTransactions.get(index)?.cuotas
-        const cuotasDetectadas = cuotasEditadas !== undefined ? cuotasEditadas : (trans.cuotas ? parseInt(String(trans.cuotas)) : null)
-        const esEnCuotas = cuotasDetectadas && cuotasDetectadas > 1
+        // La IA puede devolver cuotas como número, string, null o undefined
+        let cuotasDetectadas = cuotasEditadas !== undefined 
+          ? cuotasEditadas 
+          : (trans.cuotas !== null && trans.cuotas !== undefined 
+              ? (typeof trans.cuotas === 'number' ? trans.cuotas : parseInt(String(trans.cuotas))) 
+              : null)
+        
+        // Si las cuotas detectadas son válidas y mayores a 1, usarlas; sino usar el valor del formulario
+        const cuotasFinal = (cuotasDetectadas && cuotasDetectadas > 1) 
+          ? cuotasDetectadas 
+          : (parseInt(gastoForm.cuotas) || 1)
+        
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Transacción ${index + 1} - cuotas detectadas:`, cuotasDetectadas, 'cuotas final:', cuotasFinal)
         
         const gastoData = {
           descripcion: trans.descripcion,
@@ -748,7 +762,7 @@ export default function GastosPage() {
           fecha: fecha,
           mes_facturacion: mesFacturacion,
           tarjeta_id: tarjetaIdToUse,
-          cuotas: esEnCuotas ? cuotasDetectadas : (parseInt(gastoForm.cuotas) || 1),
+          cuotas: cuotasFinal,
           cuota_actual: 1,
           es_fijo: false, // NO marcar como fijo, las cuotas se distribuyen automáticamente
           tag_ids: gastoForm.tag_ids || [],
@@ -1032,11 +1046,40 @@ export default function GastosPage() {
           </select>
         </div>
 
+        {/* Acciones masivas */}
+        {selectedGastos.size > 0 && (
+          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+            <span className="text-sm font-semibold text-indigo-900">
+              {selectedGastos.size} gasto{selectedGastos.size !== 1 ? 's' : ''} seleccionado{selectedGastos.size !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={() => setShowDeleteMasivoModal(true)}
+              className="btn btn-danger btn-sm"
+            >
+              <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
+            </button>
+          </div>
+        )}
+
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50">
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedGastos.size === gastosMes.length && gastosMes.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedGastos(new Set(gastosMes.map(g => g.id)))
+                      } else {
+                        setSelectedGastos(new Set())
+                      }
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                  />
+                </th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Descripción</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Monto</th>
@@ -1049,7 +1092,7 @@ export default function GastosPage() {
             <tbody>
               {gastosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400">Sin gastos</td>
+                  <td colSpan={8} className="p-8 text-center text-slate-400">Sin gastos</td>
                 </tr>
               ) : gastosMes.map(g => {
                 const monto = g.cuotas > 1 ? g.monto / g.cuotas : g.monto
@@ -1066,6 +1109,23 @@ export default function GastosPage() {
 
                 return (
                   <tr key={g.id} className={`border-b border-slate-100 hover:bg-slate-50 transition ${g.pagado ? 'opacity-50' : ''}`}>
+                    <td className="p-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedGastos.has(g.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedGastos)
+                          if (e.target.checked) {
+                            newSelected.add(g.id)
+                          } else {
+                            newSelected.delete(g.id)
+                          }
+                          setSelectedGastos(newSelected)
+                        }}
+                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
@@ -2502,6 +2562,23 @@ export default function GastosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Confirmación Eliminación Masiva */}
+      <ConfirmModal
+        isOpen={showDeleteMasivoModal}
+        onClose={() => setShowDeleteMasivoModal(false)}
+        onConfirm={async () => {
+          const promises = Array.from(selectedGastos).map(id => deleteGasto(id))
+          await Promise.all(promises)
+          setSelectedGastos(new Set())
+          setShowDeleteMasivoModal(false)
+        }}
+        title="Eliminar Gastos Seleccionados"
+        message={`¿Estás seguro de que deseas eliminar ${selectedGastos.size} gasto${selectedGastos.size !== 1 ? 's' : ''}?\n\nEsta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   )
 }

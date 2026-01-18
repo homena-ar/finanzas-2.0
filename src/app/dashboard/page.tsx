@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName, fetchDolar, getTagClass, getMonthKey } from '@/lib/utils'
-import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X, ChevronRight } from 'lucide-react'
+import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X, ChevronRight, CheckCircle2 } from 'lucide-react'
+import type { Gasto } from '@/types'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
 import * as XLSX from 'xlsx'
@@ -17,10 +18,17 @@ export default function DashboardPage() {
   const { profile } = useAuth()
   const {
     tarjetas, categorias, gastos, loading, currentMonth, monthKey, changeMonth,
-    getGastosMes, getImpuestosMes
+    getGastosMes, getImpuestosMes, updateGasto, mediosPago
   } = useData()
   const [dolar, setDolar] = useState(1050)
   const [showEndingModal, setShowEndingModal] = useState(false)
+  const [showPagoMasivoModal, setShowPagoMasivoModal] = useState(false)
+  const [tarjetaParaPagoMasivo, setTarjetaParaPagoMasivo] = useState<any>(null)
+  const [gastosParaPagar, setGastosParaPagar] = useState<Gasto[]>([])
+  const [pagoMasivoForm, setPagoMasivoForm] = useState({
+    fecha_pago: new Date().toISOString().split('T')[0],
+    medio_pago: ''
+  })
 
   console.log('📄 [ResumenPage] Render - loading:', loading)
 
@@ -486,6 +494,7 @@ export default function DashboardPage() {
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">USD</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Imp</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Total</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -503,17 +512,52 @@ export default function DashboardPage() {
 
                 if (gEfectivo.length > 0 || iEfectivo.length > 0) {
                   return (
-                    <tr
-                      onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
-                      className="border-b border-slate-100 hover:bg-emerald-50 cursor-pointer transition-colors"
-                    >
-                      <td className="p-4">
+                    <tr className="border-b border-slate-100 hover:bg-emerald-50 transition-colors">
+                      <td 
+                        className="p-4 cursor-pointer"
+                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
+                      >
                         <span className="tag bg-emerald-100 text-emerald-700">💵 Efectivo</span>
                       </td>
-                      <td className="p-4 font-semibold">{formatMoney(efectivoARS)}</td>
-                      <td className="p-4 font-semibold text-emerald-600">{efectivoUSD > 0 ? formatMoney(efectivoUSD, 'USD') : '-'}</td>
-                      <td className="p-4 font-semibold">{formatMoney(efectivoImp)}</td>
+                      <td 
+                        className="p-4 font-semibold cursor-pointer"
+                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
+                      >
+                        {formatMoney(efectivoARS)}
+                      </td>
+                      <td 
+                        className="p-4 font-semibold text-emerald-600 cursor-pointer"
+                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
+                      >
+                        {efectivoUSD > 0 ? formatMoney(efectivoUSD, 'USD') : '-'}
+                      </td>
+                      <td 
+                        className="p-4 font-semibold cursor-pointer"
+                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
+                      >
+                        {formatMoney(efectivoImp)}
+                      </td>
                       <td className="p-4 font-bold">{formatMoney(efectivoARS + efectivoImp)}</td>
+                      <td className="p-4">
+                        {gEfectivo.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setTarjetaParaPagoMasivo({ id: null, nombre: 'Efectivo' })
+                              setGastosParaPagar(gEfectivo)
+                              setPagoMasivoForm({
+                                fecha_pago: new Date().toISOString().split('T')[0],
+                                medio_pago: ''
+                              })
+                              setShowPagoMasivoModal(true)
+                            }}
+                            className="btn btn-success btn-sm"
+                            title="Pagar todos los gastos en efectivo"
+                          >
+                            <CheckCircle2 className="w-4 h-4" /> Pagar Todos ({gEfectivo.length})
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   )
                 }
@@ -533,16 +577,53 @@ export default function DashboardPage() {
                 return (
                   <tr
                     key={t.id}
-                    className="border-b border-slate-100 hover:bg-indigo-50 cursor-pointer transition-colors"
-                    onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
+                    className="border-b border-slate-100 hover:bg-indigo-50 transition-colors"
                   >
-                    <td className="p-4">
+                    <td 
+                      className="p-4 cursor-pointer"
+                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
+                    >
                       <span className={`tag ${getTagClass(t.tipo)}`}>{t.nombre}</span>
                     </td>
-                    <td className="p-4 font-semibold">{formatMoney(cARS)}</td>
-                    <td className="p-4 font-semibold text-emerald-600">{cUSD > 0 ? formatMoney(cUSD, 'USD') : '-'}</td>
-                    <td className="p-4 font-semibold">{formatMoney(cImp)}</td>
+                    <td 
+                      className="p-4 font-semibold cursor-pointer"
+                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
+                    >
+                      {formatMoney(cARS)}
+                    </td>
+                    <td 
+                      className="p-4 font-semibold text-emerald-600 cursor-pointer"
+                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
+                    >
+                      {cUSD > 0 ? formatMoney(cUSD, 'USD') : '-'}
+                    </td>
+                    <td 
+                      className="p-4 font-semibold cursor-pointer"
+                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
+                    >
+                      {formatMoney(cImp)}
+                    </td>
                     <td className="p-4 font-bold">{formatMoney(cARS + cImp)}</td>
+                    <td className="p-4">
+                      {gT.length > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTarjetaParaPagoMasivo(t)
+                            setGastosParaPagar(gT)
+                            setPagoMasivoForm({
+                              fecha_pago: new Date().toISOString().split('T')[0],
+                              medio_pago: ''
+                            })
+                            setShowPagoMasivoModal(true)
+                          }}
+                          className="btn btn-success btn-sm"
+                          title="Pagar todos los gastos de esta tarjeta"
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> Pagar Todos ({gT.length})
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 )
               }) : (
@@ -609,6 +690,88 @@ export default function DashboardPage() {
                   <div className="text-xs text-emerald-600 font-semibold">Total USD</div>
                   <div className="text-lg font-bold text-emerald-700">{formatMoney(terminanUSD, 'USD')}</div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pago Masivo */}
+      {showPagoMasivoModal && tarjetaParaPagoMasivo && (
+        <div className="modal-overlay" onClick={() => setShowPagoMasivoModal(false)}>
+          <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-emerald-50">
+              <h3 className="font-bold text-lg text-emerald-800">
+                💳 Pagar Todos los Gastos - {tarjetaParaPagoMasivo.nombre || 'Efectivo'}
+              </h3>
+              <button onClick={() => setShowPagoMasivoModal(false)} className="p-1 hover:bg-emerald-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-slate-50 rounded-lg p-3">
+                <p className="text-sm text-slate-600 mb-2">
+                  Se marcarán como pagados <strong>{gastosParaPagar.length} gastos</strong> de esta tarjeta/forma de pago.
+                </p>
+                <div className="text-xs text-slate-500">
+                  Total: {formatMoney(gastosParaPagar.reduce((sum, g) => sum + (g.cuotas > 1 ? g.monto / g.cuotas : g.monto), 0))}
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Fecha de Pago</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={pagoMasivoForm.fecha_pago}
+                  onChange={e => setPagoMasivoForm(f => ({ ...f, fecha_pago: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="label">Medio de Pago (opcional)</label>
+                <select
+                  className="input text-slate-900 bg-white"
+                  value={pagoMasivoForm.medio_pago}
+                  onChange={e => setPagoMasivoForm(f => ({ ...f, medio_pago: e.target.value }))}
+                >
+                  <option value="" className="text-slate-900">Sin especificar</option>
+                  {mediosPago.map(mp => (
+                    <option key={mp.id} value={mp.nombre} className="text-slate-900">{mp.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={async () => {
+                    // Marcar todos los gastos como pagados
+                    const promises = gastosParaPagar.map(g => 
+                      updateGasto(g.id, {
+                        pagado: true,
+                        fecha_pago: pagoMasivoForm.fecha_pago,
+                        medio_pago: pagoMasivoForm.medio_pago || null
+                      })
+                    )
+                    await Promise.all(promises)
+                    setShowPagoMasivoModal(false)
+                    setTarjetaParaPagoMasivo(null)
+                    setGastosParaPagar([])
+                  }}
+                  className="btn btn-success flex-1"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Confirmar Pago de Todos
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPagoMasivoModal(false)
+                    setTarjetaParaPagoMasivo(null)
+                    setGastosParaPagar([])
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           </div>

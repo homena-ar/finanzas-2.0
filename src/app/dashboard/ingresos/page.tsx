@@ -36,6 +36,8 @@ export default function IngresosPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [showAlert, setShowAlert] = useState(false)
   const [alertData, setAlertData] = useState({ title: '', message: '', variant: 'info' as 'success' | 'error' | 'warning' | 'info' })
+  const [selectedIngresos, setSelectedIngresos] = useState<Set<string>>(new Set())
+  const [showDeleteMasivoModal, setShowDeleteMasivoModal] = useState(false)
 
   // New tag/categoria creation states
   const [showNewTagInput, setShowNewTagInput] = useState(false)
@@ -506,10 +508,39 @@ export default function IngresosPage() {
 
       {/* Ingresos List */}
       <div className="card">
+        {/* Acciones masivas */}
+        {selectedIngresos.size > 0 && (
+          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+            <span className="text-sm font-semibold text-indigo-900">
+              {selectedIngresos.size} ingreso{selectedIngresos.size !== 1 ? 's' : ''} seleccionado{selectedIngresos.size !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={() => setShowDeleteMasivoModal(true)}
+              className="btn btn-danger btn-sm"
+            >
+              <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
+            </button>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                <th className="text-left p-4 font-semibold text-slate-700 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedIngresos.size === ingresosMes.length && ingresosMes.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIngresos(new Set(ingresosMes.map(i => i.id)))
+                      } else {
+                        setSelectedIngresos(new Set())
+                      }
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                  />
+                </th>
                 <th className="text-left p-4 font-semibold text-slate-700">Descripción</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Categoría</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Fecha</th>
@@ -520,7 +551,7 @@ export default function IngresosPage() {
             <tbody>
               {ingresosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center p-12">
+                  <td colSpan={6} className="text-center p-12">
                     <Wallet className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                     <p className="text-slate-500 mb-4">No hay ingresos registrados para este mes</p>
                     <button
@@ -535,6 +566,23 @@ export default function IngresosPage() {
                 const categoria = categoriasIngresos.find(c => c.id === ingreso.categoria_id)
                 return (
                   <tr key={ingreso.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td className="p-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIngresos.has(ingreso.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedIngresos)
+                          if (e.target.checked) {
+                            newSelected.add(ingreso.id)
+                          } else {
+                            newSelected.delete(ingreso.id)
+                          }
+                          setSelectedIngresos(newSelected)
+                        }}
+                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
                     <td className="p-4">
                       <div className="font-medium">{ingreso.descripcion}</div>
                       {ingreso.tag_ids && ingreso.tag_ids.length > 0 && (
@@ -1065,6 +1113,23 @@ export default function IngresosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Confirmación Eliminación Masiva */}
+      <ConfirmModal
+        isOpen={showDeleteMasivoModal}
+        onClose={() => setShowDeleteMasivoModal(false)}
+        onConfirm={async () => {
+          const promises = Array.from(selectedIngresos).map(id => deleteIngreso(id))
+          await Promise.all(promises)
+          setSelectedIngresos(new Set())
+          setShowDeleteMasivoModal(false)
+        }}
+        title="Eliminar Ingresos Seleccionados"
+        message={`¿Estás seguro de que deseas eliminar ${selectedIngresos.size} ingreso${selectedIngresos.size !== 1 ? 's' : ''}?\n\nEsta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   )
 }
