@@ -94,29 +94,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [categoriasIngresos, setCategoriasIngresos] = useState<CategoriaIngreso[]>([])
   const [tagsIngresos, setTagsIngresos] = useState<TagIngreso[]>([])
   const [loading, setLoading] = useState(true)
+  // Siempre inicializar al mes actual, no usar el mes guardado
   const [currentMonth, setCurrentMonth] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lastViewedMonth')
-      if (saved) {
-        try {
-          // Validar que el formato sea correcto (YYYY-MM)
-          const dateMatch = saved.match(/^\d{4}-\d{2}$/)
-          if (dateMatch) {
-            const parsedDate = new Date(saved + '-01')
-            // Validar que la fecha sea válida
-            if (!isNaN(parsedDate.getTime())) {
-              return parsedDate
-            }
-          }
-        } catch (e) {
-          console.error('Error parsing saved month:', e)
-        }
-      }
-    }
-    return new Date()
+    const today = new Date()
+    // Establecer al primer día del mes actual para consistencia
+    return new Date(today.getFullYear(), today.getMonth(), 1)
   })
 
   const monthKey = currentMonth.toISOString().slice(0, 7)
+
+  // Actualizar al mes actual cuando se carga la página (solo una vez al inicio)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !authLoading && user) {
+      const today = new Date()
+      const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+      const currentMonthDate = new Date(today.getFullYear(), today.getMonth(), 1)
+      
+      // Comparar el mes actual con el que estamos viendo
+      const viewingMonthKey = currentMonth.toISOString().slice(0, 7)
+      
+      // Si el mes actual es diferente al que estamos viendo, actualizar al mes actual
+      if (viewingMonthKey !== currentMonthKey) {
+        setCurrentMonth(currentMonthDate)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]) // Solo ejecutar cuando termine de cargar la autenticación y haya usuario
 
   useEffect(() => {
     if (typeof window !== 'undefined' && monthKey) {

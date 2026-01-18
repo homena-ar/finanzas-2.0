@@ -8,7 +8,6 @@ import { formatMoney, getMonthName, fetchDolar, getTagClass, getMonthKey } from 
 import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X, ChevronRight } from 'lucide-react'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
-import { AlertModal } from '@/components/Modal'
 import * as XLSX from 'xlsx'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
@@ -22,8 +21,6 @@ export default function DashboardPage() {
   } = useData()
   const [dolar, setDolar] = useState(1050)
   const [showEndingModal, setShowEndingModal] = useState(false)
-  const [showMonthAlert, setShowMonthAlert] = useState(false)
-  const [hasShownInitialAlert, setHasShownInitialAlert] = useState(false)
 
   console.log('📄 [ResumenPage] Render - loading:', loading)
 
@@ -36,34 +33,6 @@ export default function DashboardPage() {
       .then(setDolar)
       .catch(err => console.error('Error al obtener cotización del dólar:', err))
   }, [])
-
-  // Check if viewing a different month than current (SOLO 1 VEZ POR SESIÓN)
-  useEffect(() => {
-    if (!loading && !hasShownInitialAlert) {
-      const today = new Date()
-      const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-
-      // Solo mostrar si:
-      // 1. El mes guardado es diferente al actual
-      // 2. No se ha mostrado ya en esta sesión
-      const alreadyShown = sessionStorage.getItem('monthAlertShown') === 'true'
-
-      if (monthKey !== currentMonthKey && !alreadyShown) {
-        // Determinar si es anterior o futuro
-        const viewingDate = new Date(monthKey + '-01')
-        const todayDate = new Date(currentMonthKey + '-01')
-        const isPast = viewingDate < todayDate
-        const isFuture = viewingDate > todayDate
-        
-        // Guardar información para el modal
-        sessionStorage.setItem('monthAlertType', isPast ? 'past' : (isFuture ? 'future' : 'current'))
-        setShowMonthAlert(true)
-        sessionStorage.setItem('monthAlertShown', 'true')
-      }
-
-      setHasShownInitialAlert(true)
-    }
-  }, [loading, hasShownInitialAlert, monthKey])
 
   // Export to Excel function
   const exportToExcel = () => {
@@ -646,33 +615,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Month Alert Modal */}
-      <AlertModal
-        isOpen={showMonthAlert}
-        onClose={() => {
-          setShowMonthAlert(false)
-        }}
-        title={(() => {
-          const alertType = typeof window !== 'undefined' ? sessionStorage.getItem('monthAlertType') : 'past'
-          if (alertType === 'future') {
-            return `📅 Estás viendo un mes futuro`
-          } else if (alertType === 'past') {
-            return `📅 Estás viendo un mes anterior`
-          }
-          return `📅 Estás viendo otro mes`
-        })()}
-        message={(() => {
-          const alertType = typeof window !== 'undefined' ? sessionStorage.getItem('monthAlertType') : 'past'
-          const monthName = getMonthName(currentMonth)
-          if (alertType === 'future') {
-            return `Estás viendo: ${monthName}.\n\nEste es un mes futuro. Podés cambiarlo con las flechas si querés ver otro mes.`
-          } else if (alertType === 'past') {
-            return `Estás viendo: ${monthName}.\n\nEste es un mes anterior. Podés cambiarlo con las flechas si querés ver otro mes.`
-          }
-          return `Estás viendo: ${monthName}.\n\nPodés cambiarlo con las flechas si querés ver otro mes.`
-        })()}
-        variant="info"
-      />
     </div>
   )
 }

@@ -97,21 +97,59 @@ REGLAS PARA DETECTAR DECIMALES:
      * Y así sucesivamente...
    - TODOS los consumos deben tener la MISMA FECHA: el primer día del mes del resumen (ej: si es diciembre 2025, usar "2025-12-01")
    - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
-   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EN TODA LA DESCRIPCIÓN Y CONTEXTO):
-     * Busca palabras clave como "CUOTAS", "X CUOTAS", "SIN INTERÉS", "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", "CUOTA 1/3", "CUOTA 1/6", "CUOTA 1/12", etc.
-     * Busca patrones como "CUOTA X/Y" donde Y es el total de cuotas (ej: "CUOTA 1/6" → 6 cuotas, "CUOTA 2/12" → 12 cuotas)
-     * Busca números seguidos de "CUOTAS" (ej: "3 CUOTAS", "6 CUOTAS SIN INTERÉS", "12 CUOTAS")
-     * Busca en la descripción del comercio, en el nombre del establecimiento, o en cualquier parte del consumo
-     * Si encuentras "CUOTA" seguido de números, o números seguidos de "CUOTAS", SIEMPRE extrae el número total de cuotas
-     * IMPORTANTE: Si detectas cuotas, el monto del consumo es el MONTO TOTAL, no el monto de una cuota individual
-     * Si no hay indicación de cuotas en ninguna parte, el campo "cuotas" debe ser null o 1
-     * Ejemplos: 
+   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EXHAUSTIVAMENTE EN TODO EL DOCUMENTO):
+     * ⚠️ REGLA CRÍTICA: SIEMPRE busca indicadores de cuotas en CADA consumo individual. Es FUNDAMENTAL detectar esto correctamente.
+     * Busca en TODAS estas ubicaciones para cada consumo:
+       - Descripción del comercio/establecimiento
+       - Nombre del comercio
+       - Detalles adicionales del consumo
+       - Notas o comentarios asociados
+       - Cualquier texto relacionado con el consumo
+     
+     * PATRONES A BUSCAR (busca TODOS estos patrones):
+       - "X CUOTAS" donde X es un número (ej: "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", "18 CUOTAS", "24 CUOTAS")
+       - "CUOTA X/Y" donde Y es el total de cuotas (ej: "CUOTA 1/6" → 6 cuotas, "CUOTA 2/12" → 12 cuotas, "CUOTA 3/18" → 18 cuotas)
+       - "CUOTA X DE Y" (ej: "CUOTA 1 DE 6" → 6 cuotas, "CUOTA 2 DE 12" → 12 cuotas)
+       - "X CUOTAS SIN INTERÉS" o "X CUOTAS S/I" (ej: "3 CUOTAS SIN INTERÉS" → 3 cuotas)
+       - "EN X CUOTAS" (ej: "EN 6 CUOTAS" → 6 cuotas)
+       - "X VECES" seguido de contexto de pago (ej: "6 VECES" en contexto de tarjeta → 6 cuotas)
+       - Números seguidos de "CUOTAS" en cualquier formato (ej: "6CUOTAS", "6-CUOTAS", "6_CUOTAS")
+       - Variaciones con espacios: "6 CUOTAS", "6  CUOTAS", "6   CUOTAS"
+     
+     * NÚMEROS COMUNES DE CUOTAS EN ARGENTINA:
+       - 3, 6, 12, 18, 24 cuotas son los más comunes
+       - También pueden ser: 2, 4, 9, 10, 15, 20, 30, 36, 48 cuotas
+       - Cualquier número entero positivo es válido
+     
+     * CÓMO EXTRAER EL NÚMERO DE CUOTAS:
+       - Si encuentras "CUOTA X/Y": usa Y (el número después de la barra)
+       - Si encuentras "X CUOTAS": usa X (el número antes de "CUOTAS")
+       - Si encuentras "CUOTA X DE Y": usa Y (el número después de "DE")
+       - Si encuentras múltiples indicadores, usa el número MÁS ALTO encontrado (ej: si dice "3 CUOTAS" y "CUOTA 1/6", usa 6)
+       - Si solo encuentras "CUOTA X" sin el total, busca en el contexto si hay un número total mencionado
+     
+     * IMPORTANTE SOBRE EL MONTO:
+       - Si detectas cuotas, el monto del consumo es el MONTO TOTAL de todas las cuotas
+       - NO es el monto de una cuota individual
+       - El sistema dividirá automáticamente el monto total entre las cuotas
+     
+     * VALORES POR DEFECTO:
+       - Si NO encuentras NINGÚN indicador de cuotas en ninguna parte del consumo → cuotas: null o 1
+       - Si el consumo es un pago único, factura única, o transferencia → cuotas: null o 1
+       - Si hay dudas, es mejor poner null o 1 que un número incorrecto
+     
+     * EJEMPLOS PRÁCTICOS (usa estos como referencia):
        - "MERCADOLIBRE 3 CUOTAS SIN INTERÉS" → cuotas: 3
        - "FALABELLA CUOTA 1/6" → cuotas: 6
        - "COTO CUOTA 2/12" → cuotas: 12
-       - "6 CUOTAS" → cuotas: 6
-       - "12 CUOTAS" → cuotas: 12
-       - "PAGO AFIP" o "Pago único" → cuotas: null o 1
+       - "DISCO CUOTA 1 DE 18" → cuotas: 18
+       - "JUMBO EN 6 CUOTAS" → cuotas: 6
+       - "GARBARINO 12 CUOTAS S/I" → cuotas: 12
+       - "PAGO AFIP" → cuotas: null o 1 (no hay indicador de cuotas)
+       - "TRANSFERENCIA BANCARIA" → cuotas: null o 1 (pago único)
+       - "FACTURA SERVICIOS" → cuotas: null o 1 (pago único)
+     
+     * ⚠️ RECUERDA: La detección de cuotas es CRÍTICA. Si un consumo está en cuotas y no lo detectas, el usuario tendrá que agregarlo manualmente. Busca EXHAUSTIVAMENTE en todo el texto relacionado con cada consumo.
 
 3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
    - Extrae impuestos, comisiones y cargos del período actual
@@ -157,7 +195,7 @@ REGLAS PARA DETECTAR DECIMALES:
       "fecha": "YYYY-MM-01" (SIEMPRE el primer día del mes del resumen detectado. Si el vencimiento es en enero, el resumen es de diciembre, entonces usar "YYYY-12-01". Si el vencimiento es en febrero, usar "YYYY-01-01", etc. Formato ISO),
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
       "comercio": "nombre del comercio o establecimiento si está disponible o null",
-      "cuotas": número entero o null (si el consumo es en cuotas, indica el número total de cuotas, ej: 3, 6, 12. Si no es en cuotas, null)
+      "cuotas": número entero o null (CRÍTICO: Si el consumo está en cuotas, DEBES indicar el número TOTAL de cuotas detectado, ej: 3, 6, 12, 18, 24. Busca exhaustivamente en la descripción, comercio y contexto. Si NO encuentras ningún indicador de cuotas, usa null o 1. El monto es el TOTAL, no el de una cuota)
     }
   ],
   "impuestos": [

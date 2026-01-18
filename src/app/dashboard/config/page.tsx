@@ -1430,19 +1430,19 @@ export default function ConfigPage() {
       {/* Modal Invitar Usuario */}
       {showInviteModal && (
         <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="modal max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-lg">Invitar Usuario</h3>
+          <div className="modal max-w-md w-full mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
+            <div className="p-3 sm:p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-base sm:text-lg">Invitar Usuario</h3>
               <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 sm:p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+            <div className="p-3 sm:p-4 sm:p-6 space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto">
               <div>
-                <label className="label">Email del usuario</label>
+                <label className="label text-sm">Email del usuario</label>
                 <input
                   type="email"
-                  className="input"
+                  className="input w-full text-sm"
                   placeholder="usuario@ejemplo.com"
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
@@ -1453,11 +1453,11 @@ export default function ConfigPage() {
 
               {/* SELECTORES DE PERMISOS */}
               <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-sm text-slate-700">Configurar Permisos</h4>
+                <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                  <h4 className="font-semibold text-xs sm:text-sm text-slate-700">Configurar Permisos</h4>
                   <div className="group relative">
-                    <Info className="w-4 h-4 text-slate-400 cursor-help" />
-                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <Info className="w-4 h-4 text-slate-400 cursor-help flex-shrink-0" />
+                    <div className="hidden sm:block absolute left-0 bottom-full mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                       <p className="font-semibold mb-2">Niveles de Permisos:</p>
                       <ul className="space-y-1.5 text-slate-200">
                         {permissionOptions.map(opt => (
@@ -1475,13 +1475,13 @@ export default function ConfigPage() {
                     const currentPermission = invitePermissions[section as keyof WorkspacePermissions]
                     const currentDescription = getPermissionDescription(currentPermission)
                     return (
-                      <div key={section} className="relative">
-                        <div className="flex items-center gap-1 mb-1">
-                          <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
+                      <div key={section} className="relative w-full">
+                        <div className="flex items-center gap-1 mb-1 flex-wrap">
+                          <label className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap">{section}</label>
                           {currentDescription && (
                             <div className="group relative">
-                              <HelpCircle className="w-3 h-3 text-slate-400 cursor-help" />
-                              <div className="absolute left-0 top-full mt-1 w-56 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                              <HelpCircle className="w-3 h-3 text-slate-400 cursor-help flex-shrink-0" />
+                              <div className="hidden sm:block absolute left-0 top-full mt-1 w-56 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                                 {currentDescription}
                               </div>
                             </div>
@@ -1493,14 +1493,14 @@ export default function ConfigPage() {
                             ...p,
                             [section]: e.target.value
                           }))}
-                          className="input input-sm text-xs w-full"
+                          className="input input-sm text-xs w-full min-w-0"
                         >
                           {permissionOptions.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                           ))}
                         </select>
                         {currentDescription && (
-                          <p className="text-[10px] text-slate-500 mt-1 italic">{currentDescription}</p>
+                          <p className="text-[10px] text-slate-500 mt-1 italic break-words">{currentDescription}</p>
                         )}
                       </div>
                     )
@@ -1509,11 +1509,11 @@ export default function ConfigPage() {
               </div>
 
             </div>
-            <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row gap-3 sm:justify-end">
-              <button onClick={() => setShowInviteModal(false)} className="btn btn-secondary order-2 sm:order-1">
+            <div className="p-3 sm:p-4 border-t border-slate-200 flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+              <button onClick={() => setShowInviteModal(false)} className="btn btn-secondary w-full sm:w-auto order-2 sm:order-1 text-sm">
                 Cancelar
               </button>
-              <button onClick={handleInviteUser} className="btn btn-primary order-1 sm:order-2">
+              <button onClick={handleInviteUser} className="btn btn-primary w-full sm:w-auto order-1 sm:order-2 text-sm">
                 Enviar Invitación
               </button>
             </div>
