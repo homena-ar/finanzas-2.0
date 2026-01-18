@@ -113,7 +113,7 @@ export default function GastosPage() {
   // Form states
   const [gastoForm, setGastoForm] = useState({
     descripcion: '', tarjeta_id: '', categoria_id: '', monto: '',
-    moneda: 'ARS', cuotas: '1', fecha: new Date().toISOString().split('T')[0],
+    moneda: 'ARS', cuotas: '1', cuotas_custom: '', fecha: new Date().toISOString().split('T')[0],
     es_fijo: false, tag_ids: [] as string[], pagado: false
   })
   const [impForm, setImpForm] = useState({
@@ -196,7 +196,7 @@ export default function GastosPage() {
       categoria_id: gastoForm.categoria_id || null,
       monto: parseFloat(gastoForm.monto),
       moneda: gastoForm.moneda as 'ARS' | 'USD',
-      cuotas: parseInt(gastoForm.cuotas),
+      cuotas: parseInt(gastoForm.cuotas === 'custom' ? (gastoForm.cuotas_custom || '1') : gastoForm.cuotas),
       cuota_actual: 1,
       fecha: gastoForm.fecha,
       mes_facturacion: mesFacturacion,
@@ -246,7 +246,7 @@ export default function GastosPage() {
   const resetGastoForm = () => {
     setGastoForm({
       descripcion: '', tarjeta_id: tarjetas[0]?.id || '', categoria_id: '', monto: '',
-      moneda: 'ARS', cuotas: '1', fecha: new Date().toISOString().split('T')[0],
+      moneda: 'ARS', cuotas: '1', cuotas_custom: '', fecha: new Date().toISOString().split('T')[0],
       es_fijo: false, tag_ids: [], pagado: false
     })
     setGastoError('')
@@ -258,13 +258,19 @@ export default function GastosPage() {
 
   const openEditGasto = (g: Gasto) => {
     setEditingGasto(g)
+    const cuotasVal = String(g.cuotas || 1)
+    // Si el número de cuotas no está en la lista predefinida, usar "custom"
+    const cuotasPredefinidas = ['1', '2', '3', '4', '6', '9', '12', '18', '24', '36', '48']
+    const isCustom = !cuotasPredefinidas.includes(cuotasVal)
+    
     setGastoForm({
       descripcion: g.descripcion,
       tarjeta_id: g.tarjeta_id || '',
       categoria_id: g.categoria_id || '',
       monto: String(g.monto),
       moneda: g.moneda,
-      cuotas: String(g.cuotas),
+      cuotas: isCustom ? 'custom' : cuotasVal,
+      cuotas_custom: isCustom ? cuotasVal : '',
       fecha: g.fecha,
       es_fijo: g.es_fijo,
       tag_ids: g.tag_ids || [],
@@ -822,7 +828,7 @@ export default function GastosPage() {
         // Si hay cuota actual detectada y total de cuotas, calcular cuotas restantes
         let cuotasFinal = totalCuotasDetectadas && totalCuotasDetectadas > 1 
           ? totalCuotasDetectadas 
-          : (parseInt(gastoForm.cuotas) || 1)
+          : (parseInt(gastoForm.cuotas === 'custom' ? (gastoForm.cuotas_custom || '1') : gastoForm.cuotas) || 1)
         
         let cuotaActualFinal = 1
         
@@ -895,7 +901,7 @@ export default function GastosPage() {
             fecha: fechaToUse,
             mes_facturacion: mesFacturacion,
             tarjeta_id: tarjetaIdToUse,
-            cuotas: parseInt(gastoForm.cuotas) || 1,
+            cuotas: parseInt(gastoForm.cuotas === 'custom' ? (gastoForm.cuotas_custom || '1') : gastoForm.cuotas) || 1,
             cuota_actual: 1,
             es_fijo: false,
             tag_ids: gastoForm.tag_ids || [],
@@ -1574,13 +1580,48 @@ export default function GastosPage() {
                 </div>
                 <div>
                   <label className="label">Cuotas</label>
-                  <select
-                    className="input"
-                    value={gastoForm.cuotas}
-                    onChange={e => setGastoForm(f => ({ ...f, cuotas: e.target.value }))}
-                  >
-                    {[1,3,6,12,18,24].map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="input flex-1"
+                      value={gastoForm.cuotas}
+                      onChange={e => setGastoForm(f => ({ ...f, cuotas: e.target.value }))}
+                    >
+                      <option value="1">1 (Sin cuotas)</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="6">6</option>
+                      <option value="9">9</option>
+                      <option value="12">12</option>
+                      <option value="18">18</option>
+                      <option value="24">24</option>
+                      <option value="36">36</option>
+                      <option value="48">48</option>
+                      <option value="custom">Otra cantidad...</option>
+                    </select>
+                    {gastoForm.cuotas === 'custom' && (
+                      <input
+                        type="number"
+                        min="1"
+                        max="999"
+                        className="input w-24"
+                        placeholder="Cantidad"
+                        value={gastoForm.cuotas_custom || ''}
+                        onChange={e => {
+                          const val = e.target.value
+                          if (val === '' || (parseInt(val) > 0 && parseInt(val) <= 999)) {
+                            setGastoForm(f => ({ ...f, cuotas_custom: val }))
+                          }
+                        }}
+                        onBlur={() => {
+                          if (gastoForm.cuotas_custom && parseInt(gastoForm.cuotas_custom) > 0) {
+                            setGastoForm(f => ({ ...f, cuotas: gastoForm.cuotas_custom }))
+                          }
+                        }}
+                        autoFocus
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 

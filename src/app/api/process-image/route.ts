@@ -170,10 +170,18 @@ REGLAS PARA DETECTAR DECIMALES:
        - PASO 3: Si encuentras múltiples indicadores, usa el número MÁS ALTO encontrado
        - ⚠️ REGLA DE ORO: Si ves "X/Y" en cualquier parte (columna CUOTA o descripción), SIEMPRE usa Y como total de cuotas
      
-     * IMPORTANTE SOBRE EL MONTO:
-       - Si detectas cuotas, el monto del consumo es el MONTO TOTAL de todas las cuotas
-       - NO es el monto de una cuota individual
-       - El sistema dividirá automáticamente el monto total entre las cuotas
+     * ⚠️⚠️⚠️ CRÍTICO SOBRE EL MONTO EN RESÚMENES BANCARIOS ARGENTINOS:
+       - En los resúmenes bancarios argentinos, cuando un consumo está en cuotas, el monto mostrado en la tabla de consumos es generalmente el MONTO DE UNA CUOTA INDIVIDUAL, NO el total
+       - REGLA DE ORO: Si detectas que un consumo tiene cuotas (ej: "01/03" o "3 CUOTAS") y el monto mostrado es, por ejemplo, 30.000:
+         * El monto mostrado (30.000) = valor de UNA cuota
+         * El monto total del consumo = 30.000 × 3 = 90.000
+         * DEBES multiplicar el monto mostrado por el número de cuotas para obtener el total
+       - Ejemplos:
+         * Consumo: "FARMACITY", Monto mostrado: 30.000, Cuotas: 3 → monto total: 30.000 × 3 = 90.000
+         * Consumo: "MERCADOLIBRE", Monto mostrado: 15.000, Cuotas: 6 → monto total: 15.000 × 6 = 90.000
+         * Consumo: "COTO", Monto mostrado: 50.000, Cuotas: 12 → monto total: 50.000 × 12 = 600.000
+       - EXCEPCIÓN: Si el resumen explícitamente dice "TOTAL" o "MONTO TOTAL" junto al monto, entonces ese monto ya es el total y NO debes multiplicarlo
+       - Si NO hay indicación de cuotas, el monto mostrado es el monto total del consumo (no hay que multiplicar)
      
      * VALORES POR DEFECTO:
        - Si NO encuentras NINGÚN indicador de cuotas en ninguna parte del consumo → cuotas: null o 1
@@ -234,7 +242,15 @@ REGLAS PARA DETECTAR DECIMALES:
   "transacciones": [
     {
       "descripcion": "descripción exacta del consumo (ej: nombre del comercio, descripción del consumo)",
-      "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (ej: 15179.99, 6647.26, 3600.00),
+      "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (⚠️⚠️⚠️ CRÍTICO: 
+        - Si el consumo tiene cuotas (ej: "01/03" o "3 CUOTAS"):
+          * El monto mostrado en el resumen es generalmente el valor de UNA CUOTA INDIVIDUAL
+          * DEBES multiplicar ese monto por el número de cuotas para obtener el total
+          * Ejemplo: Si ves monto 30.000 y cuotas 3 → monto total: 30.000 × 3 = 90.000
+          * Ejemplo: Si ves monto 15.000 y cuotas 6 → monto total: 15.000 × 6 = 90.000
+        - Si NO hay cuotas (cuotas: null o 1), el monto mostrado es el monto total del consumo
+        - EXCEPCIÓN: Si el resumen explícitamente dice "TOTAL" junto al monto, entonces ese monto ya es el total y NO multipliques
+        - Ejemplos: 15179.99, 6647.26, 3600.00, 90000.00),
       "moneda": "ARS" o "USD" según corresponda,
       "fecha": "YYYY-MM-01" (SIEMPRE el primer día del mes del resumen detectado. Si el vencimiento es en enero, el resumen es de diciembre, entonces usar "YYYY-12-01". Si el vencimiento es en febrero, usar "YYYY-01-01", etc. Formato ISO),
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
@@ -248,7 +264,6 @@ REGLAS PARA DETECTAR DECIMALES:
         - Si la columna CUOTA no existe o está vacía, busca en la descripción del consumo.
         - Si detectas cuotas, SIEMPRE devuelve el número TOTAL de cuotas (Y), no la cuota actual (X).
         - Si NO encuentras ningún indicador de cuotas en ninguna parte, usa null o 1.
-        - El monto es el MONTO TOTAL de todas las cuotas, no el de una cuota individual.
         - ⚠️ NO PUEDES OMITIR ESTE CAMPO - es fundamental para el funcionamiento del sistema),
       "cuota_actual": número entero o null (OPCIONAL: Si encuentras formato "X/Y" en la columna CUOTA, devuelve X (la cuota actual). Si no hay información, usa null. Ejemplos: "01/03" → cuota_actual: 1, "04/06" → cuota_actual: 4)
     }
@@ -529,6 +544,9 @@ Responde solo con el JSON, sin texto adicional.`
         } else {
           cleaned.moneda = 'ARS'
         }
+        
+        // NOTA: El monto ya debería venir multiplicado por las cuotas desde la IA según el prompt actualizado
+        // Si la IA no lo multiplicó correctamente, se ajustará más adelante cuando se procesen las cuotas
         
         if (trans.fecha) {
           const fechaStr = String(trans.fecha)
