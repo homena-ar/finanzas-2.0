@@ -857,7 +857,7 @@ export default function GastosPage() {
         let montoFinal = trans.monto
         
         // CASO 1: Cuota intermedia (ej: cuota 4 de 6)
-        if (cuotaActualDetectada && totalCuotasDetectadas && cuotaActualDetectada > 0 && totalCuotasDetectadas > cuotaActualDetectada) {
+        if (cuotaActualDetectada && totalCuotasDetectadas && cuotaActualDetectada > 0 && totalCuotasDetectadas >= cuotaActualDetectada) {
           // Calcular cuántas cuotas faltan (si es cuota 4 de 6, faltan 3: 4, 5, 6)
           const cuotasRestantes = totalCuotasDetectadas - cuotaActualDetectada + 1
           cuotasFinal = cuotasRestantes
@@ -865,14 +865,15 @@ export default function GastosPage() {
           
           // IMPORTANTE: Si es una cuota intermedia (ej: cuota 4 de 6), el monto mostrado en el resumen
           // es el monto de UNA cuota. Necesitamos multiplicar por las cuotas restantes para obtener el total.
-          // Ejemplo: Si el monto es 89.998,98 y es cuota 4 de 6, el total restante es: 89.998,98 × 3 = 269.996,94
+          // Ejemplo: Si el monto es 14.999,83 y es cuota 4 de 6, el total restante es: 14.999,83 × 3 = 44.999,49
           montoFinal = trans.monto * cuotasRestantes
           
           console.log(`✅ [GastosPage] CASO 1 - Cuota intermedia detectada:`)
+          console.log(`   - Descripción: ${trans.descripcion}`)
           console.log(`   - Cuota actual: ${cuotaActualDetectada} de ${totalCuotasDetectadas}`)
-          console.log(`   - Cuotas restantes: ${cuotasRestantes} (${cuotaActualDetectada}, ${cuotaActualDetectada + 1}, ..., ${totalCuotasDetectadas})`)
-          console.log(`   - Monto por cuota: ${trans.monto}`)
-          console.log(`   - Monto total restante: ${montoFinal} (${trans.monto} × ${cuotasRestantes})`)
+          console.log(`   - Cuotas restantes: ${cuotasRestantes} (cuotas ${cuotaActualDetectada}, ${cuotaActualDetectada + 1}, ..., ${totalCuotasDetectadas})`)
+          console.log(`   - Monto por cuota (del resumen): ${trans.monto}`)
+          console.log(`   - Monto total restante calculado: ${montoFinal} (${trans.monto} × ${cuotasRestantes})`)
           console.log(`   - Se agregarán ${cuotasRestantes} cuotas con monto total de ${montoFinal}`)
         } 
         // CASO 2: Primera cuota o solo total de cuotas sin cuota actual
@@ -884,14 +885,16 @@ export default function GastosPage() {
           cuotaActualFinal = 1
           
           console.log(`✅ [GastosPage] CASO 2 - Primera cuota detectada:`)
+          console.log(`   - Descripción: ${trans.descripcion}`)
           console.log(`   - Total de cuotas: ${totalCuotasDetectadas}`)
-          console.log(`   - Monto por cuota: ${trans.monto}`)
-          console.log(`   - Monto total: ${montoFinal} (${trans.monto} × ${totalCuotasDetectadas})`)
+          console.log(`   - Monto por cuota (del resumen): ${trans.monto}`)
+          console.log(`   - Monto total calculado: ${montoFinal} (${trans.monto} × ${totalCuotasDetectadas})`)
           console.log(`   - Se agregarán ${totalCuotasDetectadas} cuotas con monto total de ${montoFinal}`)
         }
         // CASO 3: Sin cuotas o cuota única
         else {
           console.log(`✅ [GastosPage] CASO 3 - Sin cuotas o cuota única:`)
+          console.log(`   - Descripción: ${trans.descripcion}`)
           console.log(`   - Monto: ${montoFinal}`)
           console.log(`   - Cuotas: ${cuotasFinal}`)
         }
@@ -2225,25 +2228,28 @@ export default function GastosPage() {
                       value={selectedTarjetaId || ''}
                       onChange={(e) => {
                         console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
+                        const tarjeta = tarjetas.find(t => t.id === e.target.value)
+                        console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
                         setSelectedTarjetaId(e.target.value)
                       }}
-                      className="input w-full text-xs h-8"
+                      className="input w-full text-xs h-8 font-semibold"
                       style={{ 
-                        color: selectedTarjetaId ? 'rgb(15, 23, 42)' : 'rgb(100, 116, 139)',
-                        backgroundColor: selectedTarjetaId ? 'rgb(241, 245, 249)' : 'rgb(248, 250, 252)',
+                        color: 'rgb(15, 23, 42)',
+                        backgroundColor: 'rgb(226, 232, 240)',
                         WebkitAppearance: 'none',
                         MozAppearance: 'none',
-                        appearance: 'none'
+                        appearance: 'none',
+                        fontWeight: '600'
                       }}
                     >
-                      <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white' }}>
+                      <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white', fontWeight: '400' }}>
                         {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
                       </option>
                       {tarjetas.map(t => (
                         <option 
                           key={t.id} 
                           value={t.id}
-                          style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
+                          style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '600' }}
                         >
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
@@ -2408,17 +2414,19 @@ export default function GastosPage() {
                                       console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
                                       updateEditedTransaction(index, 'moneda', e.target.value)
                                     }}
-                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500"
+                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500 font-bold"
                                     style={{ 
-                                      color: (moneda || 'ARS') ? 'rgb(15, 23, 42)' : 'rgb(100, 116, 139)',
-                                      backgroundColor: (moneda || 'ARS') ? 'rgb(241, 245, 249)' : 'rgb(248, 250, 252)',
+                                      color: 'rgb(15, 23, 42)',
+                                      backgroundColor: 'rgb(226, 232, 240)',
                                       WebkitAppearance: 'none',
                                       MozAppearance: 'none',
-                                      appearance: 'none'
+                                      appearance: 'none',
+                                      fontWeight: '700',
+                                      textAlign: 'center'
                                     }}
                                   >
-                                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>ARS</option>
-                                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>USD</option>
+                                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
+                                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
                                   </select>
                                 </div>
                               </div>

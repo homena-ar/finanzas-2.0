@@ -243,18 +243,18 @@ REGLAS PARA DETECTAR DECIMALES:
   "transacciones": [
     {
       "descripcion": "descripción exacta del consumo (ej: nombre del comercio, descripción del consumo)",
-      "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (⚠️⚠️⚠️ CRÍTICO: 
-        - REGLA GENERAL: El monto mostrado en el resumen es el valor de UNA CUOTA INDIVIDUAL cuando hay cuotas
-        - Si el consumo tiene cuotas y NO hay cuota_actual (es la primera cuota, ej: "01/03"):
-          * Multiplica el monto mostrado por el número total de cuotas
-          * Ejemplo: Si ves monto 30.000 y cuotas 3 → monto total: 30.000 × 3 = 90.000
-        - Si el consumo tiene cuotas Y hay cuota_actual (es una cuota intermedia, ej: "04/06"):
-          * NO multipliques el monto - devuelve el monto tal cual aparece (es el monto de una cuota)
-          * El sistema calculará automáticamente el monto total restante multiplicando por las cuotas restantes
-          * Ejemplo: Si ves monto 89.998,98 y es cuota 4 de 6 → devuelve 89.998,98 (el sistema calculará 89.998,98 × 3 = 269.996,94)
-        - Si NO hay cuotas (cuotas: null o 1), el monto mostrado es el monto total del consumo (no multipliques)
-        - EXCEPCIÓN: Si el resumen explícitamente dice "TOTAL" junto al monto, entonces ese monto ya es el total y NO multipliques
-        - Ejemplos: 15179.99, 6647.26, 3600.00, 90000.00),
+      "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (⚠️⚠️⚠️ CRÍTICO - LEE ESTO CUIDADOSAMENTE: 
+        - REGLA ABSOLUTA: SIEMPRE devuelve el monto TAL CUAL aparece en el resumen, SIN MULTIPLICAR POR NADA
+        - El monto mostrado en el resumen es el valor de UNA CUOTA INDIVIDUAL cuando hay cuotas
+        - NUNCA multipliques el monto por el número de cuotas - el sistema lo hará automáticamente
+        - Ejemplos:
+          * Si ves "BILLABONG 01/03 14.999,83" → devuelve monto: 14999.83 (SIN multiplicar)
+          * Si ves "BILLABONG 04/06 14.999,83" → devuelve monto: 14999.83 (SIN multiplicar)
+          * Si ves "FARMACITY 04/06 89.998,98" → devuelve monto: 89998.98 (SIN multiplicar)
+          * Si ves "MERCADOLIBRE 3 CUOTAS 30.000" → devuelve monto: 30000 (SIN multiplicar)
+        - El sistema multiplicará automáticamente según las cuotas detectadas
+        - Si NO hay cuotas (cuotas: null o 1), el monto es el monto total del consumo
+        - Ejemplos de valores: 15179.99, 6647.26, 3600.00, 14999.83),
       "moneda": "ARS" o "USD" según corresponda,
       "fecha": "YYYY-MM-01" (SIEMPRE el primer día del mes del resumen detectado. Si el vencimiento es en enero, el resumen es de diciembre, entonces usar "YYYY-12-01". Si el vencimiento es en febrero, usar "YYYY-01-01", etc. Formato ISO),
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
