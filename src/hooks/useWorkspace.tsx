@@ -344,7 +344,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // Enviar email usando Resend API
       try {
         // Obtener nombre del invitador si está disponible
-        const inviterName = profile?.nombre || profile?.display_name || null
+        const inviterName = profile?.nombre || null
         
         // Usar el template profesional
         const emailTemplate = getInvitationEmailTemplate(
