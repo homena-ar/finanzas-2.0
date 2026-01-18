@@ -64,23 +64,60 @@ body {
     font-size: 16px; /* Evita zoom en iOS */
   }
   
-  /* Estilos para selectores - asegurar que el texto seleccionado sea visible */
-  select.input {
-    @apply text-slate-900 bg-white;
+  /* Estilos para selectores - FORZAR que el texto seleccionado sea visible */
+  select.input,
+  select.input:focus,
+  select.input:active,
+  select.input:hover,
+  select.input:not(:invalid) {
+    color: rgb(15, 23, 42) !important; /* slate-900 - FORZAR color oscuro */
+    background-color: white !important; /* FORZAR fondo blanco */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  
+  /* Opciones del selector */
+  select.input option {
     color: rgb(15, 23, 42) !important; /* slate-900 */
     background-color: white !important;
   }
   
-  select.input option {
-    @apply text-slate-900 bg-white;
+  /* Cuando el select tiene un valor seleccionado (cualquier valor) */
+  select.input:not([value=""]),
+  select.input[value]:not([value=""]) {
     color: rgb(15, 23, 42) !important;
     background-color: white !important;
   }
   
-  /* Cuando el select está enfocado o tiene un valor seleccionado */
-  select.input:not([value=""]) {
-    @apply text-slate-900 bg-white;
+  /* Forzar color en todos los selectores, incluso los que no tienen clase input */
+  select {
     color: rgb(15, 23, 42) !important;
+    background-color: white !important;
+  }
+  
+  select:focus,
+  select:active,
+  select:hover {
+    color: rgb(15, 23, 42) !important;
+    background-color: white !important;
+  }
+  
+  select option {
+    color: rgb(15, 23, 42) !important;
+    background-color: white !important;
+  }
+  
+  /* Estilos específicos para selectores en modales y formularios */
+  .modal select,
+  .modal select.input {
+    color: rgb(15, 23, 42) !important;
+    background-color: white !important;
+  }
+  
+  .modal select option {
+    color: rgb(15, 23, 42) !important;
+    background-color: white !important;
   }
   
   .label {

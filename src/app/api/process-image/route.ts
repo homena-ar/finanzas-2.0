@@ -104,13 +104,29 @@ REGLAS PARA DETECTAR DECIMALES:
      * Y así sucesivamente...
    - TODOS los consumos deben tener la MISMA FECHA: el primer día del mes del resumen (ej: si es diciembre 2025, usar "2025-12-01")
    - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
-   - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EXHAUSTIVAMENTE EN TODO EL DOCUMENTO):
-     * ⚠️ REGLA CRÍTICA: SIEMPRE busca indicadores de cuotas en CADA consumo individual. Es FUNDAMENTAL detectar esto correctamente.
-     * ⚠️ BUSCA EN LA COLUMNA "CUOTA" DEL RESUMEN: Muchos resúmenes tienen una columna específica llamada "CUOTA" que muestra el formato "X/Y" donde Y es el total de cuotas
-       - Ejemplo: Si ves "01/03" en la columna CUOTA → significa cuota 1 de 3 → cuotas: 3
-       - Ejemplo: Si ves "04/06" en la columna CUOTA → significa cuota 4 de 6 → cuotas: 6
-       - Ejemplo: Si ves "02/12" en la columna CUOTA → significa cuota 2 de 12 → cuotas: 12
-       - SIEMPRE revisa esta columna si existe en la tabla de consumos
+   - DETECCIÓN DE CUOTAS (⚠️⚠️⚠️ CRÍTICO - OBLIGATORIO EN CADA CONSUMO):
+     * ⚠️⚠️⚠️ REGLA ABSOLUTA: DEBES buscar y detectar cuotas en CADA consumo. NO puedes omitir esto bajo ninguna circunstancia.
+     
+     * ⚠️⚠️⚠️ PRIORIDAD ABSOLUTA #1: BUSCA PRIMERO Y SIEMPRE EN LA COLUMNA "CUOTA" DEL RESUMEN
+       - CASI TODOS los resúmenes bancarios argentinos (Galicia, BBVA, Santander, etc.) tienen una columna llamada "CUOTA" o "CUOTAS"
+       - Esta columna está en la TABLA DE CONSUMOS, generalmente entre las columnas "REFERENCIA" y "COMPROBANTE" o después de "FECHA"
+       - La columna muestra el formato "X/Y" donde:
+         * X = cuota actual que se está facturando (1, 2, 3, 4, etc.)
+         * Y = TOTAL de cuotas del consumo (3, 6, 12, 18, 24, etc.)
+       - ⚠️⚠️⚠️ REGLA DE ORO: SIEMPRE usa el número DESPUÉS de la barra (Y) como el total de cuotas
+       - ⚠️⚠️⚠️ NO uses el primer número (X) - ese es solo la cuota actual, no el total
+       - Ejemplos OBLIGATORIOS (usa estos como referencia exacta):
+         * Columna CUOTA muestra "01/03" → cuotas: 3 (NO 1, el total es 3)
+         * Columna CUOTA muestra "04/06" → cuotas: 6 (NO 4, el total es 6)
+         * Columna CUOTA muestra "02/12" → cuotas: 12 (NO 2, el total es 12)
+         * Columna CUOTA muestra "01/18" → cuotas: 18 (NO 1, el total es 18)
+         * Columna CUOTA muestra "03/24" → cuotas: 24 (NO 3, el total es 24)
+       - ⚠️ SI VES CUALQUIER VALOR EN LA COLUMNA "CUOTA" QUE NO SEA VACÍO, "-", "N/A" o "0", ENTONCES EL CONSUMO ESTÁ EN CUOTAS
+       - ⚠️ SI LA COLUMNA CUOTA EXISTE EN LA TABLA Y TIENE UN VALOR PARA UN CONSUMO, DEBES EXTRAERLO OBLIGATORIAMENTE
+       - ⚠️ NO IGNORES ESTA COLUMNA - ES LA FORMA MÁS COMÚN Y CONFIABLE DE DETECTAR CUOTAS EN ARGENTINA
+       - ⚠️ Si un consumo tiene "01/03" en la columna CUOTA, significa que es la primera cuota de un total de 3 cuotas
+       - ⚠️ Si un consumo tiene "04/06" en la columna CUOTA, significa que es la cuarta cuota de un total de 6 cuotas
+       - ⚠️ El formato "X/Y" es ESTÁNDAR en todos los resúmenes bancarios argentinos
      
      * Busca en TODAS estas ubicaciones para cada consumo:
        - Columna "CUOTA" en la tabla de consumos (formato "X/Y")
@@ -137,13 +153,21 @@ REGLAS PARA DETECTAR DECIMALES:
        - También pueden ser: 2, 4, 9, 10, 15, 20, 30, 36, 48 cuotas
        - Cualquier número entero positivo es válido
      
-     * CÓMO EXTRAER EL NÚMERO DE CUOTAS:
-       - PRIMERO: Busca en la columna "CUOTA" si existe. Si ves "X/Y", usa Y (el número después de la barra)
-       - Si encuentras "CUOTA X/Y": usa Y (el número después de la barra)
-       - Si encuentras "X CUOTAS": usa X (el número antes de "CUOTAS")
-       - Si encuentras "CUOTA X DE Y": usa Y (el número después de "DE")
-       - Si encuentras múltiples indicadores, usa el número MÁS ALTO encontrado (ej: si dice "3 CUOTAS" y "CUOTA 1/6", usa 6)
-       - Si solo encuentras "CUOTA X" sin el total, busca en el contexto si hay un número total mencionado
+     * CÓMO EXTRAER EL NÚMERO DE CUOTAS (SIGUE ESTE ORDEN EXACTO):
+       - PASO 1 (OBLIGATORIO): Busca PRIMERO en la columna "CUOTA" de la tabla de consumos
+         * Si la columna existe y tiene un valor "X/Y" (donde X e Y son números):
+           → USA SIEMPRE Y (el número DESPUÉS de la barra) como el total de cuotas
+           → Ejemplo: "01/03" → cuotas: 3
+           → Ejemplo: "04/06" → cuotas: 6
+           → Ejemplo: "02/12" → cuotas: 12
+         * Si la columna existe pero está vacía o tiene "-" o "N/A" → cuotas: null o 1
+         * ⚠️ IMPORTANTE: El primer número (X) es la cuota actual, el segundo (Y) es el total
+       - PASO 2: Si no hay columna CUOTA o está vacía, busca en la descripción:
+         * "CUOTA X/Y" → usa Y (el número después de la barra)
+         * "X CUOTAS" → usa X (el número antes de "CUOTAS")
+         * "CUOTA X DE Y" → usa Y (el número después de "DE")
+       - PASO 3: Si encuentras múltiples indicadores, usa el número MÁS ALTO encontrado
+       - ⚠️ REGLA DE ORO: Si ves "X/Y" en cualquier parte (columna CUOTA o descripción), SIEMPRE usa Y como total de cuotas
      
      * IMPORTANTE SOBRE EL MONTO:
        - Si detectas cuotas, el monto del consumo es el MONTO TOTAL de todas las cuotas
@@ -214,7 +238,14 @@ REGLAS PARA DETECTAR DECIMALES:
       "fecha": "YYYY-MM-01" (SIEMPRE el primer día del mes del resumen detectado. Si el vencimiento es en enero, el resumen es de diciembre, entonces usar "YYYY-12-01". Si el vencimiento es en febrero, usar "YYYY-01-01", etc. Formato ISO),
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
       "comercio": "nombre del comercio o establecimiento si está disponible o null",
-      "cuotas": número entero o null (CRÍTICO: Si el consumo está en cuotas, DEBES indicar el número TOTAL de cuotas detectado, ej: 3, 6, 12, 18, 24. Busca exhaustivamente en la descripción, comercio y contexto. Si NO encuentras ningún indicador de cuotas, usa null o 1. El monto es el TOTAL, no el de una cuota)
+      "cuotas": número entero o null (⚠️⚠️⚠️ CRÍTICO Y OBLIGATORIO: 
+        - PRIMERO: Busca en la columna "CUOTA" de la tabla. Si existe y tiene formato "X/Y", USA Y (el número después de la barra) como el total de cuotas.
+        - Ejemplos: "01/03" → cuotas: 3, "04/06" → cuotas: 6, "02/12" → cuotas: 12
+        - Si la columna CUOTA no existe o está vacía, busca en la descripción del consumo.
+        - Si detectas cuotas, SIEMPRE devuelve el número TOTAL de cuotas (no la cuota actual).
+        - Si NO encuentras ningún indicador de cuotas en ninguna parte, usa null o 1.
+        - El monto es el TOTAL de todas las cuotas, no el de una cuota individual.
+        - ⚠️ NO PUEDES OMITIR ESTE CAMPO - es fundamental para el funcionamiento del sistema)
     }
   ],
   "impuestos": [
@@ -258,14 +289,20 @@ Entrada en documento: "40.487,43" → Salida en JSON: 40487.43
 - Solo incluye CONSUMOS del período actual, NO pagos ni ajustes anteriores
 - Las fechas deben estar en formato YYYY-MM-DD
 
-⚠️ VERIFICACIÓN FINAL ANTES DE RESPONDER:
-1. ¿Extraíste TODOS los consumos del resumen? Revisa que no te hayas perdido ninguno
+⚠️⚠️⚠️ VERIFICACIÓN FINAL OBLIGATORIA ANTES DE RESPONDER:
+1. ¿Extraíste TODOS los consumos del resumen? Revisa que no te hayas perdido ninguno (incluyendo BILLABONG, FARMACITY, etc.)
 2. ¿Revisaste TODAS las páginas del documento?
 3. ¿Revisaste TODAS las tarjetas si hay múltiples en el mismo resumen?
-4. ¿Detectaste las cuotas correctamente en CADA consumo que las tenga?
-5. ¿Incluiste comercios poco comunes o desconocidos (como BILLABONG, etc.)?
+4. ⚠️⚠️⚠️ ¿Revisaste la columna "CUOTA" para CADA consumo y extrajiste el número TOTAL de cuotas (el número después de la barra)?
+   - Si viste "01/03" → ¿pusiste cuotas: 3?
+   - Si viste "04/06" → ¿pusiste cuotas: 6?
+   - Si viste "02/12" → ¿pusiste cuotas: 12?
+   - Si la columna CUOTA estaba vacía o tenía "-" → ¿pusiste cuotas: null o 1?
+5. ¿Incluiste comercios poco comunes o desconocidos (como BILLABONG, FARMACITY, etc.)?
 
-Analiza el documento paso a paso, revisa EXHAUSTIVAMENTE y responde SOLO con el JSON, sin texto adicional.`
+⚠️ REGLA FINAL: Si un consumo tiene un valor en la columna CUOTA (formato "X/Y"), DEBES incluir el campo "cuotas" con el valor Y (el número después de la barra). NO puedes omitir este campo.
+
+Analiza el documento paso a paso, revisa EXHAUSTIVAMENTE, especialmente la columna CUOTA, y responde SOLO con el JSON, sin texto adicional.`
       } else {
         // Para comprobantes individuales (tickets, facturas)
         prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
@@ -519,6 +556,40 @@ Responde solo con el JSON, sin texto adicional.`
         if (trans.origen) {
           cleaned.origen = String(trans.origen).trim()
         }
+        
+        // Procesar cuotas - CRÍTICO: extraer correctamente del formato "X/Y" o número
+        if (trans.cuotas !== null && trans.cuotas !== undefined) {
+          const cuotasStr = String(trans.cuotas).trim()
+          
+          // Si viene en formato "X/Y" (ej: "01/03", "04/06"), extraer el segundo número
+          if (cuotasStr.includes('/')) {
+            const parts = cuotasStr.split('/')
+            if (parts.length === 2) {
+              const totalCuotas = parseInt(parts[1].trim())
+              if (!isNaN(totalCuotas) && totalCuotas > 0) {
+                cleaned.cuotas = totalCuotas
+                console.log(`📄 [API] Cuotas detectadas en formato X/Y: "${cuotasStr}" → total: ${totalCuotas}`)
+              } else {
+                cleaned.cuotas = null
+              }
+            } else {
+              cleaned.cuotas = null
+            }
+          } else {
+            // Si viene como número directo
+            const cuotasNum = parseInt(cuotasStr)
+            if (!isNaN(cuotasNum) && cuotasNum > 0) {
+              cleaned.cuotas = cuotasNum
+              console.log(`📄 [API] Cuotas detectadas como número: ${cuotasNum}`)
+            } else {
+              cleaned.cuotas = null
+            }
+          }
+        } else {
+          cleaned.cuotas = null
+        }
+        
+        console.log(`📄 [API] Transacción procesada - descripción: "${cleaned.descripcion}", cuotas: ${cleaned.cuotas}`)
         
         return cleaned
       }).filter((t: any) => t.descripcion && t.monto) // Filtrar transacciones válidas

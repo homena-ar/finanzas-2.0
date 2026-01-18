@@ -1487,11 +1487,12 @@ export default function GastosPage() {
                   <label className="label">Moneda</label>
                   <select
                     className="input text-slate-900 bg-white"
-                    value={gastoForm.moneda}
+                    value={gastoForm.moneda || 'ARS'}
                     onChange={e => setGastoForm(f => ({ ...f, moneda: e.target.value }))}
+                    style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
                   >
-                    <option value="ARS" className="text-slate-900">Pesos</option>
-                    <option value="USD" className="text-slate-900">USD</option>
+                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>Pesos</option>
+                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>USD</option>
                   </select>
                 </div>
                 <div>
@@ -1512,11 +1513,12 @@ export default function GastosPage() {
                   <div className="space-y-2">
                     <select
                       className="input w-full text-slate-900 bg-white"
-                      value={gastoForm.tarjeta_id}
+                      value={gastoForm.tarjeta_id || ''}
                       onChange={e => setGastoForm(f => ({ ...f, tarjeta_id: e.target.value }))}
+                      style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
                     >
-                      <option value="" className="text-slate-900">💵 Efectivo</option>
-                      {tarjetas.map(t => <option key={t.id} value={t.id} className="text-slate-900">{t.nombre}</option>)}
+                      <option value="" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>💵 Efectivo</option>
+                      {tarjetas.map(t => <option key={t.id} value={t.id} style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>{t.nombre}</option>)}
                     </select>
                     <button
                       type="button"
@@ -2022,13 +2024,14 @@ export default function GastosPage() {
                       </div>
                     )}
                     <select
-                      value={selectedTarjetaId}
+                      value={selectedTarjetaId || ''}
                       onChange={(e) => setSelectedTarjetaId(e.target.value)}
                       className="input w-full text-xs h-8 text-slate-900 bg-white border-slate-300 focus:border-indigo-500"
+                      style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
                     >
-                      <option value="" className="text-slate-900 bg-white">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
+                      <option value="" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
                       {tarjetas.map(t => (
-                        <option key={t.id} value={t.id} className="text-slate-900 bg-white">
+                        <option key={t.id} value={t.id} style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
                       ))}
@@ -2186,15 +2189,16 @@ export default function GastosPage() {
                                     placeholder="0.00"
                                   />
                                   <select
-                                    value={moneda}
+                                    value={moneda || 'ARS'}
                                     onChange={(e) => {
                                       e.stopPropagation()
                                       updateEditedTransaction(index, 'moneda', e.target.value)
                                     }}
                                     className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500 text-slate-900 bg-white"
+                                    style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
                                   >
-                                    <option value="ARS" className="text-slate-900">ARS</option>
-                                    <option value="USD" className="text-slate-900">USD</option>
+                                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>ARS</option>
+                                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>USD</option>
                                   </select>
                                 </div>
                               </div>
