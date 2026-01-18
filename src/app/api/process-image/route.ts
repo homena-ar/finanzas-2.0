@@ -89,20 +89,24 @@ REGLAS PARA DETECTAR DECIMALES:
    - ⚠️⚠️⚠️ REGLA ABSOLUTA Y OBLIGATORIA: DEBES EXTRAER TODOS Y CADA UNO DE LOS CONSUMOS VISIBLES en la imagen/documento
    - ⚠️⚠️⚠️ Si la imagen está recortada o es solo una parte del resumen, extrae TODOS los consumos que puedas ver en esa parte
    - ⚠️⚠️⚠️ NO puedes omitir, olvidar o saltarte NINGÚN consumo visible, sin importar el nombre del comercio
-   - ⚠️⚠️⚠️ PASO A PASO OBLIGATORIO:
+   - ⚠️⚠️⚠️ PASO A PASO OBLIGATORIO - SIGUE ESTOS PASOS EN ORDEN:
      1. Busca la sección "DETALLE DEL CONSUMO", "Consumos", "Detalle de Consumos", "Movimientos", "Transacciones" o cualquier tabla con columnas como FECHA, REFERENCIA, CUOTA, COMPROBANTE, PESOS, DÓLARES
-     2. Identifica CADA FILA de esa tabla que sea visible
-     3. Para CADA FILA visible, extrae TODOS los datos: descripción, monto, fecha, cuotas, moneda
-     4. NO te detengas después de encontrar el primer consumo - continúa revisando TODAS las filas
-     5. Si ves múltiples secciones con consumos (ej: una tabla arriba y otra abajo), extrae de TODAS
-   - ⚠️⚠️⚠️ EJEMPLOS ESPECÍFICOS DE LO QUE DEBES EXTRAER SI LO VES:
-     * "K DLO*PEDIDOSYA PLUS" o "PEDIDOSYA PLUS" → EXTRAER
+     2. Identifica CADA FILA de esa tabla que sea visible (excluyendo encabezados y totales)
+     3. CUENTA cuántas filas de consumos hay - si ves 11 filas, debes extraer 11 transacciones
+     4. Para CADA FILA visible, extrae TODOS los datos: descripción (columna REFERENCIA), monto (columna PESOS o DÓLARES), fecha (columna FECHA), cuotas (columna CUOTA), moneda (según si está en PESOS o DÓLARES)
+     5. ⚠️⚠️⚠️ CRÍTICO: NO te detengas después de encontrar el primer consumo - continúa revisando TODAS las filas hasta el final de la tabla visible
+     6. Si ves múltiples secciones con consumos (ej: una tabla arriba y otra abajo), extrae de TODAS
+     7. Si hay múltiples tarjetas en el mismo resumen (ej: "TARJETA 7498" y "TARJETA 9970"), extrae consumos de TODAS las tarjetas visibles
+   - ⚠️⚠️⚠️ EJEMPLOS ESPECÍFICOS DE LO QUE DEBES EXTRAER SI LO VES (NO TE SALTES NINGUNO):
+     * "K DLO*PEDIDOSYA PLUS" o "PEDIDOSYA PLUS" o "DLO*PEDIDOSYA" → EXTRAER
      * "* BILLABONG" o "BILLABONG" → EXTRAER (y revisar columna CUOTA para ver si tiene "04/06" u otro formato)
      * "* FARMACITY" o "FARMACITY SAN MARTIN Y PU" → EXTRAER (y revisar columna CUOTA)
-     * "K AMAZON MKTPL*BI9168ZS2" o "AMAZON MKTPL" → EXTRAER
-     * "K MERPAGO*PROSHOP" o "MERPAGO*PROSHOP" → EXTRAER
+     * "K AMAZON MKTPL*BI9168ZS2" o "AMAZON MKTPL" o "AMAZON" → EXTRAER
+     * "K MERPAGO*PROSHOP" o "MERPAGO*PROSHOP" o "MERPAGO*FARMACIAHUDSO" o "MERPAGO*ECOMODICO" o "MERPAGO*BDESCUENTOS" o "MERPAGO*MERCADOLIBRE" o "MERPAGO*LAPANALERA" → EXTRAER TODOS
      * "* EDENOR SA" o "EDENOR" → EXTRAER
-     * CUALQUIER otra fila en la tabla de consumos → EXTRAER
+     * "Spotify" → EXTRAER
+     * "TELECENTRO SA" o "TELECENTRO" → EXTRAER
+     * CUALQUIER otra fila en la tabla de consumos que tenga fecha, referencia y monto → EXTRAER
    - ⚠️⚠️⚠️ Si ves una tabla con columnas (FECHA, REFERENCIA, CUOTA, COMPROBANTE, PESOS, DÓLARES):
      * DEBES contar cuántas filas de datos hay (excluyendo encabezados)
      * DEBES extraer UNA transacción por CADA fila de datos

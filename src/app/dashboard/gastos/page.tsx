@@ -619,6 +619,16 @@ export default function GastosPage() {
 
           setExtractedData(result.data)
           
+          // Seleccionar automáticamente todas las transacciones e impuestos detectados
+          if (result.data.transacciones && Array.isArray(result.data.transacciones)) {
+            const allTransactions = new Set<number>(result.data.transacciones.map((_: any, i: number) => i))
+            setSelectedTransactions(allTransactions)
+          }
+          if (result.data.impuestos && Array.isArray(result.data.impuestos)) {
+            const allImpuestos = new Set<number>(result.data.impuestos.map((_: any, i: number) => i))
+            setSelectedImpuestos(allImpuestos)
+          }
+          
           // Detectar fecha general del documento desde el mes del resumen
           if (result.data.total && result.data.total.mes_resumen) {
             // Si la IA detectó el mes del resumen, usar el primer día de ese mes
