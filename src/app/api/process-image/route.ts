@@ -269,7 +269,15 @@ REGLAS PARA DETECTAR DECIMALES:
         - Si detectas cuotas, SIEMPRE devuelve el número TOTAL de cuotas (Y), no la cuota actual (X).
         - Si NO encuentras ningún indicador de cuotas en ninguna parte, usa null o 1.
         - ⚠️ NO PUEDES OMITIR ESTE CAMPO - es fundamental para el funcionamiento del sistema),
-      "cuota_actual": número entero o null (OPCIONAL: Si encuentras formato "X/Y" en la columna CUOTA, devuelve X (la cuota actual). Si no hay información, usa null. Ejemplos: "01/03" → cuota_actual: 1, "04/06" → cuota_actual: 4)
+      "cuota_actual": número entero o null (⚠️⚠️⚠️ CRÍTICO Y OBLIGATORIO cuando hay formato "X/Y" en CUOTA:
+        - Si encuentras formato "X/Y" en la columna CUOTA, DEBES devolver X (la cuota actual)
+        - Este campo es ESENCIAL para calcular correctamente las cuotas restantes
+        - Ejemplos OBLIGATORIOS:
+          * "01/03" → cuota_actual: 1, cuotas: 3
+          * "04/06" → cuota_actual: 4, cuotas: 6
+          * "02/12" → cuota_actual: 2, cuotas: 12
+        - Si NO hay formato "X/Y", usa null
+        - NO confundas X con Y, son números DIFERENTES)
     }
   ],
   "impuestos": [
@@ -621,18 +629,32 @@ Responde solo con el JSON, sin texto adicional.`
           }
         }
         
-        // Si hay cuota_actual en la respuesta, usarla
+        // Si hay cuota_actual en la respuesta, usarla (PRIORIDAD)
         if (trans.cuota_actual !== null && trans.cuota_actual !== undefined) {
           const cuotaAct = parseInt(String(trans.cuota_actual))
           if (!isNaN(cuotaAct) && cuotaAct > 0) {
             cuotaActual = cuotaAct
+            console.log(`📄 [API] ✅ cuota_actual encontrada en respuesta: ${cuotaAct}`)
           }
         }
         
         cleaned.cuotas = totalCuotas
         cleaned.cuota_actual = cuotaActual
         
-        console.log(`📄 [API] Transacción procesada - descripción: "${cleaned.descripcion}", cuotas total: ${cleaned.cuotas}, cuota actual: ${cleaned.cuota_actual}`)
+        // LOG DETALLADO PARA DEBUGGING
+        if (totalCuotas && totalCuotas > 1) {
+          console.log(`📄 [API] ⚠️ TRANSACCIÓN CON CUOTAS:`)
+          console.log(`   - Descripción: "${cleaned.descripcion}"`)
+          console.log(`   - Monto (unitario): ${cleaned.monto}`)
+          console.log(`   - Total de cuotas: ${cleaned.cuotas}`)
+          console.log(`   - Cuota actual: ${cleaned.cuota_actual || 'NO DETECTADA'}`)
+          console.log(`   - Datos originales de IA - cuotas: "${trans.cuotas}", cuota_actual: "${trans.cuota_actual}"`)
+          if (!cuotaActual) {
+            console.log(`   - ⚠️ WARNING: cuota_actual NO fue detectada por la IA!`)
+          }
+        } else {
+          console.log(`📄 [API] Transacción sin cuotas - descripción: "${cleaned.descripcion}", monto: ${cleaned.monto}`)
+        }
         
         return cleaned
       }).filter((t: any) => t.descripcion && t.monto) // Filtrar transacciones válidas

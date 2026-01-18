@@ -2224,37 +2224,41 @@ export default function GastosPage() {
                         {detectedTarjeta.ultimos_digitos && <div><strong>Dígitos:</strong> ****{detectedTarjeta.ultimos_digitos}</div>}
                       </div>
                     )}
-                    <select
-                      value={selectedTarjetaId || ''}
-                      onChange={(e) => {
-                        console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
-                        const tarjeta = tarjetas.find(t => t.id === e.target.value)
-                        console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
-                        setSelectedTarjetaId(e.target.value)
-                      }}
-                      className="input w-full text-xs h-8 font-semibold"
-                      style={{ 
-                        color: 'rgb(15, 23, 42)',
-                        backgroundColor: 'rgb(226, 232, 240)',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none',
-                        appearance: 'none',
-                        fontWeight: '600'
-                      }}
-                    >
-                      <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white', fontWeight: '400' }}>
-                        {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
-                      </option>
-                      {tarjetas.map(t => (
-                        <option 
-                          key={t.id} 
-                          value={t.id}
-                          style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '600' }}
-                        >
-                          {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                    <div className="relative">
+                      <select
+                        value={selectedTarjetaId || ''}
+                        onChange={(e) => {
+                          console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
+                          const tarjeta = tarjetas.find(t => t.id === e.target.value)
+                          console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
+                          setSelectedTarjetaId(e.target.value)
+                        }}
+                        className="w-full h-8 text-xs font-semibold rounded-lg border-2 px-3 pr-8 cursor-pointer"
+                        style={{ 
+                          color: 'rgb(15, 23, 42) !important',
+                          backgroundColor: 'rgb(224, 242, 254) !important',
+                          borderColor: 'rgb(59, 130, 246) !important',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          appearance: 'none',
+                          fontWeight: '600'
+                        }}
+                      >
+                        <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white', fontWeight: '400' }}>
+                          {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
                         </option>
-                      ))}
-                    </select>
+                        {tarjetas.map(t => (
+                          <option 
+                            key={t.id} 
+                            value={t.id}
+                            style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '600' }}
+                          >
+                            {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600">▼</div>
+                    </div>
                   </div>
 
                   {/* Selector de Fecha/Mes General - Compacto */}
@@ -2407,27 +2411,30 @@ export default function GastosPage() {
                                     className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
                                     placeholder="0.00"
                                   />
-                                  <select
-                                    value={moneda || 'ARS'}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
-                                      updateEditedTransaction(index, 'moneda', e.target.value)
-                                    }}
-                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500 font-bold"
-                                    style={{ 
-                                      color: 'rgb(15, 23, 42)',
-                                      backgroundColor: 'rgb(226, 232, 240)',
-                                      WebkitAppearance: 'none',
-                                      MozAppearance: 'none',
-                                      appearance: 'none',
-                                      fontWeight: '700',
-                                      textAlign: 'center'
-                                    }}
-                                  >
-                                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
-                                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
-                                  </select>
+                                  <div className="relative">
+                                    <select
+                                      value={moneda || 'ARS'}
+                                      onChange={(e) => {
+                                        e.stopPropagation()
+                                        console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
+                                        updateEditedTransaction(index, 'moneda', e.target.value)
+                                      }}
+                                      className="w-16 h-7 text-xs font-bold text-center rounded-lg border-2 cursor-pointer pr-6"
+                                      style={{ 
+                                        color: 'rgb(15, 23, 42) !important',
+                                        backgroundColor: 'rgb(255, 237, 213) !important',
+                                        borderColor: 'rgb(251, 146, 60) !important',
+                                        WebkitAppearance: 'none',
+                                        MozAppearance: 'none',
+                                        appearance: 'none',
+                                        fontWeight: '700'
+                                      }}
+                                    >
+                                      <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
+                                      <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
+                                    </select>
+                                    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-orange-600">▼</div>
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
