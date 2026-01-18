@@ -90,6 +90,15 @@ export default function GastosPage() {
   const [globalDocumentDate, setGlobalDocumentDate] = useState<string | null>(null)
   const [useGlobalDate, setUseGlobalDate] = useState(false)
 
+  // Debug: Log cuando cambian los selectores
+  useEffect(() => {
+    console.log('🔵 [GastosPage] selectedTarjetaId cambió:', selectedTarjetaId)
+    if (selectedTarjetaId) {
+      const tarjeta = tarjetas.find(t => t.id === selectedTarjetaId)
+      console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
+    }
+  }, [selectedTarjetaId, tarjetas])
+
   // Función para obtener el nombre del usuario que creó el gasto
   const getUserLabel = (userId: string) => {
     if (!currentWorkspace) return null; // No mostrar en modo personal
@@ -811,6 +820,15 @@ export default function GastosPage() {
         const cuotasEditadas = editedTransactions.get(index)?.cuotas
         const cuotaActualEditada = editedTransactions.get(index)?.cuota_actual
         
+        console.log(`🔵 [GastosPage] Transacción ${index + 1} - Datos originales:`, {
+          descripcion: trans.descripcion,
+          monto: trans.monto,
+          cuotas: trans.cuotas,
+          cuota_actual: trans.cuota_actual,
+          cuotasEditadas,
+          cuotaActualEditada
+        })
+        
         // La IA puede devolver cuotas como número, string, null o undefined
         let totalCuotasDetectadas = cuotasEditadas !== undefined 
           ? cuotasEditadas 
@@ -825,16 +843,20 @@ export default function GastosPage() {
               ? (typeof trans.cuota_actual === 'number' ? trans.cuota_actual : parseInt(String(trans.cuota_actual)))
               : null)
         
+        console.log(`🔵 [GastosPage] Transacción ${index + 1} - Cuotas detectadas:`, {
+          totalCuotasDetectadas,
+          cuotaActualDetectada
+        })
+        
         // Si hay cuota actual detectada y total de cuotas, calcular cuotas restantes
         let cuotasFinal = totalCuotasDetectadas && totalCuotasDetectadas > 1 
           ? totalCuotasDetectadas 
           : (parseInt(gastoForm.cuotas === 'custom' ? (gastoForm.cuotas_custom || '1') : gastoForm.cuotas) || 1)
         
         let cuotaActualFinal = 1
-        
-        // Si hay cuota actual detectada (ej: cuota 4 de 6), calcular cuotas restantes
         let montoFinal = trans.monto
         
+        // CASO 1: Cuota intermedia (ej: cuota 4 de 6)
         if (cuotaActualDetectada && totalCuotasDetectadas && cuotaActualDetectada > 0 && totalCuotasDetectadas > cuotaActualDetectada) {
           // Calcular cuántas cuotas faltan (si es cuota 4 de 6, faltan 3: 4, 5, 6)
           const cuotasRestantes = totalCuotasDetectadas - cuotaActualDetectada + 1
@@ -846,17 +868,40 @@ export default function GastosPage() {
           // Ejemplo: Si el monto es 89.998,98 y es cuota 4 de 6, el total restante es: 89.998,98 × 3 = 269.996,94
           montoFinal = trans.monto * cuotasRestantes
           
-          console.log(`🔵 [GastosPage] Cuota actual detectada: ${cuotaActualDetectada} de ${totalCuotasDetectadas} → cuotas restantes: ${cuotasRestantes}, monto por cuota: ${trans.monto}, monto total restante: ${montoFinal}`)
-        } else if (totalCuotasDetectadas && totalCuotasDetectadas > 1) {
+          console.log(`✅ [GastosPage] CASO 1 - Cuota intermedia detectada:`)
+          console.log(`   - Cuota actual: ${cuotaActualDetectada} de ${totalCuotasDetectadas}`)
+          console.log(`   - Cuotas restantes: ${cuotasRestantes} (${cuotaActualDetectada}, ${cuotaActualDetectada + 1}, ..., ${totalCuotasDetectadas})`)
+          console.log(`   - Monto por cuota: ${trans.monto}`)
+          console.log(`   - Monto total restante: ${montoFinal} (${trans.monto} × ${cuotasRestantes})`)
+          console.log(`   - Se agregarán ${cuotasRestantes} cuotas con monto total de ${montoFinal}`)
+        } 
+        // CASO 2: Primera cuota o solo total de cuotas sin cuota actual
+        else if (totalCuotasDetectadas && totalCuotasDetectadas > 1) {
           // Si solo hay total de cuotas pero no cuota actual, asumir que es la primera
           // En este caso, el monto mostrado es de una cuota, multiplicar por el total
           montoFinal = trans.monto * totalCuotasDetectadas
           cuotasFinal = totalCuotasDetectadas
           cuotaActualFinal = 1
-          console.log(`🔵 [GastosPage] Primera cuota de ${totalCuotasDetectadas} → monto por cuota: ${trans.monto}, monto total: ${montoFinal}`)
+          
+          console.log(`✅ [GastosPage] CASO 2 - Primera cuota detectada:`)
+          console.log(`   - Total de cuotas: ${totalCuotasDetectadas}`)
+          console.log(`   - Monto por cuota: ${trans.monto}`)
+          console.log(`   - Monto total: ${montoFinal} (${trans.monto} × ${totalCuotasDetectadas})`)
+          console.log(`   - Se agregarán ${totalCuotasDetectadas} cuotas con monto total de ${montoFinal}`)
+        }
+        // CASO 3: Sin cuotas o cuota única
+        else {
+          console.log(`✅ [GastosPage] CASO 3 - Sin cuotas o cuota única:`)
+          console.log(`   - Monto: ${montoFinal}`)
+          console.log(`   - Cuotas: ${cuotasFinal}`)
         }
         
-        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Transacción ${index + 1} - total cuotas: ${totalCuotasDetectadas}, cuota actual: ${cuotaActualDetectada}, cuotas final: ${cuotasFinal}, cuota actual final: ${cuotaActualFinal}, monto final: ${montoFinal}`)
+        console.log(`🔵 [GastosPage] RESULTADO FINAL - Transacción ${index + 1}:`, {
+          descripcion: trans.descripcion,
+          montoFinal,
+          cuotasFinal,
+          cuotaActualFinal
+        })
         
         const gastoData = {
           descripcion: trans.descripcion,
@@ -2178,12 +2223,28 @@ export default function GastosPage() {
                     )}
                     <select
                       value={selectedTarjetaId || ''}
-                      onChange={(e) => setSelectedTarjetaId(e.target.value)}
+                      onChange={(e) => {
+                        console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
+                        setSelectedTarjetaId(e.target.value)
+                      }}
                       className="input w-full text-xs h-8"
+                      style={{ 
+                        color: selectedTarjetaId ? 'rgb(15, 23, 42)' : 'rgb(100, 116, 139)',
+                        backgroundColor: selectedTarjetaId ? 'rgb(241, 245, 249)' : 'rgb(248, 250, 252)',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        appearance: 'none'
+                      }}
                     >
-                      <option value="">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
+                      <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white' }}>
+                        {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
+                      </option>
                       {tarjetas.map(t => (
-                        <option key={t.id} value={t.id}>
+                        <option 
+                          key={t.id} 
+                          value={t.id}
+                          style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
+                        >
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
                       ))}
@@ -2344,12 +2405,20 @@ export default function GastosPage() {
                                     value={moneda || 'ARS'}
                                     onChange={(e) => {
                                       e.stopPropagation()
+                                      console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
                                       updateEditedTransaction(index, 'moneda', e.target.value)
                                     }}
                                     className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500"
+                                    style={{ 
+                                      color: (moneda || 'ARS') ? 'rgb(15, 23, 42)' : 'rgb(100, 116, 139)',
+                                      backgroundColor: (moneda || 'ARS') ? 'rgb(241, 245, 249)' : 'rgb(248, 250, 252)',
+                                      WebkitAppearance: 'none',
+                                      MozAppearance: 'none',
+                                      appearance: 'none'
+                                    }}
                                   >
-                                    <option value="ARS">ARS</option>
-                                    <option value="USD">USD</option>
+                                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>ARS</option>
+                                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>USD</option>
                                   </select>
                                 </div>
                               </div>

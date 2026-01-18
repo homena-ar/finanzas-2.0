@@ -691,43 +691,45 @@ export default function ConfigPage() {
 
               return (
                 <div key={ws.id} className={`rounded-xl p-4 border ${isOwner ? 'bg-slate-50 border-slate-200' : 'bg-indigo-50 border-indigo-200'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
                       {editingWorkspaceId === ws.id ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <input
                             type="text"
                             value={editingWorkspaceName}
                             onChange={(e) => setEditingWorkspaceName(e.target.value)}
-                            className="input input-sm flex-1 max-w-xs"
+                            className="input input-sm flex-1 min-w-0"
                             autoFocus
                             onKeyPress={(e) => e.key === 'Enter' && handleSaveWorkspaceName()}
                           />
-                          <button onClick={handleSaveWorkspaceName} className="btn btn-primary btn-sm">
-                            Guardar
-                          </button>
-                          <button onClick={handleCancelEditWorkspace} className="btn btn-secondary btn-sm">
-                            Cancelar
-                          </button>
+                          <div className="flex gap-2">
+                            <button onClick={handleSaveWorkspaceName} className="btn btn-primary btn-sm flex-1 sm:flex-none">
+                              Guardar
+                            </button>
+                            <button onClick={handleCancelEditWorkspace} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
+                              Cancelar
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">{ws.name}</h4>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-semibold break-words">{ws.name}</h4>
                             
                             {/* ETIQUETA DE ROL */}
                             {isOwner ? (
-                              <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                              <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
                                 <Shield className="w-3 h-3" /> PROPIETARIO
                               </span>
                             ) : (
-                              <span className="bg-indigo-200 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                              <span className="bg-indigo-200 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
                                 <UserCheck className="w-3 h-3" /> COLABORADOR
                               </span>
                             )}
 
                             {isOwner && (
-                              <div className="flex gap-1 ml-2">
+                              <div className="flex gap-1">
                                 <button
                                   onClick={() => handleEditWorkspace(ws.id, ws.name)}
                                   className="p-1 hover:bg-slate-200 rounded transition"
@@ -754,7 +756,7 @@ export default function ConfigPage() {
                         </>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:shrink-0">
                       {/* SOLO EL DUEÑO PUEDE INVITAR Y GESTIONAR MIEMBROS */}
                       {isOwner && editingWorkspaceId !== ws.id && (
                         <>
@@ -763,22 +765,22 @@ export default function ConfigPage() {
                               setInviteWorkspaceId(ws.id)
                               setShowInviteModal(true)
                             }}
-                            className="btn btn-secondary btn-sm"
+                            className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
                           >
-                            <Mail className="w-4 h-4" /> Invitar
+                            <Mail className="w-4 h-4" /> <span className="hidden sm:inline">Invitar</span>
                           </button>
                           <button
                             onClick={() => setExpandedWorkspaceId(isExpanded ? null : ws.id)}
-                            className="btn btn-secondary btn-sm"
+                            className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
                           >
-                            <Users className="w-4 h-4" /> {isExpanded ? 'Ocultar' : 'Ver'} Miembros
+                            <Users className="w-4 h-4" /> <span className="hidden sm:inline">{isExpanded ? 'Ocultar' : 'Ver'} Miembros</span>
                           </button>
                         </>
                       )}
                       
                       {/* SI SOY COLABORADOR SOLO PUEDO VER, PERO NO GESTIONAR */}
                       {!isOwner && (
-                        <div className="text-xs text-indigo-600 font-medium self-center px-3">
+                        <div className="text-xs text-indigo-600 font-medium self-center px-3 whitespace-nowrap">
                           Acceso Compartido
                         </div>
                       )}
