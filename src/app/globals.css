@@ -60,77 +60,57 @@ body {
   }
   
   .input {
-    @apply w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors;
+    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 transition-colors;
     font-size: 16px; /* Evita zoom en iOS */
   }
   
-  /* Estilos para selectores - FORZAR VISIBILIDAD MÁXIMA */
+  /* Estilos para selectores - Delicados y sutiles */
   select.input,
-  select.input:focus,
-  select.input:active,
-  select.input:hover,
-  select.input:not(:invalid),
   select {
-    color: rgb(15, 23, 42) !important; /* slate-900 - texto oscuro */
-    background-color: rgb(241, 245, 249) !important; /* slate-100 - fondo gris visible */
-    border-color: rgb(148, 163, 184) !important; /* slate-400 - borde visible */
+    color: rgb(51, 65, 85) !important; /* slate-700 - texto medio oscuro */
+    background-color: rgb(255, 255, 255) !important; /* blanco limpio */
+    border-color: rgb(203, 213, 225) !important; /* slate-300 - borde suave */
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
+    font-weight: 400 !important;
   }
   
-  /* Cuando tiene un valor seleccionado, fondo aún más oscuro para máxima visibilidad */
+  /* Cuando tiene foco - borde indigo suave */
+  select.input:focus,
+  select:focus {
+    color: rgb(30, 41, 59) !important; /* slate-800 */
+    border-color: rgb(129, 140, 248) !important; /* indigo-400 */
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1) !important;
+  }
+  
+  /* Cuando tiene un valor seleccionado - muy sutil */
   select.input:not([value=""]),
-  select.input[value]:not([value=""]),
-  select:not([value=""]),
-  select[value]:not([value=""]) {
-    color: rgb(15, 23, 42) !important;
-    background-color: rgb(226, 232, 240) !important; /* slate-200 - fondo más oscuro cuando tiene valor */
-    border-color: rgb(100, 116, 139) !important; /* slate-500 */
+  select:not([value=""]) {
+    color: rgb(30, 41, 59) !important; /* slate-800 */
+    background-color: rgb(248, 250, 252) !important; /* slate-50 - muy suave */
     font-weight: 500 !important;
   }
   
   /* Opciones del selector */
   select.input option,
   select option {
-    color: rgb(15, 23, 42) !important; /* slate-900 */
+    color: rgb(30, 41, 59) !important; /* slate-800 */
     background-color: white !important;
     padding: 8px;
+    font-weight: 400 !important;
   }
   
-  /* Forzar color en todos los estados */
-  select:focus,
-  select:active,
-  select:hover {
-    color: rgb(15, 23, 42) !important;
-    background-color: rgb(226, 232, 240) !important; /* slate-200 */
-    border-color: rgb(100, 116, 139) !important;
+  /* Hover - efecto sutil */
+  select:hover:not(:disabled) {
+    border-color: rgb(148, 163, 184) !important; /* slate-400 */
   }
   
-  /* Estilos específicos para selectores en modales y formularios */
-  .modal select,
-  .modal select.input {
-    color: rgb(15, 23, 42) !important;
-    background-color: rgb(241, 245, 249) !important;
-    border-color: rgb(148, 163, 184) !important;
-  }
-  
-  .modal select:not([value=""]),
-  .modal select.input:not([value=""]) {
-    background-color: rgb(226, 232, 240) !important;
-    font-weight: 500 !important;
-  }
-  
-  .modal select option,
-  .modal select.input option {
-    color: rgb(15, 23, 42) !important;
-    background-color: white !important;
-  }
-  
-  /* Forzar visibilidad incluso cuando el select está deshabilitado o en estados especiales */
+  /* Disabled - gris muy claro */
   select:disabled {
-    color: rgb(100, 116, 139) !important;
-    background-color: rgb(241, 245, 249) !important;
+    color: rgb(148, 163, 184) !important; /* slate-400 */
+    background-color: rgb(248, 250, 252) !important; /* slate-50 */
+    cursor: not-allowed !important;
   }
   
   .label {

@@ -170,19 +170,16 @@ REGLAS PARA DETECTAR DECIMALES:
        - PASO 3: Si encuentras múltiples indicadores, usa el número MÁS ALTO encontrado
        - ⚠️ REGLA DE ORO: Si ves "X/Y" en cualquier parte (columna CUOTA o descripción), SIEMPRE usa Y como total de cuotas
      
-     * ⚠️⚠️⚠️ CRÍTICO SOBRE EL MONTO EN RESÚMENES BANCARIOS ARGENTINOS:
-       - En los resúmenes bancarios argentinos, cuando un consumo está en cuotas, el monto mostrado en la tabla de consumos es generalmente el MONTO DE UNA CUOTA INDIVIDUAL, NO el total
-       - REGLA DE ORO: Si detectas que un consumo tiene cuotas (ej: "01/03" o "3 CUOTAS") y el monto mostrado es, por ejemplo, 30.000:
-         * El monto mostrado (30.000) = valor de UNA cuota
-         * Si es la PRIMERA cuota (ej: "01/03"): El monto total del consumo = 30.000 × 3 = 90.000
-         * Si es una cuota INTERMEDIA (ej: "04/06"): El monto mostrado es de UNA cuota, pero solo faltan 3 cuotas (4, 5, 6), entonces el monto total restante = 30.000 × 3 = 90.000
-         * IMPORTANTE: Siempre multiplica el monto mostrado por el número de cuotas RESTANTES (si es cuota 4 de 6, multiplica por 3, no por 6)
-       - Ejemplos:
-         * Consumo: "FARMACITY", Monto: 30.000, Cuotas: "01/03" (primera de 3) → monto total: 30.000 × 3 = 90.000
-         * Consumo: "BILLABONG", Monto: 89.998,98, Cuotas: "04/06" (cuarta de 6) → monto total restante: 89.998,98 × 3 = 269.996,94 (solo faltan 3 cuotas)
-         * Consumo: "MERCADOLIBRE", Monto: 15.000, Cuotas: 6 → monto total: 15.000 × 6 = 90.000
-       - EXCEPCIÓN: Si el resumen explícitamente dice "TOTAL" o "MONTO TOTAL" junto al monto, entonces ese monto ya es el total y NO debes multiplicarlo
-       - Si NO hay indicación de cuotas, el monto mostrado es el monto total del consumo (no hay que multiplicar)
+    * ⚠️⚠️⚠️ CRÍTICO SOBRE EL MONTO EN RESÚMENES BANCARIOS ARGENTINOS:
+      - En los resúmenes bancarios argentinos, cuando un consumo está en cuotas, el monto mostrado en la tabla de consumos es generalmente el MONTO DE UNA CUOTA INDIVIDUAL, NO el total
+      - 🚫 NUNCA MULTIPLIQUES NI DIVIDAS EL MONTO 🚫
+      - TU TRABAJO: Extraer el número EXACTO que aparece en el documento
+      - EL SISTEMA se encargará de todos los cálculos después
+      - Ejemplos de lo que DEBES hacer:
+        * Ves: "FARMACITY 01/03 30.000" → Devuelves: monto: 30000 (tal cual)
+        * Ves: "BILLABONG 04/06 14.999,83" → Devuelves: monto: 14999.83 (tal cual)
+        * Ves: "MERCADOLIBRE 3 CUOTAS 15.000" → Devuelves: monto: 15000 (tal cual)
+      - NO hagas cálculos mentales, NO multipliques, NO dividas - solo EXTRAE el número
      
      * VALORES POR DEFECTO:
        - Si NO encuentras NINGÚN indicador de cuotas en ninguna parte del consumo → cuotas: null o 1
@@ -557,8 +554,8 @@ Responde solo con el JSON, sin texto adicional.`
           cleaned.moneda = 'ARS'
         }
         
-        // NOTA: El monto ya debería venir multiplicado por las cuotas desde la IA según el prompt actualizado
-        // Si la IA no lo multiplicó correctamente, se ajustará más adelante cuando se procesen las cuotas
+        // NOTA: El monto viene tal cual del resumen (valor de UNA cuota si hay cuotas)
+        // El frontend se encargará de multiplicarlo según las cuotas restantes
         
         if (trans.fecha) {
           const fechaStr = String(trans.fecha)
