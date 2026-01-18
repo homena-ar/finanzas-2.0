@@ -6,7 +6,7 @@ import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identificar al usuario
 import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy yo"
 import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
-import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react'
 import { Gasto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
 
@@ -61,6 +61,13 @@ export default function GastosPage() {
   })
   const [selectedGastos, setSelectedGastos] = useState<Set<string>>(new Set())
   const [showDeleteMasivoModal, setShowDeleteMasivoModal] = useState(false)
+  const [showPagoMasivoModal, setShowPagoMasivoModal] = useState(false)
+  const [pagoMasivoForm, setPagoMasivoForm] = useState({
+    fecha_pago: new Date().toISOString().split('T')[0],
+    medio_pago: '',
+    comprobante: null as File | null,
+    medio_pago_custom: ''
+  })
 
   // AI Image processing states
   const [processingImage, setProcessingImage] = useState(false)
@@ -339,6 +346,62 @@ export default function GastosPage() {
     setShowPagoModal(false)
     setGastoToMarkPaid(null)
     setPagoForm({
+      fecha_pago: new Date().toISOString().split('T')[0],
+      medio_pago: '',
+      comprobante: null,
+      medio_pago_custom: ''
+    })
+  }
+
+  const handleConfirmPagoMasivo = async () => {
+    if (selectedGastos.size === 0) return
+
+    // Convertir comprobante a base64 si existe (mismo comprobante para todos)
+    let comprobanteUrl = null
+    let comprobanteNombre = null
+
+    if (pagoMasivoForm.comprobante) {
+      comprobanteNombre = pagoMasivoForm.comprobante.name
+      const reader = new FileReader()
+      comprobanteUrl = await new Promise((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(pagoMasivoForm.comprobante!)
+      })
+    }
+
+    // Determinar el medio de pago a guardar
+    let medioPagoFinal = pagoMasivoForm.medio_pago || null
+
+    if (pagoMasivoForm.medio_pago === 'nuevo' && pagoMasivoForm.medio_pago_custom.trim()) {
+      medioPagoFinal = pagoMasivoForm.medio_pago_custom.trim()
+
+      // Guardar en Firebase si no existe
+      const exists = mediosPago.some(m => m.nombre === medioPagoFinal)
+      if (!exists) {
+        const { error } = await addMedioPago(medioPagoFinal)
+        if (error) {
+          console.error('Error al guardar medio de pago:', error)
+        }
+      }
+    }
+
+    // Marcar todos los gastos seleccionados como pagados con el mismo comprobante
+    const gastosSeleccionados = gastosMes.filter(g => selectedGastos.has(g.id))
+    const promises = gastosSeleccionados.map(g => 
+      updateGasto(g.id, {
+        pagado: true,
+        fecha_pago: pagoMasivoForm.fecha_pago,
+        medio_pago: medioPagoFinal,
+        comprobante_url: comprobanteUrl,
+        comprobante_nombre: comprobanteNombre
+      })
+    )
+
+    await Promise.all(promises)
+
+    setShowPagoMasivoModal(false)
+    setSelectedGastos(new Set())
+    setPagoMasivoForm({
       fecha_pago: new Date().toISOString().split('T')[0],
       medio_pago: '',
       comprobante: null,
@@ -740,19 +803,43 @@ export default function GastosPage() {
         
         // Detectar si es un gasto en cuotas (la IA puede detectar esto o puede estar editado)
         const cuotasEditadas = editedTransactions.get(index)?.cuotas
+        const cuotaActualEditada = editedTransactions.get(index)?.cuota_actual
+        
         // La IA puede devolver cuotas como número, string, null o undefined
-        let cuotasDetectadas = cuotasEditadas !== undefined 
+        let totalCuotasDetectadas = cuotasEditadas !== undefined 
           ? cuotasEditadas 
           : (trans.cuotas !== null && trans.cuotas !== undefined 
               ? (typeof trans.cuotas === 'number' ? trans.cuotas : parseInt(String(trans.cuotas))) 
               : null)
         
-        // Si las cuotas detectadas son válidas y mayores a 1, usarlas; sino usar el valor del formulario
-        const cuotasFinal = (cuotasDetectadas && cuotasDetectadas > 1) 
-          ? cuotasDetectadas 
+        // Detectar cuota actual si la IA la proporcionó
+        let cuotaActualDetectada = cuotaActualEditada !== undefined
+          ? cuotaActualEditada
+          : (trans.cuota_actual !== null && trans.cuota_actual !== undefined
+              ? (typeof trans.cuota_actual === 'number' ? trans.cuota_actual : parseInt(String(trans.cuota_actual)))
+              : null)
+        
+        // Si hay cuota actual detectada y total de cuotas, calcular cuotas restantes
+        let cuotasFinal = totalCuotasDetectadas && totalCuotasDetectadas > 1 
+          ? totalCuotasDetectadas 
           : (parseInt(gastoForm.cuotas) || 1)
         
-        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Transacción ${index + 1} - cuotas detectadas:`, cuotasDetectadas, 'cuotas final:', cuotasFinal)
+        let cuotaActualFinal = 1
+        
+        // Si hay cuota actual detectada (ej: cuota 4 de 6), calcular cuotas restantes
+        if (cuotaActualDetectada && totalCuotasDetectadas && cuotaActualDetectada > 0 && totalCuotasDetectadas > cuotaActualDetectada) {
+          // Calcular cuántas cuotas faltan (si es cuota 4 de 6, faltan 3: 4, 5, 6)
+          const cuotasRestantes = totalCuotasDetectadas - cuotaActualDetectada + 1
+          cuotasFinal = cuotasRestantes
+          cuotaActualFinal = cuotaActualDetectada
+          console.log(`🔵 [GastosPage] Cuota actual detectada: ${cuotaActualDetectada} de ${totalCuotasDetectadas} → cuotas restantes: ${cuotasRestantes}`)
+        } else if (totalCuotasDetectadas && totalCuotasDetectadas > 1) {
+          // Si solo hay total de cuotas pero no cuota actual, asumir que es la primera
+          cuotasFinal = totalCuotasDetectadas
+          cuotaActualFinal = 1
+        }
+        
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Transacción ${index + 1} - total cuotas: ${totalCuotasDetectadas}, cuota actual: ${cuotaActualDetectada}, cuotas final: ${cuotasFinal}, cuota actual final: ${cuotaActualFinal}`)
         
         const gastoData = {
           descripcion: trans.descripcion,
@@ -763,7 +850,7 @@ export default function GastosPage() {
           mes_facturacion: mesFacturacion,
           tarjeta_id: tarjetaIdToUse,
           cuotas: cuotasFinal,
-          cuota_actual: 1,
+          cuota_actual: cuotaActualFinal,
           es_fijo: false, // NO marcar como fijo, las cuotas se distribuyen automáticamente
           tag_ids: gastoForm.tag_ids || [],
           pagado: gastoForm.pagado,
@@ -1048,16 +1135,32 @@ export default function GastosPage() {
 
         {/* Acciones masivas */}
         {selectedGastos.size > 0 && (
-          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between flex-wrap gap-2">
             <span className="text-sm font-semibold text-indigo-900">
               {selectedGastos.size} gasto{selectedGastos.size !== 1 ? 's' : ''} seleccionado{selectedGastos.size !== 1 ? 's' : ''}
             </span>
-            <button
-              onClick={() => setShowDeleteMasivoModal(true)}
-              className="btn btn-danger btn-sm"
-            >
-              <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setPagoMasivoForm({
+                    fecha_pago: new Date().toISOString().split('T')[0],
+                    medio_pago: '',
+                    comprobante: null,
+                    medio_pago_custom: ''
+                  })
+                  setShowPagoMasivoModal(true)
+                }}
+                className="btn btn-success btn-sm"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Registrar Pago Masivo
+              </button>
+              <button
+                onClick={() => setShowDeleteMasivoModal(true)}
+                className="btn btn-danger btn-sm"
+              >
+                <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
+              </button>
+            </div>
           </div>
         )}
 
@@ -1486,13 +1589,12 @@ export default function GastosPage() {
                 <div>
                   <label className="label">Moneda</label>
                   <select
-                    className="input text-slate-900 bg-white"
+                    className="input"
                     value={gastoForm.moneda || 'ARS'}
                     onChange={e => setGastoForm(f => ({ ...f, moneda: e.target.value }))}
-                    style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
                   >
-                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>Pesos</option>
-                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>USD</option>
+                    <option value="ARS">Pesos</option>
+                    <option value="USD">USD</option>
                   </select>
                 </div>
                 <div>
@@ -1512,13 +1614,12 @@ export default function GastosPage() {
                 {!showNewTarjetaInput ? (
                   <div className="space-y-2">
                     <select
-                      className="input w-full text-slate-900 bg-white"
+                      className="input w-full"
                       value={gastoForm.tarjeta_id || ''}
                       onChange={e => setGastoForm(f => ({ ...f, tarjeta_id: e.target.value }))}
-                      style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
                     >
-                      <option value="" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>💵 Efectivo</option>
-                      {tarjetas.map(t => <option key={t.id} value={t.id} style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>{t.nombre}</option>)}
+                      <option value="">💵 Efectivo</option>
+                      {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                     </select>
                     <button
                       type="button"
@@ -2026,12 +2127,11 @@ export default function GastosPage() {
                     <select
                       value={selectedTarjetaId || ''}
                       onChange={(e) => setSelectedTarjetaId(e.target.value)}
-                      className="input w-full text-xs h-8 text-slate-900 bg-white border-slate-300 focus:border-indigo-500"
-                      style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
+                      className="input w-full text-xs h-8"
                     >
-                      <option value="" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
+                      <option value="">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
                       {tarjetas.map(t => (
-                        <option key={t.id} value={t.id} style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>
+                        <option key={t.id} value={t.id}>
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
                       ))}
@@ -2194,11 +2294,10 @@ export default function GastosPage() {
                                       e.stopPropagation()
                                       updateEditedTransaction(index, 'moneda', e.target.value)
                                     }}
-                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500 text-slate-900 bg-white"
-                                    style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}
+                                    className="input text-xs h-7 w-16"
                                   >
-                                    <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>ARS</option>
-                                    <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white' }}>USD</option>
+                                    <option value="ARS">ARS</option>
+                                    <option value="USD">USD</option>
                                   </select>
                                 </div>
                               </div>
@@ -2583,6 +2682,121 @@ export default function GastosPage() {
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Modal Pago Masivo */}
+      {showPagoMasivoModal && selectedGastos.size > 0 && (
+        <div className="modal-overlay" onClick={() => setShowPagoMasivoModal(false)}>
+          <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-emerald-50">
+              <h3 className="font-bold text-lg text-emerald-800">
+                💳 Registrar Pago Masivo
+              </h3>
+              <button onClick={() => setShowPagoMasivoModal(false)} className="p-1 hover:bg-emerald-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-slate-50 rounded-lg p-3">
+                <p className="text-sm text-slate-600 mb-2">
+                  Se marcarán como pagados <strong>{selectedGastos.size} gastos</strong> con la misma información de pago.
+                </p>
+                <div className="text-xs text-slate-500">
+                  Total: {formatMoney(
+                    gastosMes
+                      .filter(g => selectedGastos.has(g.id))
+                      .reduce((sum, g) => sum + (g.cuotas > 1 ? g.monto / g.cuotas : g.monto), 0)
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Fecha de Pago</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={pagoMasivoForm.fecha_pago}
+                  onChange={e => setPagoMasivoForm(f => ({ ...f, fecha_pago: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="label">Medio de Pago (opcional)</label>
+                <select
+                  className="input"
+                  value={pagoMasivoForm.medio_pago}
+                  onChange={e => setPagoMasivoForm(f => ({ ...f, medio_pago: e.target.value }))}
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="efectivo">💵 Efectivo</option>
+                  <option value="transferencia">🏦 Transferencia</option>
+                  <option value="debito">💳 Débito</option>
+                  <option value="credito">💳 Crédito</option>
+                  <option value="mercadopago">📱 Mercado Pago</option>
+                  {mediosPago.length > 0 && <option disabled>──────────</option>}
+                  {mediosPago.map(medio => (
+                    <option key={medio.id} value={medio.nombre}>✨ {medio.nombre}</option>
+                  ))}
+                  <option value="nuevo">➕ Nuevo medio de pago</option>
+                </select>
+                {pagoMasivoForm.medio_pago === 'nuevo' && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Escribí el nombre del medio de pago..."
+                      value={pagoMasivoForm.medio_pago_custom}
+                      onChange={e => setPagoMasivoForm(f => ({ ...f, medio_pago_custom: e.target.value }))}
+                      autoFocus
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Por ejemplo: PayPal, Uala, Brubank, etc.</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="label">Comprobante (opcional - se usará para todos los gastos)</label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="input"
+                  onChange={e => setPagoMasivoForm(f => ({ ...f, comprobante: e.target.files?.[0] || null }))}
+                />
+                {pagoMasivoForm.comprobante && (
+                  <div className="mt-2 text-sm text-emerald-600 font-semibold">
+                    ✓ {pagoMasivoForm.comprobante.name}
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 mt-1">
+                  El mismo comprobante se asociará a todos los gastos seleccionados.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleConfirmPagoMasivo}
+                  className="btn btn-success flex-1"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Confirmar Pago de Todos
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPagoMasivoModal(false)
+                    setPagoMasivoForm({
+                      fecha_pago: new Date().toISOString().split('T')[0],
+                      medio_pago: '',
+                      comprobante: null,
+                      medio_pago_custom: ''
+                    })
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

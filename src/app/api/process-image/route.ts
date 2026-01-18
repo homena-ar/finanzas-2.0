@@ -111,21 +111,22 @@ REGLAS PARA DETECTAR DECIMALES:
        - CASI TODOS los resúmenes bancarios argentinos (Galicia, BBVA, Santander, etc.) tienen una columna llamada "CUOTA" o "CUOTAS"
        - Esta columna está en la TABLA DE CONSUMOS, generalmente entre las columnas "REFERENCIA" y "COMPROBANTE" o después de "FECHA"
        - La columna muestra el formato "X/Y" donde:
-         * X = cuota actual que se está facturando (1, 2, 3, 4, etc.)
+         * X = cuota actual que se está facturando en este resumen (1, 2, 3, 4, etc.)
          * Y = TOTAL de cuotas del consumo (3, 6, 12, 18, 24, etc.)
-       - ⚠️⚠️⚠️ REGLA DE ORO: SIEMPRE usa el número DESPUÉS de la barra (Y) como el total de cuotas
-       - ⚠️⚠️⚠️ NO uses el primer número (X) - ese es solo la cuota actual, no el total
+       - ⚠️⚠️⚠️ IMPORTANTE: Debes extraer AMBOS valores:
+         * "cuotas" = Y (el número DESPUÉS de la barra) = total de cuotas
+         * "cuota_actual" = X (el número ANTES de la barra) = cuota que se está facturando ahora
        - Ejemplos OBLIGATORIOS (usa estos como referencia exacta):
-         * Columna CUOTA muestra "01/03" → cuotas: 3 (NO 1, el total es 3)
-         * Columna CUOTA muestra "04/06" → cuotas: 6 (NO 4, el total es 6)
-         * Columna CUOTA muestra "02/12" → cuotas: 12 (NO 2, el total es 12)
-         * Columna CUOTA muestra "01/18" → cuotas: 18 (NO 1, el total es 18)
-         * Columna CUOTA muestra "03/24" → cuotas: 24 (NO 3, el total es 24)
+         * Columna CUOTA muestra "01/03" → cuotas: 3, cuota_actual: 1
+         * Columna CUOTA muestra "04/06" → cuotas: 6, cuota_actual: 4
+         * Columna CUOTA muestra "02/12" → cuotas: 12, cuota_actual: 2
+         * Columna CUOTA muestra "01/18" → cuotas: 18, cuota_actual: 1
+         * Columna CUOTA muestra "03/24" → cuotas: 24, cuota_actual: 3
        - ⚠️ SI VES CUALQUIER VALOR EN LA COLUMNA "CUOTA" QUE NO SEA VACÍO, "-", "N/A" o "0", ENTONCES EL CONSUMO ESTÁ EN CUOTAS
        - ⚠️ SI LA COLUMNA CUOTA EXISTE EN LA TABLA Y TIENE UN VALOR PARA UN CONSUMO, DEBES EXTRAERLO OBLIGATORIAMENTE
        - ⚠️ NO IGNORES ESTA COLUMNA - ES LA FORMA MÁS COMÚN Y CONFIABLE DE DETECTAR CUOTAS EN ARGENTINA
        - ⚠️ Si un consumo tiene "01/03" en la columna CUOTA, significa que es la primera cuota de un total de 3 cuotas
-       - ⚠️ Si un consumo tiene "04/06" en la columna CUOTA, significa que es la cuarta cuota de un total de 6 cuotas
+       - ⚠️ Si un consumo tiene "04/06" en la columna CUOTA, significa que es la cuarta cuota de un total de 6 cuotas (ya se pagaron las cuotas 1, 2 y 3)
        - ⚠️ El formato "X/Y" es ESTÁNDAR en todos los resúmenes bancarios argentinos
      
      * Busca en TODAS estas ubicaciones para cada consumo:
@@ -239,13 +240,17 @@ REGLAS PARA DETECTAR DECIMALES:
       "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
       "comercio": "nombre del comercio o establecimiento si está disponible o null",
       "cuotas": número entero o null (⚠️⚠️⚠️ CRÍTICO Y OBLIGATORIO: 
-        - PRIMERO: Busca en la columna "CUOTA" de la tabla. Si existe y tiene formato "X/Y", USA Y (el número después de la barra) como el total de cuotas.
-        - Ejemplos: "01/03" → cuotas: 3, "04/06" → cuotas: 6, "02/12" → cuotas: 12
+        - PRIMERO: Busca en la columna "CUOTA" de la tabla. Si existe y tiene formato "X/Y":
+          * X = cuota actual que se está facturando (1, 2, 3, 4, etc.)
+          * Y = TOTAL de cuotas del consumo (3, 6, 12, 18, 24, etc.)
+          * IMPORTANTE: Devuelve Y (el número DESPUÉS de la barra) como el total de cuotas
+          * Ejemplos: "01/03" → cuotas: 3, "04/06" → cuotas: 6, "02/12" → cuotas: 12
         - Si la columna CUOTA no existe o está vacía, busca en la descripción del consumo.
-        - Si detectas cuotas, SIEMPRE devuelve el número TOTAL de cuotas (no la cuota actual).
+        - Si detectas cuotas, SIEMPRE devuelve el número TOTAL de cuotas (Y), no la cuota actual (X).
         - Si NO encuentras ningún indicador de cuotas en ninguna parte, usa null o 1.
-        - El monto es el TOTAL de todas las cuotas, no el de una cuota individual.
-        - ⚠️ NO PUEDES OMITIR ESTE CAMPO - es fundamental para el funcionamiento del sistema)
+        - El monto es el MONTO TOTAL de todas las cuotas, no el de una cuota individual.
+        - ⚠️ NO PUEDES OMITIR ESTE CAMPO - es fundamental para el funcionamiento del sistema),
+      "cuota_actual": número entero o null (OPCIONAL: Si encuentras formato "X/Y" en la columna CUOTA, devuelve X (la cuota actual). Si no hay información, usa null. Ejemplos: "01/03" → cuota_actual: 1, "04/06" → cuota_actual: 4)
     }
   ],
   "impuestos": [
@@ -558,38 +563,54 @@ Responde solo con el JSON, sin texto adicional.`
         }
         
         // Procesar cuotas - CRÍTICO: extraer correctamente del formato "X/Y" o número
+        let cuotaActual = null
+        let totalCuotas = null
+        
         if (trans.cuotas !== null && trans.cuotas !== undefined) {
           const cuotasStr = String(trans.cuotas).trim()
           
-          // Si viene en formato "X/Y" (ej: "01/03", "04/06"), extraer el segundo número
+          // Si viene en formato "X/Y" (ej: "01/03", "04/06"), extraer ambos números
           if (cuotasStr.includes('/')) {
             const parts = cuotasStr.split('/')
             if (parts.length === 2) {
-              const totalCuotas = parseInt(parts[1].trim())
-              if (!isNaN(totalCuotas) && totalCuotas > 0) {
-                cleaned.cuotas = totalCuotas
-                console.log(`📄 [API] Cuotas detectadas en formato X/Y: "${cuotasStr}" → total: ${totalCuotas}`)
+              const cuotaAct = parseInt(parts[0].trim())
+              const total = parseInt(parts[1].trim())
+              if (!isNaN(total) && total > 0) {
+                totalCuotas = total
+                if (!isNaN(cuotaAct) && cuotaAct > 0) {
+                  cuotaActual = cuotaAct
+                }
+                console.log(`📄 [API] Cuotas detectadas en formato X/Y: "${cuotasStr}" → cuota actual: ${cuotaActual}, total: ${totalCuotas}`)
               } else {
-                cleaned.cuotas = null
+                totalCuotas = null
               }
             } else {
-              cleaned.cuotas = null
+              totalCuotas = null
             }
           } else {
-            // Si viene como número directo
+            // Si viene como número directo (total de cuotas)
             const cuotasNum = parseInt(cuotasStr)
             if (!isNaN(cuotasNum) && cuotasNum > 0) {
-              cleaned.cuotas = cuotasNum
+              totalCuotas = cuotasNum
               console.log(`📄 [API] Cuotas detectadas como número: ${cuotasNum}`)
             } else {
-              cleaned.cuotas = null
+              totalCuotas = null
             }
           }
-        } else {
-          cleaned.cuotas = null
         }
         
-        console.log(`📄 [API] Transacción procesada - descripción: "${cleaned.descripcion}", cuotas: ${cleaned.cuotas}`)
+        // Si hay cuota_actual en la respuesta, usarla
+        if (trans.cuota_actual !== null && trans.cuota_actual !== undefined) {
+          const cuotaAct = parseInt(String(trans.cuota_actual))
+          if (!isNaN(cuotaAct) && cuotaAct > 0) {
+            cuotaActual = cuotaAct
+          }
+        }
+        
+        cleaned.cuotas = totalCuotas
+        cleaned.cuota_actual = cuotaActual
+        
+        console.log(`📄 [API] Transacción procesada - descripción: "${cleaned.descripcion}", cuotas total: ${cleaned.cuotas}, cuota actual: ${cleaned.cuota_actual}`)
         
         return cleaned
       }).filter((t: any) => t.descripcion && t.monto) // Filtrar transacciones válidas

@@ -64,43 +64,52 @@ body {
     font-size: 16px; /* Evita zoom en iOS */
   }
   
-  /* Estilos para selectores - FORZAR que el texto seleccionado sea visible */
+  /* Estilos para selectores - CAMBIAR FONDO Y COLOR PARA VISIBILIDAD */
   select.input,
   select.input:focus,
   select.input:active,
   select.input:hover,
   select.input:not(:invalid) {
-    color: rgb(15, 23, 42) !important; /* slate-900 - FORZAR color oscuro */
-    background-color: white !important; /* FORZAR fondo blanco */
+    color: rgb(15, 23, 42) !important; /* slate-900 - texto oscuro */
+    background-color: rgb(248, 250, 252) !important; /* slate-50 - fondo gris claro visible */
+    border-color: rgb(203, 213, 225) !important; /* slate-300 - borde más visible */
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+  }
+  
+  /* Cuando tiene un valor seleccionado, fondo más oscuro */
+  select.input:not([value=""]),
+  select.input[value]:not([value=""]) {
+    color: rgb(15, 23, 42) !important;
+    background-color: rgb(241, 245, 249) !important; /* slate-100 - fondo más oscuro cuando tiene valor */
+    border-color: rgb(148, 163, 184) !important; /* slate-400 */
   }
   
   /* Opciones del selector */
   select.input option {
     color: rgb(15, 23, 42) !important; /* slate-900 */
     background-color: white !important;
+    padding: 8px;
   }
   
-  /* Cuando el select tiene un valor seleccionado (cualquier valor) */
-  select.input:not([value=""]),
-  select.input[value]:not([value=""]) {
-    color: rgb(15, 23, 42) !important;
-    background-color: white !important;
-  }
-  
-  /* Forzar color en todos los selectores, incluso los que no tienen clase input */
+  /* Forzar color en todos los selectores */
   select {
     color: rgb(15, 23, 42) !important;
-    background-color: white !important;
+    background-color: rgb(248, 250, 252) !important; /* slate-50 */
+    border-color: rgb(203, 213, 225) !important;
   }
   
   select:focus,
   select:active,
   select:hover {
     color: rgb(15, 23, 42) !important;
-    background-color: white !important;
+    background-color: rgb(241, 245, 249) !important; /* slate-100 */
+    border-color: rgb(148, 163, 184) !important;
+  }
+  
+  select:not([value=""]) {
+    background-color: rgb(241, 245, 249) !important; /* slate-100 cuando tiene valor */
   }
   
   select option {
@@ -112,7 +121,12 @@ body {
   .modal select,
   .modal select.input {
     color: rgb(15, 23, 42) !important;
-    background-color: white !important;
+    background-color: rgb(248, 250, 252) !important;
+    border-color: rgb(203, 213, 225) !important;
+  }
+  
+  .modal select:not([value=""]) {
+    background-color: rgb(241, 245, 249) !important;
   }
   
   .modal select option {
