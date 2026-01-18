@@ -60,6 +60,7 @@ export default function GastosPage() {
     digitos: ''
   })
   const [selectedGastos, setSelectedGastos] = useState<Set<string>>(new Set())
+  const [selectedImpuestosGastos, setSelectedImpuestosGastos] = useState<Set<string>>(new Set())
   const [showDeleteMasivoModal, setShowDeleteMasivoModal] = useState(false)
   const [showPagoMasivoModal, setShowPagoMasivoModal] = useState(false)
   const [pagoMasivoForm, setPagoMasivoForm] = useState({
@@ -1214,7 +1215,32 @@ export default function GastosPage() {
             <span className="text-sm font-semibold text-indigo-900">
               {selectedGastos.size} gasto{selectedGastos.size !== 1 ? 's' : ''} seleccionado{selectedGastos.size !== 1 ? 's' : ''}
             </span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-indigo-900">Cambiar cuenta:</label>
+                <select
+                  onChange={async (e) => {
+                    const tarjetaId = e.target.value || null
+                    const gastosSeleccionados = gastosMes.filter(g => selectedGastos.has(g.id))
+                    const promises = gastosSeleccionados.map(g => 
+                      updateGasto(g.id, { tarjeta_id: tarjetaId })
+                    )
+                    await Promise.all(promises)
+                    setSelectedGastos(new Set())
+                    e.target.value = ''
+                  }}
+                  className="input text-xs h-8 min-w-[150px]"
+                  defaultValue=""
+                >
+                  <option value="">Seleccionar cuenta...</option>
+                  <option value="">💵 Efectivo</option>
+                  {tarjetas.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre} {t.banco ? `(${t.banco})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 onClick={() => {
                   setPagoMasivoForm({
@@ -1446,14 +1472,79 @@ export default function GastosPage() {
               {impuestosMes.length}
             </span>
           </h3>
-          <button onClick={() => { resetImpForm(); setShowImpModal(true) }} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> Agregar
-          </button>
+          <div className="flex gap-2 items-center flex-wrap">
+            {selectedImpuestosGastos.size > 0 && (
+              <>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-slate-700">Cambiar cuenta:</label>
+                  <select
+                    onChange={async (e) => {
+                      const tarjetaId = e.target.value || null
+                      const impuestosSeleccionados = impuestosMes.filter(i => selectedImpuestosGastos.has(i.id))
+                      const promises = impuestosSeleccionados.map(i => 
+                        updateImpuesto(i.id, { tarjeta_id: tarjetaId })
+                      )
+                      await Promise.all(promises)
+                      setSelectedImpuestosGastos(new Set())
+                      e.target.value = ''
+                    }}
+                    className="input text-xs h-8 min-w-[150px]"
+                    defaultValue=""
+                  >
+                    <option value="">Seleccionar cuenta...</option>
+                    <option value="">💵 Efectivo</option>
+                    {tarjetas.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.nombre} {t.banco ? `(${t.banco})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => {
+                    // TODO: Implementar pago masivo de impuestos
+                    console.log('🔵 [GastosPage] Pago masivo de impuestos:', Array.from(selectedImpuestosGastos))
+                  }}
+                  className="btn btn-success text-sm"
+                >
+                  Pagar {selectedImpuestosGastos.size}
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm(`¿Eliminar ${selectedImpuestosGastos.size} impuesto${selectedImpuestosGastos.size !== 1 ? 's' : ''}?`)) {
+                      selectedImpuestosGastos.forEach(id => deleteImpuesto(id))
+                      setSelectedImpuestosGastos(new Set())
+                    }
+                  }}
+                  className="btn btn-danger text-sm"
+                >
+                  Eliminar {selectedImpuestosGastos.size}
+                </button>
+              </>
+            )}
+            <button onClick={() => { resetImpForm(); setShowImpModal(true) }} className="btn btn-primary">
+              <Plus className="w-4 h-4" /> Agregar
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50">
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">
+                  <input
+                    type="checkbox"
+                    checked={impuestosMes.length > 0 && selectedImpuestosGastos.size === impuestosMes.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedImpuestosGastos(new Set(impuestosMes.map(i => i.id)))
+                      } else {
+                        setSelectedImpuestosGastos(new Set())
+                      }
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                  />
+                </th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Concepto</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Monto</th>
@@ -1463,12 +1554,29 @@ export default function GastosPage() {
             <tbody>
               {impuestosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-400">Sin impuestos</td>
+                  <td colSpan={5} className="p-8 text-center text-slate-400">Sin impuestos</td>
                 </tr>
               ) : (
                 <>
                   {impuestosMes.map(i => (
-                    <tr key={i.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={i.id} className={`border-b border-slate-100 hover:bg-slate-50 ${selectedImpuestosGastos.has(i.id) ? 'bg-indigo-50' : ''}`}>
+                      <td className="p-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedImpuestosGastos.has(i.id)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedImpuestosGastos)
+                            if (e.target.checked) {
+                              newSelected.add(i.id)
+                            } else {
+                              newSelected.delete(i.id)
+                            }
+                            setSelectedImpuestosGastos(newSelected)
+                          }}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
                       <td className="p-4 font-semibold">{i.descripcion}</td>
                       <td className="p-4">
                         {tarjetaMap[i.tarjeta_id || ''] ? (
@@ -1495,6 +1603,7 @@ export default function GastosPage() {
                     </tr>
                   ))}
                   <tr className="bg-slate-50">
+                    <td className="p-4 font-bold"></td>
                     <td className="p-4 font-bold">TOTAL</td>
                     <td></td>
                     <td className="p-4 font-bold">{formatMoney(totalImp)}</td>
@@ -2234,37 +2343,41 @@ export default function GastosPage() {
                         {detectedTarjeta.ultimos_digitos && <div><strong>Dígitos:</strong> ****{detectedTarjeta.ultimos_digitos}</div>}
                       </div>
                     )}
-                    <select
-                      value={selectedTarjetaId || ''}
-                      onChange={(e) => {
-                        console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
-                        const tarjeta = tarjetas.find(t => t.id === e.target.value)
-                        console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
-                        setSelectedTarjetaId(e.target.value)
-                      }}
-                      className="input w-full text-xs h-8 font-semibold"
-                      style={{
-                        color: 'rgb(30, 41, 59)',
-                        backgroundColor: 'rgb(255, 255, 255)',
-                        borderColor: 'rgb(203, 213, 225)',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none',
-                        appearance: 'none'
-                      }}
-                    >
-                      <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white' }}>
-                        {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
-                      </option>
-                      {tarjetas.map(t => (
-                        <option 
-                          key={t.id} 
-                          value={t.id}
-                          style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}
-                        >
-                          {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                    <div className="relative">
+                      <select
+                        value={selectedTarjetaId || ''}
+                        onChange={(e) => {
+                          console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
+                          const tarjeta = tarjetas.find(t => t.id === e.target.value)
+                          console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
+                          setSelectedTarjetaId(e.target.value)
+                        }}
+                        className="w-full h-8 text-xs font-semibold rounded-lg border-2 px-3 pr-8 cursor-pointer"
+                        style={{ 
+                          color: 'rgb(15, 23, 42) !important',
+                          backgroundColor: 'rgb(224, 242, 254) !important',
+                          borderColor: 'rgb(59, 130, 246) !important',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          appearance: 'none',
+                          fontWeight: '600'
+                        }}
+                      >
+                        <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white', fontWeight: '400' }}>
+                          {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
                         </option>
-                      ))}
-                    </select>
+                        {tarjetas.map(t => (
+                          <option 
+                            key={t.id} 
+                            value={t.id}
+                            style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '600' }}
+                          >
+                            {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600">▼</div>
+                    </div>
                   </div>
 
                   {/* Selector de Fecha/Mes General - Compacto */}
@@ -2417,26 +2530,30 @@ export default function GastosPage() {
                                     className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
                                     placeholder="0.00"
                                   />
-                                  <select
-                                    value={moneda || 'ARS'}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
-                                      updateEditedTransaction(index, 'moneda', e.target.value)
-                                    }}
-                                    className="input w-16 h-7 text-xs font-semibold text-center cursor-pointer"
-                                    style={{
-                                      color: 'rgb(30, 41, 59)',
-                                      backgroundColor: 'rgb(255, 255, 255)',
-                                      borderColor: 'rgb(203, 213, 225)',
-                                      WebkitAppearance: 'none',
-                                      MozAppearance: 'none',
-                                      appearance: 'none'
-                                    }}
-                                  >
-                                    <option value="ARS" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>ARS</option>
-                                    <option value="USD" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>USD</option>
-                                  </select>
+                                  <div className="relative">
+                                    <select
+                                      value={moneda || 'ARS'}
+                                      onChange={(e) => {
+                                        e.stopPropagation()
+                                        console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
+                                        updateEditedTransaction(index, 'moneda', e.target.value)
+                                      }}
+                                      className="w-16 h-7 text-xs font-bold text-center rounded-lg border-2 cursor-pointer pr-6"
+                                      style={{ 
+                                        color: 'rgb(15, 23, 42) !important',
+                                        backgroundColor: 'rgb(255, 237, 213) !important',
+                                        borderColor: 'rgb(251, 146, 60) !important',
+                                        WebkitAppearance: 'none',
+                                        MozAppearance: 'none',
+                                        appearance: 'none',
+                                        fontWeight: '700'
+                                      }}
+                                    >
+                                      <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
+                                      <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
+                                    </select>
+                                    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-orange-600">▼</div>
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -2498,34 +2615,6 @@ export default function GastosPage() {
                         <h4 className="font-semibold text-orange-900 text-xs flex items-center gap-2">
                           📝 Impuestos ({extractedData.impuestos.length})
                         </h4>
-                        {selectedImpuestos.size > 0 && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                // TODO: Implementar pago masivo de impuestos
-                                console.log('🔵 [GastosPage] Pago masivo de impuestos:', Array.from(selectedImpuestos))
-                              }}
-                              className="btn btn-success text-xs px-2 py-1"
-                            >
-                              Pagar {selectedImpuestos.size}
-                            </button>
-                            <button
-                              onClick={() => {
-                                // Eliminar impuestos seleccionados de la lista
-                                const newImpuestos = extractedData.impuestos.filter((_: any, i: number) => !selectedImpuestos.has(i))
-                                // Actualizar extractedData
-                                setExtractedData((prev: any) => ({
-                                  ...prev,
-                                  impuestos: newImpuestos
-                                }))
-                                setSelectedImpuestos(new Set())
-                              }}
-                              className="btn btn-danger text-xs px-2 py-1"
-                            >
-                              Eliminar {selectedImpuestos.size}
-                            </button>
-                          </div>
-                        )}
                       </div>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         {extractedData.impuestos.map((imp: any, index: number) => {
@@ -2592,25 +2681,29 @@ export default function GastosPage() {
                                         className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
                                         placeholder="0.00"
                                       />
-                                      <select
-                                        value={moneda}
-                                        onChange={(e) => {
-                                          e.stopPropagation()
-                                          updateEditedImpuesto(index, 'moneda', e.target.value)
-                                        }}
-                                        className="input text-xs h-7 w-16 border-slate-300 focus:border-orange-500 font-semibold text-center"
-                                        style={{
-                                          color: 'rgb(30, 41, 59)',
-                                          backgroundColor: 'rgb(255, 255, 255)',
-                                          borderColor: 'rgb(203, 213, 225)',
-                                          WebkitAppearance: 'none',
-                                          MozAppearance: 'none',
-                                          appearance: 'none'
-                                        }}
-                                      >
-                                        <option value="ARS" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>ARS</option>
-                                        <option value="USD" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>USD</option>
-                                      </select>
+                                      <div className="relative">
+                                        <select
+                                          value={moneda}
+                                          onChange={(e) => {
+                                            e.stopPropagation()
+                                            updateEditedImpuesto(index, 'moneda', e.target.value)
+                                          }}
+                                          className="w-16 h-7 text-xs font-bold text-center rounded-lg border-2 cursor-pointer pr-6"
+                                          style={{ 
+                                            color: 'rgb(15, 23, 42) !important',
+                                            backgroundColor: 'rgb(255, 237, 213) !important',
+                                            borderColor: 'rgb(251, 146, 60) !important',
+                                            WebkitAppearance: 'none',
+                                            MozAppearance: 'none',
+                                            appearance: 'none',
+                                            fontWeight: '700'
+                                          }}
+                                        >
+                                          <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
+                                          <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
+                                        </select>
+                                        <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-orange-600">▼</div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>

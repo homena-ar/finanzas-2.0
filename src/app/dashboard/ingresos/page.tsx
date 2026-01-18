@@ -510,16 +510,43 @@ export default function IngresosPage() {
       <div className="card">
         {/* Acciones masivas */}
         {selectedIngresos.size > 0 && (
-          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between flex-wrap gap-2">
             <span className="text-sm font-semibold text-indigo-900">
               {selectedIngresos.size} ingreso{selectedIngresos.size !== 1 ? 's' : ''} seleccionado{selectedIngresos.size !== 1 ? 's' : ''}
             </span>
-            <button
-              onClick={() => setShowDeleteMasivoModal(true)}
-              className="btn btn-danger btn-sm"
-            >
-              <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
-            </button>
+            <div className="flex gap-2 items-center flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-indigo-900">Cambiar categoría:</label>
+                <select
+                  onChange={async (e) => {
+                    const categoriaId = e.target.value || null
+                    const ingresosSeleccionados = ingresosMes.filter(i => selectedIngresos.has(i.id))
+                    const promises = ingresosSeleccionados.map(i => 
+                      updateIngreso(i.id, { categoria_id: categoriaId })
+                    )
+                    await Promise.all(promises)
+                    setSelectedIngresos(new Set())
+                    e.target.value = ''
+                  }}
+                  className="input text-xs h-8 min-w-[150px]"
+                  defaultValue=""
+                >
+                  <option value="">Seleccionar categoría...</option>
+                  <option value="">Sin categoría</option>
+                  {categoriasIngresos.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.icono} {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => setShowDeleteMasivoModal(true)}
+                className="btn btn-danger btn-sm"
+              >
+                <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
+              </button>
+            </div>
           </div>
         )}
 
