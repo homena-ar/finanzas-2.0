@@ -49,6 +49,14 @@ export default function DashboardPage() {
       const alreadyShown = sessionStorage.getItem('monthAlertShown') === 'true'
 
       if (monthKey !== currentMonthKey && !alreadyShown) {
+        // Determinar si es anterior o futuro
+        const viewingDate = new Date(monthKey + '-01')
+        const todayDate = new Date(currentMonthKey + '-01')
+        const isPast = viewingDate < todayDate
+        const isFuture = viewingDate > todayDate
+        
+        // Guardar información para el modal
+        sessionStorage.setItem('monthAlertType', isPast ? 'past' : (isFuture ? 'future' : 'current'))
         setShowMonthAlert(true)
         sessionStorage.setItem('monthAlertShown', 'true')
       }
@@ -643,15 +651,26 @@ export default function DashboardPage() {
         isOpen={showMonthAlert}
         onClose={() => {
           setShowMonthAlert(false)
-          // Optionally navigate to current month
-          const today = new Date()
-          const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-          if (monthKey !== todayKey) {
-            // User can manually go to current month if they want
-          }
         }}
-        title="📅 Estás viendo un mes anterior"
-        message={`Este es el último mes que estuviste revisando: ${getMonthName(currentMonth)}.\n\nRecordá que no es el mes actual. Podés cambiarlo con las flechas si querés ver otro mes.`}
+        title={(() => {
+          const alertType = typeof window !== 'undefined' ? sessionStorage.getItem('monthAlertType') : 'past'
+          if (alertType === 'future') {
+            return `📅 Estás viendo un mes futuro`
+          } else if (alertType === 'past') {
+            return `📅 Estás viendo un mes anterior`
+          }
+          return `📅 Estás viendo otro mes`
+        })()}
+        message={(() => {
+          const alertType = typeof window !== 'undefined' ? sessionStorage.getItem('monthAlertType') : 'past'
+          const monthName = getMonthName(currentMonth)
+          if (alertType === 'future') {
+            return `Estás viendo: ${monthName}.\n\nEste es un mes futuro. Podés cambiarlo con las flechas si querés ver otro mes.`
+          } else if (alertType === 'past') {
+            return `Estás viendo: ${monthName}.\n\nEste es un mes anterior. Podés cambiarlo con las flechas si querés ver otro mes.`
+          }
+          return `Estás viendo: ${monthName}.\n\nPodés cambiarlo con las flechas si querés ver otro mes.`
+        })()}
         variant="info"
       />
     </div>

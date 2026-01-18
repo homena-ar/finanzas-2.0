@@ -98,7 +98,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('lastViewedMonth')
       if (saved) {
-        return new Date(saved + '-01')
+        try {
+          // Validar que el formato sea correcto (YYYY-MM)
+          const dateMatch = saved.match(/^\d{4}-\d{2}$/)
+          if (dateMatch) {
+            const parsedDate = new Date(saved + '-01')
+            // Validar que la fecha sea válida
+            if (!isNaN(parsedDate.getTime())) {
+              return parsedDate
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing saved month:', e)
+        }
       }
     }
     return new Date()
@@ -108,7 +120,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && monthKey) {
-      localStorage.setItem('lastViewedMonth', monthKey)
+      try {
+        // Validar que monthKey sea válido antes de guardar
+        const dateMatch = monthKey.match(/^\d{4}-\d{2}$/)
+        if (dateMatch) {
+          const testDate = new Date(monthKey + '-01')
+          if (!isNaN(testDate.getTime())) {
+            localStorage.setItem('lastViewedMonth', monthKey)
+          }
+        }
+      } catch (e) {
+        console.error('Error saving month to localStorage:', e)
+      }
     }
   }, [monthKey])
 
@@ -594,7 +617,27 @@ useEffect(() => {
   const changeMonth = useCallback((delta: number) => {
     setCurrentMonth(prev => {
       const newDate = new Date(prev)
-      newDate.setMonth(newDate.getMonth() + delta)
+      const currentMonth = newDate.getMonth()
+      const currentYear = newDate.getFullYear()
+      
+      // Calcular el nuevo mes y año de forma más segura
+      let newMonth = currentMonth + delta
+      let newYear = currentYear
+      
+      // Manejar desbordamiento de meses
+      while (newMonth < 0) {
+        newMonth += 12
+        newYear -= 1
+      }
+      while (newMonth > 11) {
+        newMonth -= 12
+        newYear += 1
+      }
+      
+      newDate.setFullYear(newYear)
+      newDate.setMonth(newMonth)
+      newDate.setDate(1) // Asegurar que siempre sea el día 1
+      
       return newDate
     })
   }, [])
