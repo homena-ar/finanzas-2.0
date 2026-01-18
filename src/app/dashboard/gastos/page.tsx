@@ -499,7 +499,7 @@ export default function GastosPage() {
           await smoothProgress(5, 200)
           
           // Iniciar progreso continuo mientras se prepara y envía la petición
-          const progressPromise = simulateContinuousProgress(5, 70, 10000) // 10 segundos estimados, hasta 70%
+          const progressPromise = simulateContinuousProgress(5, 69, 10000) // 10 segundos estimados, hasta 69%
           
           // Llamar a la API
           const response = await fetch('/api/process-image', {
@@ -518,13 +518,17 @@ export default function GastosPage() {
             new Promise(resolve => setTimeout(resolve, 100))
           ])
 
-          // Avanzar a 75% cuando llega la respuesta
-          await smoothProgress(75, 200)
+          // Esperar unos segundos en 70% como solicitó el usuario
+          await smoothProgress(70, 300)
+          await new Promise(resolve => setTimeout(resolve, 2000)) // Esperar 2 segundos en 70%
+
+          // Avanzar gradualmente de 70 a 99, de a uno por vez con esperas
+          for (let i = 71; i <= 99; i++) {
+            await smoothProgress(i, 150) // Avanzar de a 1%
+            await new Promise(resolve => setTimeout(resolve, 100)) // Esperar 100ms entre cada incremento
+          }
 
           const result = await response.json()
-
-          // Avanzar a 90% mientras se procesa el resultado
-          await smoothProgress(90, 300)
 
           if (!response.ok || !result.success) {
             const errorMessage = result.error || 'Error al procesar el archivo'
@@ -572,9 +576,10 @@ export default function GastosPage() {
             setSelectedTarjetaId(gastoForm.tarjeta_id || '')
           }
           
-          // Avanzar a 95% y luego a 100% suavemente
-          await smoothProgress(95, 200)
-          await new Promise(resolve => setTimeout(resolve, 100))
+          // Esperar un momento en 99% antes de completar
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          // Avanzar a 100% suavemente
           await smoothProgress(100, 300)
           
           // Completar
@@ -1421,12 +1426,12 @@ export default function GastosPage() {
                 <div>
                   <label className="label">Moneda</label>
                   <select
-                    className="input"
+                    className="input text-slate-900 bg-white"
                     value={gastoForm.moneda}
                     onChange={e => setGastoForm(f => ({ ...f, moneda: e.target.value }))}
                   >
-                    <option value="ARS">Pesos</option>
-                    <option value="USD">USD</option>
+                    <option value="ARS" className="text-slate-900">Pesos</option>
+                    <option value="USD" className="text-slate-900">USD</option>
                   </select>
                 </div>
                 <div>
@@ -1446,12 +1451,12 @@ export default function GastosPage() {
                 {!showNewTarjetaInput ? (
                   <div className="space-y-2">
                     <select
-                      className="input w-full"
+                      className="input w-full text-slate-900 bg-white"
                       value={gastoForm.tarjeta_id}
                       onChange={e => setGastoForm(f => ({ ...f, tarjeta_id: e.target.value }))}
                     >
-                      <option value="">💵 Efectivo</option>
-                      {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                      <option value="" className="text-slate-900">💵 Efectivo</option>
+                      {tarjetas.map(t => <option key={t.id} value={t.id} className="text-slate-900">{t.nombre}</option>)}
                     </select>
                     <button
                       type="button"
@@ -1959,11 +1964,11 @@ export default function GastosPage() {
                     <select
                       value={selectedTarjetaId}
                       onChange={(e) => setSelectedTarjetaId(e.target.value)}
-                      className="input w-full text-xs h-8 text-slate-900 bg-white"
+                      className="input w-full text-xs h-8 text-slate-900 bg-white border-slate-300 focus:border-indigo-500"
                     >
-                      <option value="" className="text-slate-900">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
+                      <option value="" className="text-slate-900 bg-white">{detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}</option>
                       {tarjetas.map(t => (
-                        <option key={t.id} value={t.id} className="text-slate-900">
+                        <option key={t.id} value={t.id} className="text-slate-900 bg-white">
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
                       ))}
@@ -2126,10 +2131,10 @@ export default function GastosPage() {
                                       e.stopPropagation()
                                       updateEditedTransaction(index, 'moneda', e.target.value)
                                     }}
-                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500"
+                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500 text-slate-900 bg-white"
                                   >
-                                    <option value="ARS">ARS</option>
-                                    <option value="USD">USD</option>
+                                    <option value="ARS" className="text-slate-900">ARS</option>
+                                    <option value="USD" className="text-slate-900">USD</option>
                                   </select>
                                 </div>
                               </div>

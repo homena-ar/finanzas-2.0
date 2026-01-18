@@ -85,11 +85,18 @@ REGLAS PARA DETECTAR DECIMALES:
    - ultimos_digitos: últimos 4-6 dígitos de la tarjeta si están visibles
    - nombre_titular: nombre del titular si está visible
 
-2. CONSUMOS DEL PERÍODO ACTUAL:
+2. CONSUMOS DEL PERÍODO ACTUAL (CRÍTICO - NO PUEDES PERDERTE NINGUNO):
+   - ⚠️ REGLA ABSOLUTA: DEBES EXTRAER TODOS Y CADA UNO DE LOS CONSUMOS del período actual
+   - NO puedes omitir, olvidar o saltarte NINGÚN consumo, sin importar el nombre del comercio
+   - Busca EXHAUSTIVAMENTE en TODO el documento: todas las páginas, todas las secciones, todas las tablas
+   - Busca la sección titulada "Consumos", "Detalle de Consumos", "Movimientos", "Transacciones" o similar
+   - Revisa TODAS las filas de la tabla de consumos, incluso si el nombre del comercio es poco común o desconocido
+   - Ejemplos de comercios que DEBEN ser extraídos: "BILLABONG", "FARMACITY", "PEDIDOSYA", "MERCADOLIBRE", "AMAZON", etc.
+   - Si hay múltiples páginas, revisa TODAS las páginas del resumen
+   - Si hay múltiples tarjetas en el mismo resumen, extrae los consumos de TODAS las tarjetas
    - SOLO extrae CONSUMOS individuales del período actual
    - NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS")
    - NO incluyas saldos anteriores o intereses como transacciones
-   - Busca la sección titulada "Consumos", "Detalle de Consumos" o similar
    - IMPORTANTE: DETECTA EL MES DEL RESUMEN basándote en la fecha de vencimiento:
      * Si el vencimiento es en enero → el resumen es de DICIEMBRE (mes anterior)
      * Si el vencimiento es en febrero → el resumen es de ENERO (mes anterior)
@@ -99,14 +106,23 @@ REGLAS PARA DETECTAR DECIMALES:
    - NO uses la fecha individual de cada consumo, usa siempre el mes del resumen detectado
    - DETECCIÓN DE CUOTAS (MUY IMPORTANTE - BUSCA EXHAUSTIVAMENTE EN TODO EL DOCUMENTO):
      * ⚠️ REGLA CRÍTICA: SIEMPRE busca indicadores de cuotas en CADA consumo individual. Es FUNDAMENTAL detectar esto correctamente.
+     * ⚠️ BUSCA EN LA COLUMNA "CUOTA" DEL RESUMEN: Muchos resúmenes tienen una columna específica llamada "CUOTA" que muestra el formato "X/Y" donde Y es el total de cuotas
+       - Ejemplo: Si ves "01/03" en la columna CUOTA → significa cuota 1 de 3 → cuotas: 3
+       - Ejemplo: Si ves "04/06" en la columna CUOTA → significa cuota 4 de 6 → cuotas: 6
+       - Ejemplo: Si ves "02/12" en la columna CUOTA → significa cuota 2 de 12 → cuotas: 12
+       - SIEMPRE revisa esta columna si existe en la tabla de consumos
+     
      * Busca en TODAS estas ubicaciones para cada consumo:
+       - Columna "CUOTA" en la tabla de consumos (formato "X/Y")
        - Descripción del comercio/establecimiento
        - Nombre del comercio
        - Detalles adicionales del consumo
        - Notas o comentarios asociados
        - Cualquier texto relacionado con el consumo
+       - Encabezados de columnas que puedan indicar cuotas
      
      * PATRONES A BUSCAR (busca TODOS estos patrones):
+       - "X/Y" en columna CUOTA (ej: "01/03" → 3 cuotas, "04/06" → 6 cuotas, "02/12" → 12 cuotas)
        - "X CUOTAS" donde X es un número (ej: "3 CUOTAS", "6 CUOTAS", "12 CUOTAS", "18 CUOTAS", "24 CUOTAS")
        - "CUOTA X/Y" donde Y es el total de cuotas (ej: "CUOTA 1/6" → 6 cuotas, "CUOTA 2/12" → 12 cuotas, "CUOTA 3/18" → 18 cuotas)
        - "CUOTA X DE Y" (ej: "CUOTA 1 DE 6" → 6 cuotas, "CUOTA 2 DE 12" → 12 cuotas)
@@ -122,6 +138,7 @@ REGLAS PARA DETECTAR DECIMALES:
        - Cualquier número entero positivo es válido
      
      * CÓMO EXTRAER EL NÚMERO DE CUOTAS:
+       - PRIMERO: Busca en la columna "CUOTA" si existe. Si ves "X/Y", usa Y (el número después de la barra)
        - Si encuentras "CUOTA X/Y": usa Y (el número después de la barra)
        - Si encuentras "X CUOTAS": usa X (el número antes de "CUOTAS")
        - Si encuentras "CUOTA X DE Y": usa Y (el número después de "DE")
@@ -139,6 +156,8 @@ REGLAS PARA DETECTAR DECIMALES:
        - Si hay dudas, es mejor poner null o 1 que un número incorrecto
      
      * EJEMPLOS PRÁCTICOS (usa estos como referencia):
+       - Columna CUOTA muestra "01/03" → cuotas: 3
+       - Columna CUOTA muestra "04/06" → cuotas: 6
        - "MERCADOLIBRE 3 CUOTAS SIN INTERÉS" → cuotas: 3
        - "FALABELLA CUOTA 1/6" → cuotas: 6
        - "COTO CUOTA 2/12" → cuotas: 12
@@ -149,7 +168,7 @@ REGLAS PARA DETECTAR DECIMALES:
        - "TRANSFERENCIA BANCARIA" → cuotas: null o 1 (pago único)
        - "FACTURA SERVICIOS" → cuotas: null o 1 (pago único)
      
-     * ⚠️ RECUERDA: La detección de cuotas es CRÍTICA. Si un consumo está en cuotas y no lo detectas, el usuario tendrá que agregarlo manualmente. Busca EXHAUSTIVAMENTE en todo el texto relacionado con cada consumo.
+     * ⚠️ RECUERDA: La detección de cuotas es CRÍTICA. Si un consumo está en cuotas y no lo detectas, el usuario tendrá que agregarlo manualmente. Busca EXHAUSTIVAMENTE en todo el texto relacionado con cada consumo, ESPECIALMENTE en la columna CUOTA si existe.
 
 3. IMPUESTOS, COMISIONES Y CARGOS (importante - separar de consumos):
    - Extrae impuestos, comisiones y cargos del período actual
@@ -239,7 +258,14 @@ Entrada en documento: "40.487,43" → Salida en JSON: 40487.43
 - Solo incluye CONSUMOS del período actual, NO pagos ni ajustes anteriores
 - Las fechas deben estar en formato YYYY-MM-DD
 
-Analiza el documento paso a paso y responde SOLO con el JSON, sin texto adicional.`
+⚠️ VERIFICACIÓN FINAL ANTES DE RESPONDER:
+1. ¿Extraíste TODOS los consumos del resumen? Revisa que no te hayas perdido ninguno
+2. ¿Revisaste TODAS las páginas del documento?
+3. ¿Revisaste TODAS las tarjetas si hay múltiples en el mismo resumen?
+4. ¿Detectaste las cuotas correctamente en CADA consumo que las tenga?
+5. ¿Incluiste comercios poco comunes o desconocidos (como BILLABONG, etc.)?
+
+Analiza el documento paso a paso, revisa EXHAUSTIVAMENTE y responde SOLO con el JSON, sin texto adicional.`
       } else {
         // Para comprobantes individuales (tickets, facturas)
         prompt = `Analiza este ${documentType} de un comprobante de compra, ticket o factura y extrae la siguiente información en formato JSON:
