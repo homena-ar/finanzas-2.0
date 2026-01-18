@@ -473,22 +473,60 @@ Responde solo con el JSON, sin texto adicional.`
     // Intentar extraer JSON de la respuesta
     let extractedData
     try {
-      // Buscar JSON en la respuesta (puede venir con markdown o texto adicional)
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        extractedData = JSON.parse(jsonMatch[0])
+      // Limpiar la respuesta: eliminar markdown code blocks si existen
+      let cleanedText = text.trim()
+      
+      // Eliminar markdown code blocks (```json ... ``` o ``` ... ```)
+      cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      
+      // Buscar el JSON más grande en la respuesta (puede haber texto antes o después)
+      // Estrategia: Buscar el primer { y encontrar el } correspondiente balanceado
+      const firstBrace = cleanedText.indexOf('{')
+      if (firstBrace !== -1) {
+        let braceCount = 0
+        let lastBrace = -1
+        for (let i = firstBrace; i < cleanedText.length; i++) {
+          if (cleanedText[i] === '{') braceCount++
+          if (cleanedText[i] === '}') {
+            braceCount--
+            if (braceCount === 0) {
+              lastBrace = i
+              break
+            }
+          }
+        }
+        if (lastBrace !== -1) {
+          const jsonCandidate = cleanedText.substring(firstBrace, lastBrace + 1)
+          try {
+            extractedData = JSON.parse(jsonCandidate)
+            console.log('✅ [API] JSON extraído exitosamente usando balanceo de llaves')
+          } catch (e) {
+            console.log('⚠️ [API] Balanceo de llaves falló, intentando regex...')
+            // Fallback: usar regex
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+              extractedData = JSON.parse(jsonMatch[0])
+              console.log('✅ [API] JSON extraído exitosamente usando regex')
+            } else {
+              throw new Error('No se encontró JSON válido en la respuesta')
+            }
+          }
+        } else {
+          throw new Error('No se encontró JSON balanceado en la respuesta')
+        }
       } else {
-        // Si no hay JSON, intentar parsear toda la respuesta
-        extractedData = JSON.parse(text)
+        // Si no hay {, intentar parsear directamente
+        extractedData = JSON.parse(cleanedText)
+        console.log('✅ [API] JSON parseado directamente')
       }
     } catch (parseError: any) {
       console.error('❌ [API] Error parsing Gemini response:', parseError)
-      console.error('❌ [API] Response text (primeros 500 chars):', text.substring(0, 500))
+      console.error('❌ [API] Response text (primeros 1000 chars):', text.substring(0, 1000))
+      console.error('❌ [API] Response text (últimos 500 chars):', text.substring(Math.max(0, text.length - 500)))
       return NextResponse.json(
         { 
           error: 'No se pudo extraer información estructurada del documento',
-          details: parseError.message || 'Error al parsear la respuesta de la IA',
-          rawResponse: text.substring(0, 1000) // Solo primeros 1000 caracteres para no exceder límites
+          details: parseError.message || 'Error al parsear la respuesta de la IA'
         },
         { status: 500 }
       )
