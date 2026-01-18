@@ -14,12 +14,16 @@ export function getInvitationEmailTemplate(
   inviterName?: string
 ): { html: string; text: string; subject: string } {
   const permissionLabels: Record<string, string> = {
+    'ninguno': 'Sin acceso',
+    'solo_lectura': 'Solo lectura',
+    'solo_propios': 'Solo propios',
+    'ver_todo_agregar_propio': 'Ver todo, agregar propios',
+    'admin': 'Administrador',
+    // Aliases para compatibilidad
     'lectura': 'Solo lectura',
     'escritura': 'Lectura y escritura',
-    'admin': 'Administrador',
     'read': 'Solo lectura',
-    'write': 'Lectura y escritura',
-    'admin': 'Administrador'
+    'write': 'Lectura y escritura'
   }
 
   const getPermissionLabel = (perm: string) => {
