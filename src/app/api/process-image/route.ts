@@ -86,20 +86,38 @@ REGLAS PARA DETECTAR DECIMALES:
    - nombre_titular: nombre del titular si está visible
 
 2. CONSUMOS DEL PERÍODO ACTUAL (CRÍTICO - NO PUEDES PERDERTE NINGUNO):
-   - ⚠️ REGLA ABSOLUTA: DEBES EXTRAER TODOS Y CADA UNO DE LOS CONSUMOS VISIBLES en la imagen/documento
-   - ⚠️ IMPORTANTE: Si la imagen está recortada o es solo una parte del resumen, extrae TODOS los consumos que puedas ver en esa parte
-   - NO puedes omitir, olvidar o saltarte NINGÚN consumo visible, sin importar el nombre del comercio
-   - Busca EXHAUSTIVAMENTE en TODO lo que puedas ver: todas las secciones visibles, todas las tablas visibles, todas las filas visibles
-   - Busca la sección titulada "Consumos", "Detalle de Consumos", "Movimientos", "Transacciones" o similar
-   - Revisa TODAS las filas de la tabla de consumos que sean visibles, incluso si el nombre del comercio es poco común o desconocido
-   - Ejemplos de comercios que DEBES extraer si los ves: "BILLABONG", "FARMACITY", "PEDIDOSYA", "MERCADOLIBRE", "AMAZON", "EDENOR", "MERCADOPAGO", "AMAZON MKTPL", "K DLO*PEDIDOSYA", "K MERPAGO*PROSHOP", etc.
+   - ⚠️⚠️⚠️ REGLA ABSOLUTA Y OBLIGATORIA: DEBES EXTRAER TODOS Y CADA UNO DE LOS CONSUMOS VISIBLES en la imagen/documento
+   - ⚠️⚠️⚠️ Si la imagen está recortada o es solo una parte del resumen, extrae TODOS los consumos que puedas ver en esa parte
+   - ⚠️⚠️⚠️ NO puedes omitir, olvidar o saltarte NINGÚN consumo visible, sin importar el nombre del comercio
+   - ⚠️⚠️⚠️ PASO A PASO OBLIGATORIO:
+     1. Busca la sección "DETALLE DEL CONSUMO", "Consumos", "Detalle de Consumos", "Movimientos", "Transacciones" o cualquier tabla con columnas como FECHA, REFERENCIA, CUOTA, COMPROBANTE, PESOS, DÓLARES
+     2. Identifica CADA FILA de esa tabla que sea visible
+     3. Para CADA FILA visible, extrae TODOS los datos: descripción, monto, fecha, cuotas, moneda
+     4. NO te detengas después de encontrar el primer consumo - continúa revisando TODAS las filas
+     5. Si ves múltiples secciones con consumos (ej: una tabla arriba y otra abajo), extrae de TODAS
+   - ⚠️⚠️⚠️ EJEMPLOS ESPECÍFICOS DE LO QUE DEBES EXTRAER SI LO VES:
+     * "K DLO*PEDIDOSYA PLUS" o "PEDIDOSYA PLUS" → EXTRAER
+     * "* BILLABONG" o "BILLABONG" → EXTRAER (y revisar columna CUOTA para ver si tiene "04/06" u otro formato)
+     * "* FARMACITY" o "FARMACITY SAN MARTIN Y PU" → EXTRAER (y revisar columna CUOTA)
+     * "K AMAZON MKTPL*BI9168ZS2" o "AMAZON MKTPL" → EXTRAER
+     * "K MERPAGO*PROSHOP" o "MERPAGO*PROSHOP" → EXTRAER
+     * "* EDENOR SA" o "EDENOR" → EXTRAER
+     * CUALQUIER otra fila en la tabla de consumos → EXTRAER
+   - ⚠️⚠️⚠️ Si ves una tabla con columnas (FECHA, REFERENCIA, CUOTA, COMPROBANTE, PESOS, DÓLARES):
+     * DEBES contar cuántas filas de datos hay (excluyendo encabezados)
+     * DEBES extraer UNA transacción por CADA fila de datos
+     * Si ves 7 filas de consumos, debes extraer 7 transacciones
+     * Si ves 10 filas de consumos, debes extraer 10 transacciones
+   - ⚠️⚠️⚠️ VERIFICACIÓN FINAL OBLIGATORIA antes de responder:
+     * ¿Cuántas filas de consumos contaste en la tabla visible?
+     * ¿Extraje una transacción por cada fila?
+     * ¿Revisé TODAS las secciones visibles del documento?
    - Si la imagen muestra solo una parte del resumen, extrae TODOS los consumos de esa parte visible
    - Si hay múltiples páginas visibles, revisa TODAS las páginas visibles
    - Si hay múltiples tarjetas visibles en el mismo resumen, extrae los consumos de TODAS las tarjetas visibles
    - SOLO extrae CONSUMOS individuales del período actual que sean VISIBLES
    - NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS")
    - NO incluyas saldos anteriores o intereses como transacciones
-   - ⚠️ Si ves una tabla con múltiples filas de consumos, DEBES extraer TODAS las filas visibles, no solo algunas
    - IMPORTANTE: DETECTA EL MES DEL RESUMEN basándote en la fecha de vencimiento:
      * Si el vencimiento es en enero → el resumen es de DICIEMBRE (mes anterior)
      * Si el vencimiento es en febrero → el resumen es de ENERO (mes anterior)
@@ -322,15 +340,18 @@ Entrada en documento: "40.487,43" → Salida en JSON: 40487.43
 - Las fechas deben estar en formato YYYY-MM-DD
 
 ⚠️⚠️⚠️ VERIFICACIÓN FINAL OBLIGATORIA ANTES DE RESPONDER:
-1. ¿Extraíste TODOS los consumos del resumen? Revisa que no te hayas perdido ninguno (incluyendo BILLABONG, FARMACITY, etc.)
-2. ¿Revisaste TODAS las páginas del documento?
-3. ¿Revisaste TODAS las tarjetas si hay múltiples en el mismo resumen?
-4. ⚠️⚠️⚠️ ¿Revisaste la columna "CUOTA" para CADA consumo y extrajiste el número TOTAL de cuotas (el número después de la barra)?
-   - Si viste "01/03" → ¿pusiste cuotas: 3?
-   - Si viste "04/06" → ¿pusiste cuotas: 6?
-   - Si viste "02/12" → ¿pusiste cuotas: 12?
+1. ⚠️⚠️⚠️ ¿Cuántas filas de consumos contaste en la tabla visible? ¿Extraje una transacción por cada fila?
+2. ⚠️⚠️⚠️ ¿Extraíste TODOS los consumos VISIBLES? Revisa que no te hayas perdido ninguno (incluyendo BILLABONG, FARMACITY, PEDIDOSYA, AMAZON, MERPAGO, EDENOR, etc.)
+3. ⚠️⚠️⚠️ Si la imagen está recortada, ¿extraje TODOS los consumos de la parte visible, no solo el primero?
+4. ¿Revisaste TODAS las secciones visibles del documento (tablas arriba, tablas abajo, etc.)?
+5. ¿Revisaste TODAS las páginas visibles del documento?
+6. ¿Revisaste TODAS las tarjetas visibles si hay múltiples en el mismo resumen?
+7. ⚠️⚠️⚠️ ¿Revisaste la columna "CUOTA" para CADA consumo y extrajiste el número TOTAL de cuotas (el número después de la barra) Y la cuota actual (el número antes de la barra)?
+   - Si viste "01/03" → ¿pusiste cuotas: 3, cuota_actual: 1?
+   - Si viste "04/06" → ¿pusiste cuotas: 6, cuota_actual: 4?
+   - Si viste "02/12" → ¿pusiste cuotas: 12, cuota_actual: 2?
    - Si la columna CUOTA estaba vacía o tenía "-" → ¿pusiste cuotas: null o 1?
-5. ¿Incluiste comercios poco comunes o desconocidos (como BILLABONG, FARMACITY, etc.)?
+8. ¿Incluiste comercios poco comunes o desconocidos (como BILLABONG, FARMACITY, PEDIDOSYA, AMAZON MKTPL, MERPAGO, EDENOR, etc.)?
 
 ⚠️ REGLA FINAL: Si un consumo tiene un valor en la columna CUOTA (formato "X/Y"), DEBES incluir el campo "cuotas" con el valor Y (el número después de la barra). NO puedes omitir este campo.
 
