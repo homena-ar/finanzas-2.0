@@ -11,6 +11,8 @@ import {
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { Profile } from '@/types'
+import { sendEmailVerification } from 'firebase/auth'
+import { getWelcomeEmailTemplate, getEmailVerificationTemplate } from '@/lib/email-templates'
 
 interface AuthContextType {
   user: User | null
@@ -130,11 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('🔐 [Firebase useAuth] signUp called')
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const userName = email.split('@')[0]
+      
       // Create profile document
       const defaultProfile: Profile = {
         id: userCredential.user.uid,
         email: email,
-        nombre: email.split('@')[0],
+        nombre: userName,
         budget_ars: 0,
         budget_usd: 0,
         ahorro_pesos: 0,
@@ -146,6 +150,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Create default categorias
       await createDefaultCategorias(userCredential.user.uid)
+
+      // Enviar correo de verificación de Firebase
+      try {
+        await sendEmailVerification(userCredential.user)
+        console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado')
+      } catch (emailError) {
+        console.error('⚠️ [Firebase useAuth] Error enviando email de verificación de Firebase:', emailError)
+        // No fallar el registro si el email falla
+      }
+
+      // Enviar correo de bienvenida personalizado
+      try {
+        const welcomeResponse = await fetch('/api/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            userName: userName
+          })
+        })
+        
+        if (welcomeResponse.ok) {
+          console.log('✅ [Firebase useAuth] Correo de bienvenida enviado')
+        } else {
+          console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', await welcomeResponse.text())
+        }
+      } catch (welcomeError) {
+        console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', welcomeError)
+        // No fallar el registro si el email falla
+      }
 
       console.log('🔐 [Firebase useAuth] signUp SUCCESS')
       return { error: null }

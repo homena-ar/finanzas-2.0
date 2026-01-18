@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useAuth } from './useAuth'
 import { db } from '@/lib/firebase'
+import { getInvitationEmailTemplate } from '@/lib/email-templates'
 import {
   collection,
   addDoc,
@@ -342,36 +343,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       // Enviar email usando Resend API
       try {
-        const emailHtml = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #6366f1;">¡Te invitaron a colaborar!</h2>
-
-            <p>Has sido invitado a colaborar en <strong>${workspaceName}</strong> en FinControl.</p>
-
-            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="margin-top: 0; color: #4b5563;">Permisos asignados:</h3>
-              <ul style="color: #6b7280;">
-                <li>💰 Gastos: <strong>${permissions.gastos}</strong></li>
-                <li>💵 Ingresos: <strong>${permissions.ingresos}</strong></li>
-                <li>🏦 Ahorros: <strong>${permissions.ahorros}</strong></li>
-                <li>💳 Tarjetas: <strong>${permissions.tarjetas}</strong></li>
-              </ul>
-            </div>
-
-            <p><strong>Para aceptar la invitación:</strong></p>
-            <ol style="color: #6b7280;">
-              <li>Inicia sesión en FinControl con este email: <strong>${email}</strong></li>
-              <li>Ve a la página de Configuración</li>
-              <li>Verás la invitación pendiente y podrás aceptarla</li>
-            </ol>
-
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
-              <p>Este es un email automático de FinControl. Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
-            </div>
-          </div>
-        `
-
-        const emailText = `Te invitaron a colaborar en ${workspaceName} en FinControl. Entra a la app para aceptar la invitación.`
+        // Obtener nombre del invitador si está disponible
+        const inviterName = profile?.nombre || profile?.display_name || null
+        
+        // Usar el template profesional
+        const emailTemplate = getInvitationEmailTemplate(
+          workspaceName,
+          email,
+          permissions,
+          inviterName || undefined
+        )
+        
+        const emailHtml = emailTemplate.html
+        const emailText = emailTemplate.text
 
         // Formatear el campo 'from' correctamente para Resend
         // Resend requiere formato: "Nombre <email@domain.com>" o solo "email@domain.com"
@@ -391,7 +375,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         const emailPayload = {
           to: email,
           from: emailFrom,
-          subject: `Invitación a ${workspaceName} - FinControl`,
+          subject: emailTemplate.subject,
           html: emailHtml,
           text: emailText,
           workspaceName,
