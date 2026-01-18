@@ -833,24 +833,35 @@ export default function GastosPage() {
         let cuotaActualFinal = 1
         
         // Si hay cuota actual detectada (ej: cuota 4 de 6), calcular cuotas restantes
+        let montoFinal = trans.monto
+        
         if (cuotaActualDetectada && totalCuotasDetectadas && cuotaActualDetectada > 0 && totalCuotasDetectadas > cuotaActualDetectada) {
           // Calcular cuántas cuotas faltan (si es cuota 4 de 6, faltan 3: 4, 5, 6)
           const cuotasRestantes = totalCuotasDetectadas - cuotaActualDetectada + 1
           cuotasFinal = cuotasRestantes
           cuotaActualFinal = cuotaActualDetectada
-          console.log(`🔵 [GastosPage] Cuota actual detectada: ${cuotaActualDetectada} de ${totalCuotasDetectadas} → cuotas restantes: ${cuotasRestantes}`)
+          
+          // IMPORTANTE: Si es una cuota intermedia (ej: cuota 4 de 6), el monto mostrado en el resumen
+          // es el monto de UNA cuota. Necesitamos multiplicar por las cuotas restantes para obtener el total.
+          // Ejemplo: Si el monto es 89.998,98 y es cuota 4 de 6, el total restante es: 89.998,98 × 3 = 269.996,94
+          montoFinal = trans.monto * cuotasRestantes
+          
+          console.log(`🔵 [GastosPage] Cuota actual detectada: ${cuotaActualDetectada} de ${totalCuotasDetectadas} → cuotas restantes: ${cuotasRestantes}, monto por cuota: ${trans.monto}, monto total restante: ${montoFinal}`)
         } else if (totalCuotasDetectadas && totalCuotasDetectadas > 1) {
           // Si solo hay total de cuotas pero no cuota actual, asumir que es la primera
+          // En este caso, el monto mostrado es de una cuota, multiplicar por el total
+          montoFinal = trans.monto * totalCuotasDetectadas
           cuotasFinal = totalCuotasDetectadas
           cuotaActualFinal = 1
+          console.log(`🔵 [GastosPage] Primera cuota de ${totalCuotasDetectadas} → monto por cuota: ${trans.monto}, monto total: ${montoFinal}`)
         }
         
-        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Transacción ${index + 1} - total cuotas: ${totalCuotasDetectadas}, cuota actual: ${cuotaActualDetectada}, cuotas final: ${cuotasFinal}, cuota actual final: ${cuotaActualFinal}`)
+        console.log(`🔵 [GastosPage] handleConfirmExtractedData - Transacción ${index + 1} - total cuotas: ${totalCuotasDetectadas}, cuota actual: ${cuotaActualDetectada}, cuotas final: ${cuotasFinal}, cuota actual final: ${cuotaActualFinal}, monto final: ${montoFinal}`)
         
         const gastoData = {
           descripcion: trans.descripcion,
           categoria_id: categoriaId,
-          monto: trans.monto,
+          monto: montoFinal,
           moneda: trans.moneda || 'ARS',
           fecha: fecha,
           mes_facturacion: mesFacturacion,
@@ -2335,7 +2346,7 @@ export default function GastosPage() {
                                       e.stopPropagation()
                                       updateEditedTransaction(index, 'moneda', e.target.value)
                                     }}
-                                    className="input text-xs h-7 w-16"
+                                    className="input text-xs h-7 w-16 border-slate-300 focus:border-indigo-500"
                                   >
                                     <option value="ARS">ARS</option>
                                     <option value="USD">USD</option>

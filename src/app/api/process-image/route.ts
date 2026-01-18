@@ -174,12 +174,13 @@ REGLAS PARA DETECTAR DECIMALES:
        - En los resúmenes bancarios argentinos, cuando un consumo está en cuotas, el monto mostrado en la tabla de consumos es generalmente el MONTO DE UNA CUOTA INDIVIDUAL, NO el total
        - REGLA DE ORO: Si detectas que un consumo tiene cuotas (ej: "01/03" o "3 CUOTAS") y el monto mostrado es, por ejemplo, 30.000:
          * El monto mostrado (30.000) = valor de UNA cuota
-         * El monto total del consumo = 30.000 × 3 = 90.000
-         * DEBES multiplicar el monto mostrado por el número de cuotas para obtener el total
+         * Si es la PRIMERA cuota (ej: "01/03"): El monto total del consumo = 30.000 × 3 = 90.000
+         * Si es una cuota INTERMEDIA (ej: "04/06"): El monto mostrado es de UNA cuota, pero solo faltan 3 cuotas (4, 5, 6), entonces el monto total restante = 30.000 × 3 = 90.000
+         * IMPORTANTE: Siempre multiplica el monto mostrado por el número de cuotas RESTANTES (si es cuota 4 de 6, multiplica por 3, no por 6)
        - Ejemplos:
-         * Consumo: "FARMACITY", Monto mostrado: 30.000, Cuotas: 3 → monto total: 30.000 × 3 = 90.000
-         * Consumo: "MERCADOLIBRE", Monto mostrado: 15.000, Cuotas: 6 → monto total: 15.000 × 6 = 90.000
-         * Consumo: "COTO", Monto mostrado: 50.000, Cuotas: 12 → monto total: 50.000 × 12 = 600.000
+         * Consumo: "FARMACITY", Monto: 30.000, Cuotas: "01/03" (primera de 3) → monto total: 30.000 × 3 = 90.000
+         * Consumo: "BILLABONG", Monto: 89.998,98, Cuotas: "04/06" (cuarta de 6) → monto total restante: 89.998,98 × 3 = 269.996,94 (solo faltan 3 cuotas)
+         * Consumo: "MERCADOLIBRE", Monto: 15.000, Cuotas: 6 → monto total: 15.000 × 6 = 90.000
        - EXCEPCIÓN: Si el resumen explícitamente dice "TOTAL" o "MONTO TOTAL" junto al monto, entonces ese monto ya es el total y NO debes multiplicarlo
        - Si NO hay indicación de cuotas, el monto mostrado es el monto total del consumo (no hay que multiplicar)
      
@@ -243,12 +244,15 @@ REGLAS PARA DETECTAR DECIMALES:
     {
       "descripcion": "descripción exacta del consumo (ej: nombre del comercio, descripción del consumo)",
       "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (⚠️⚠️⚠️ CRÍTICO: 
-        - Si el consumo tiene cuotas (ej: "01/03" o "3 CUOTAS"):
-          * El monto mostrado en el resumen es generalmente el valor de UNA CUOTA INDIVIDUAL
-          * DEBES multiplicar ese monto por el número de cuotas para obtener el total
+        - REGLA GENERAL: El monto mostrado en el resumen es el valor de UNA CUOTA INDIVIDUAL cuando hay cuotas
+        - Si el consumo tiene cuotas y NO hay cuota_actual (es la primera cuota, ej: "01/03"):
+          * Multiplica el monto mostrado por el número total de cuotas
           * Ejemplo: Si ves monto 30.000 y cuotas 3 → monto total: 30.000 × 3 = 90.000
-          * Ejemplo: Si ves monto 15.000 y cuotas 6 → monto total: 15.000 × 6 = 90.000
-        - Si NO hay cuotas (cuotas: null o 1), el monto mostrado es el monto total del consumo
+        - Si el consumo tiene cuotas Y hay cuota_actual (es una cuota intermedia, ej: "04/06"):
+          * NO multipliques el monto - devuelve el monto tal cual aparece (es el monto de una cuota)
+          * El sistema calculará automáticamente el monto total restante multiplicando por las cuotas restantes
+          * Ejemplo: Si ves monto 89.998,98 y es cuota 4 de 6 → devuelve 89.998,98 (el sistema calculará 89.998,98 × 3 = 269.996,94)
+        - Si NO hay cuotas (cuotas: null o 1), el monto mostrado es el monto total del consumo (no multipliques)
         - EXCEPCIÓN: Si el resumen explícitamente dice "TOTAL" junto al monto, entonces ese monto ya es el total y NO multipliques
         - Ejemplos: 15179.99, 6647.26, 3600.00, 90000.00),
       "moneda": "ARS" o "USD" según corresponda,
