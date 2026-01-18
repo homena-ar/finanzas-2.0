@@ -86,17 +86,20 @@ REGLAS PARA DETECTAR DECIMALES:
    - nombre_titular: nombre del titular si está visible
 
 2. CONSUMOS DEL PERÍODO ACTUAL (CRÍTICO - NO PUEDES PERDERTE NINGUNO):
-   - ⚠️ REGLA ABSOLUTA: DEBES EXTRAER TODOS Y CADA UNO DE LOS CONSUMOS del período actual
-   - NO puedes omitir, olvidar o saltarte NINGÚN consumo, sin importar el nombre del comercio
-   - Busca EXHAUSTIVAMENTE en TODO el documento: todas las páginas, todas las secciones, todas las tablas
+   - ⚠️ REGLA ABSOLUTA: DEBES EXTRAER TODOS Y CADA UNO DE LOS CONSUMOS VISIBLES en la imagen/documento
+   - ⚠️ IMPORTANTE: Si la imagen está recortada o es solo una parte del resumen, extrae TODOS los consumos que puedas ver en esa parte
+   - NO puedes omitir, olvidar o saltarte NINGÚN consumo visible, sin importar el nombre del comercio
+   - Busca EXHAUSTIVAMENTE en TODO lo que puedas ver: todas las secciones visibles, todas las tablas visibles, todas las filas visibles
    - Busca la sección titulada "Consumos", "Detalle de Consumos", "Movimientos", "Transacciones" o similar
-   - Revisa TODAS las filas de la tabla de consumos, incluso si el nombre del comercio es poco común o desconocido
-   - Ejemplos de comercios que DEBEN ser extraídos: "BILLABONG", "FARMACITY", "PEDIDOSYA", "MERCADOLIBRE", "AMAZON", etc.
-   - Si hay múltiples páginas, revisa TODAS las páginas del resumen
-   - Si hay múltiples tarjetas en el mismo resumen, extrae los consumos de TODAS las tarjetas
-   - SOLO extrae CONSUMOS individuales del período actual
+   - Revisa TODAS las filas de la tabla de consumos que sean visibles, incluso si el nombre del comercio es poco común o desconocido
+   - Ejemplos de comercios que DEBES extraer si los ves: "BILLABONG", "FARMACITY", "PEDIDOSYA", "MERCADOLIBRE", "AMAZON", "EDENOR", "MERCADOPAGO", "AMAZON MKTPL", "K DLO*PEDIDOSYA", "K MERPAGO*PROSHOP", etc.
+   - Si la imagen muestra solo una parte del resumen, extrae TODOS los consumos de esa parte visible
+   - Si hay múltiples páginas visibles, revisa TODAS las páginas visibles
+   - Si hay múltiples tarjetas visibles en el mismo resumen, extrae los consumos de TODAS las tarjetas visibles
+   - SOLO extrae CONSUMOS individuales del período actual que sean VISIBLES
    - NO incluyas pagos de meses anteriores (ej: "SU PAGO EN PESOS")
    - NO incluyas saldos anteriores o intereses como transacciones
+   - ⚠️ Si ves una tabla con múltiples filas de consumos, DEBES extraer TODAS las filas visibles, no solo algunas
    - IMPORTANTE: DETECTA EL MES DEL RESUMEN basándote en la fecha de vencimiento:
      * Si el vencimiento es en enero → el resumen es de DICIEMBRE (mes anterior)
      * Si el vencimiento es en febrero → el resumen es de ENERO (mes anterior)

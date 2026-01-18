@@ -2232,15 +2232,24 @@ export default function GastosPage() {
                         console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
                         setSelectedTarjetaId(e.target.value)
                       }}
-                      className="input w-full text-xs h-8"
+                      className="input w-full text-xs h-8 font-semibold"
+                      style={{
+                        color: 'rgb(30, 41, 59)',
+                        backgroundColor: 'rgb(255, 255, 255)',
+                        borderColor: 'rgb(203, 213, 225)',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        appearance: 'none'
+                      }}
                     >
-                      <option value="">
+                      <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white' }}>
                         {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
                       </option>
                       {tarjetas.map(t => (
                         <option 
                           key={t.id} 
                           value={t.id}
+                          style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}
                         >
                           {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
                         </option>
@@ -2398,20 +2407,26 @@ export default function GastosPage() {
                                     className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
                                     placeholder="0.00"
                                   />
-                                  <div className="relative">
-                                    <select
-                                      value={moneda || 'ARS'}
-                                      onChange={(e) => {
-                                        e.stopPropagation()
-                                        console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
-                                        updateEditedTransaction(index, 'moneda', e.target.value)
-                                      }}
-                                      className="input w-16 h-7 text-xs font-semibold text-center rounded-lg cursor-pointer"
-                                    >
-                                      <option value="ARS">ARS</option>
-                                      <option value="USD">USD</option>
-                                    </select>
-                                  </div>
+                                  <select
+                                    value={moneda || 'ARS'}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
+                                      updateEditedTransaction(index, 'moneda', e.target.value)
+                                    }}
+                                    className="input w-16 h-7 text-xs font-semibold text-center cursor-pointer"
+                                    style={{
+                                      color: 'rgb(30, 41, 59)',
+                                      backgroundColor: 'rgb(255, 255, 255)',
+                                      borderColor: 'rgb(203, 213, 225)',
+                                      WebkitAppearance: 'none',
+                                      MozAppearance: 'none',
+                                      appearance: 'none'
+                                    }}
+                                  >
+                                    <option value="ARS" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>ARS</option>
+                                    <option value="USD" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>USD</option>
+                                  </select>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -2430,11 +2445,30 @@ export default function GastosPage() {
                                     placeholder="1"
                                   />
                                 </div>
-                                {cuotas && cuotas > 1 && (
-                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                    {cuotas} cuotas (se distribuirá en {cuotas} meses)
-                                  </span>
-                                )}
+                                {(() => {
+                                  const cuotaActual = getTransactionValue(index, 'cuota_actual', trans.cuota_actual)
+                                  const totalCuotas = getTransactionValue(index, 'cuotas', trans.cuotas)
+                                  const cuotasRestantes = cuotaActual && totalCuotas && totalCuotas > cuotaActual
+                                    ? totalCuotas - cuotaActual + 1
+                                    : cuotas
+                                  
+                                  if (cuotas && cuotas > 1) {
+                                    if (cuotaActual && totalCuotas && totalCuotas > cuotaActual) {
+                                      return (
+                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                          {cuotasRestantes} cuotas restantes (cuotas {cuotaActual} a {totalCuotas} de {totalCuotas})
+                                        </span>
+                                      )
+                                    } else {
+                                      return (
+                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                          {cuotas} cuotas (se distribuirá en {cuotas} meses)
+                                        </span>
+                                      )
+                                    }
+                                  }
+                                  return null
+                                })()}
                               </div>
                               <div className="flex items-center gap-2 text-xs flex-wrap">
                                 {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
@@ -2454,6 +2488,34 @@ export default function GastosPage() {
                         <h4 className="font-semibold text-orange-900 text-xs flex items-center gap-2">
                           📝 Impuestos ({extractedData.impuestos.length})
                         </h4>
+                        {selectedImpuestos.size > 0 && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                // TODO: Implementar pago masivo de impuestos
+                                console.log('🔵 [GastosPage] Pago masivo de impuestos:', Array.from(selectedImpuestos))
+                              }}
+                              className="btn btn-success text-xs px-2 py-1"
+                            >
+                              Pagar {selectedImpuestos.size}
+                            </button>
+                            <button
+                              onClick={() => {
+                                // Eliminar impuestos seleccionados de la lista
+                                const newImpuestos = extractedData.impuestos.filter((_: any, i: number) => !selectedImpuestos.has(i))
+                                // Actualizar extractedData
+                                setExtractedData((prev: any) => ({
+                                  ...prev,
+                                  impuestos: newImpuestos
+                                }))
+                                setSelectedImpuestos(new Set())
+                              }}
+                              className="btn btn-danger text-xs px-2 py-1"
+                            >
+                              Eliminar {selectedImpuestos.size}
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         {extractedData.impuestos.map((imp: any, index: number) => {
@@ -2526,10 +2588,18 @@ export default function GastosPage() {
                                           e.stopPropagation()
                                           updateEditedImpuesto(index, 'moneda', e.target.value)
                                         }}
-                                        className="input text-xs h-7 w-16 border-slate-300 focus:border-orange-500"
+                                        className="input text-xs h-7 w-16 border-slate-300 focus:border-orange-500 font-semibold text-center"
+                                        style={{
+                                          color: 'rgb(30, 41, 59)',
+                                          backgroundColor: 'rgb(255, 255, 255)',
+                                          borderColor: 'rgb(203, 213, 225)',
+                                          WebkitAppearance: 'none',
+                                          MozAppearance: 'none',
+                                          appearance: 'none'
+                                        }}
                                       >
-                                        <option value="ARS">ARS</option>
-                                        <option value="USD">USD</option>
+                                        <option value="ARS" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>ARS</option>
+                                        <option value="USD" style={{ color: 'rgb(30, 41, 59)', backgroundColor: 'white' }}>USD</option>
                                       </select>
                                     </div>
                                   </div>
