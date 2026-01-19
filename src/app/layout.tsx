@@ -1,40 +1,48 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/hooks/useAuth'
 import { WorkspaceProvider } from '@/hooks/useWorkspace'
 import { DataProvider } from '@/hooks/useData'
 
 // URL base de la aplicación (cambiar según el entorno)
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.nexuno.com.ar'
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://fin.nexuno.com.ar'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#6366f1',
+}
 
 export const metadata: Metadata = {
-  title: 'FinControl - Controlá tus Finanzas',
-  description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares. Gestioná gastos, proyecciones, ahorros y patrimonio en un solo lugar.',
-  themeColor: '#6366f1',
-  keywords: ['finanzas', 'control financiero', 'gastos', 'ahorro', 'patrimonio', 'presupuesto'],
-  authors: [{ name: 'FinControl' }],
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
+  title: {
+    default: 'FinControl - Controlá tus Finanzas',
+    template: '%s | FinControl',
   },
+  description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares. Gestioná gastos, ingresos, ahorros, proyecciones y patrimonio en un solo lugar.',
+  keywords: ['finanzas', 'control financiero', 'gastos', 'ingresos', 'ahorro', 'patrimonio', 'presupuesto', 'argentina', 'pesos', 'dólares'],
+  authors: [{ name: 'FinControl', url: baseUrl }],
+  creator: 'FinControl',
+  publisher: 'FinControl',
   metadataBase: new URL(baseUrl),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     type: 'website',
     locale: 'es_AR',
-    url: '/',
+    url: baseUrl,
     title: 'FinControl - Controlá tus Finanzas',
-    description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares.',
+    description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares. Gestioná gastos, ingresos, ahorros y proyecciones.',
     siteName: 'FinControl',
     images: [
       {
-        url: '/og-image.png',
-        secureUrl: '/og-image.png',
+        url: '/og-image.svg',
         width: 1200,
         height: 630,
         alt: 'FinControl - Plataforma de Control Financiero',
-        type: 'image/png',
+        type: 'image/svg+xml',
       },
     ],
   },
@@ -42,7 +50,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'FinControl - Controlá tus Finanzas',
     description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares.',
-    images: ['/og-image.png'],
+    images: ['/og-image.svg'],
   },
   appleWebApp: {
     capable: true,
@@ -52,6 +60,17 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({
@@ -65,11 +84,6 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
       </head>
       <body className="font-sans">
         <AuthProvider>

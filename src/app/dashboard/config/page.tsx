@@ -63,6 +63,7 @@ export default function ConfigPage() {
   // Workspace modal states
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
   const [workspaceName, setWorkspaceName] = useState('')
+  const [workspaceIcono, setWorkspaceIcono] = useState('')
   
   // Invite modal states
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -235,7 +236,7 @@ export default function ConfigPage() {
       return
     }
 
-    const result = await createWorkspace(workspaceName)
+    const result = await createWorkspace(workspaceName, workspaceIcono || undefined)
 
     if (result.error) {
       setAlertData({
@@ -250,6 +251,7 @@ export default function ConfigPage() {
         variant: 'success'
       })
       setWorkspaceName('')
+      setWorkspaceIcono('')
       setShowWorkspaceModal(false)
     }
 
@@ -568,9 +570,10 @@ export default function ConfigPage() {
     }
   }
 
-  const handleEditWorkspace = (workspaceId: string, currentName: string) => {
+  const handleEditWorkspace = (workspaceId: string, currentName: string, currentIcono?: string | null) => {
     setEditingWorkspaceId(workspaceId)
     setEditingWorkspaceName(currentName)
+    setWorkspaceIcono(currentIcono || '')
   }
 
   const handleSaveWorkspaceName = async () => {
@@ -578,22 +581,23 @@ export default function ConfigPage() {
       return
     }
 
-    const result = await updateWorkspace(editingWorkspaceId, editingWorkspaceName)
+    const result = await updateWorkspace(editingWorkspaceId, editingWorkspaceName, workspaceIcono || null)
 
     if (result.error) {
       setAlertData({
         title: 'Error',
-        message: 'No se pudo actualizar el nombre',
+        message: 'No se pudo actualizar el workspace',
         variant: 'error'
       })
     } else {
       setAlertData({
-        title: 'Nombre actualizado',
-        message: 'El workspace fue renombrado exitosamente',
+        title: 'Workspace actualizado',
+        message: 'El workspace fue actualizado exitosamente',
         variant: 'success'
       })
       setEditingWorkspaceId(null)
       setEditingWorkspaceName('')
+      setWorkspaceIcono('')
     }
 
     setShowAlert(true)
@@ -602,6 +606,7 @@ export default function ConfigPage() {
   const handleCancelEditWorkspace = () => {
     setEditingWorkspaceId(null)
     setEditingWorkspaceName('')
+    setWorkspaceIcono('')
   }
 
   // Permisos disponibles para el selector con explicaciones
@@ -693,27 +698,40 @@ export default function ConfigPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       {editingWorkspaceId === ws.id ? (
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                          <input
-                            type="text"
-                            value={editingWorkspaceName}
-                            onChange={(e) => setEditingWorkspaceName(e.target.value)}
-                            className="input input-sm flex-1 min-w-0"
-                            autoFocus
-                            onKeyPress={(e) => e.key === 'Enter' && handleSaveWorkspaceName()}
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={handleSaveWorkspaceName} className="btn btn-primary btn-sm flex-1 sm:flex-none">
-                              Guardar
-                            </button>
-                            <button onClick={handleCancelEditWorkspace} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
-                              Cancelar
-                            </button>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1">
+                              <EmojiPickerField
+                                value={workspaceIcono}
+                                onChange={setWorkspaceIcono}
+                                placeholder="🏢"
+                                size="sm"
+                              />
+                              <input
+                                type="text"
+                                value={editingWorkspaceName}
+                                onChange={(e) => setEditingWorkspaceName(e.target.value)}
+                                className="input input-sm flex-1 min-w-0"
+                                autoFocus
+                                onKeyPress={(e) => e.key === 'Enter' && handleSaveWorkspaceName()}
+                                placeholder="Nombre del workspace"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={handleSaveWorkspaceName} className="btn btn-primary btn-sm flex-1 sm:flex-none">
+                                Guardar
+                              </button>
+                              <button onClick={handleCancelEditWorkspace} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
+                                Cancelar
+                              </button>
+                            </div>
                           </div>
+                          <p className="text-xs text-slate-500">Elegí un emoji para identificar el workspace (opcional)</p>
                         </div>
                       ) : (
                         <>
                           <div className="flex flex-wrap items-center gap-2">
+                            {ws.icono && <span className="text-xl">{ws.icono}</span>}
                             <h4 className="font-semibold break-words">{ws.name}</h4>
                             
                             {/* ETIQUETA DE ROL */}
@@ -730,9 +748,9 @@ export default function ConfigPage() {
                             {isOwner && (
                               <div className="flex gap-1">
                                 <button
-                                  onClick={() => handleEditWorkspace(ws.id, ws.name)}
+                                  onClick={() => handleEditWorkspace(ws.id, ws.name, ws.icono)}
                                   className="p-1 hover:bg-slate-200 rounded transition"
-                                  title="Editar nombre"
+                                  title="Editar workspace"
                                 >
                                   <Edit2 className="w-4 h-4 text-slate-600" />
                                 </button>
@@ -766,13 +784,13 @@ export default function ConfigPage() {
                             }}
                             className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
                           >
-                            <Mail className="w-4 h-4" /> <span className="hidden sm:inline">Invitar</span>
+                            <Mail className="w-4 h-4" /> Invitar
                           </button>
                           <button
                             onClick={() => setExpandedWorkspaceId(isExpanded ? null : ws.id)}
                             className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
                           >
-                            <Users className="w-4 h-4" /> <span className="hidden sm:inline">{isExpanded ? 'Ocultar' : 'Ver'} Miembros</span>
+                            <Users className="w-4 h-4" /> {isExpanded ? 'Ocultar' : 'Ver Miembros'}
                           </button>
                         </>
                       )}
@@ -790,7 +808,7 @@ export default function ConfigPage() {
                   {isOwner && isExpanded && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
                       <div className="flex items-center justify-between mb-3">
-                        <h5 className="font-semibold text-sm">Invitaciones Enviadas</h5>
+                        <h5 className="font-semibold text-sm">Invitaciones enviadas</h5>
                         {sentInvitations.filter(inv => inv.workspace_id === ws.id).length > 0 && (
                           <button
                             onClick={() => {
@@ -823,69 +841,71 @@ export default function ConfigPage() {
                                 cancelled: '🚫 Cancelada'
                               }
                               return (
-                                <div key={inv.id} className="bg-white rounded-lg p-3 border border-slate-200 flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium">{inv.email}</p>
-                                    <div className="text-xs text-slate-500 mt-1 space-y-1">
-                                      <div className="flex flex-wrap gap-2">
-                                        {Object.entries(inv.permissions).map(([section, perm]) => (
-                                          <div key={section} className="flex items-center gap-1 group relative">
-                                            <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">
-                                              {section}: {permissionOptions.find(o => o.value === perm)?.label || perm}
-                                            </span>
-                                            {getPermissionDescription(perm) && (
-                                              <>
-                                                <HelpCircle className="w-3 h-3 text-slate-400 cursor-help" />
-                                                <div className="absolute left-0 top-full mt-1 w-64 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                                                  <p className="font-semibold mb-1">{section}: {permissionOptions.find(o => o.value === perm)?.label}</p>
-                                                  <p className="text-slate-200">{getPermissionDescription(perm)}</p>
-                                                </div>
-                                              </>
-                                            )}
-                                          </div>
-                                        ))}
+                                <div key={inv.id} className="bg-white rounded-lg p-3 border border-slate-200">
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">{inv.email}</p>
+                                      <div className="text-xs text-slate-500 mt-1 space-y-1">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {Object.entries(inv.permissions).map(([section, perm]) => (
+                                            <div key={section} className="flex items-center gap-1 group relative">
+                                              <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 text-[10px]">
+                                                {section}: {permissionOptions.find(o => o.value === perm)?.label || perm}
+                                              </span>
+                                              {getPermissionDescription(perm) && (
+                                                <>
+                                                  <HelpCircle className="w-3 h-3 text-slate-400 cursor-help hidden sm:block" />
+                                                  <div className="absolute left-0 top-full mt-1 w-64 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 hidden sm:block">
+                                                    <p className="font-semibold mb-1">{section}: {permissionOptions.find(o => o.value === perm)?.label}</p>
+                                                    <p className="text-slate-200">{getPermissionDescription(perm)}</p>
+                                                  </div>
+                                                </>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-1 rounded border font-medium ${statusColors[inv.status as keyof typeof statusColors] || statusColors.pending}`}>
-                                      {statusLabels[inv.status as keyof typeof statusLabels] || '⏳ Pendiente'}
-                                    </span>
-                                    {(inv.status === 'pending' || inv.status === 'rejected') && (
+                                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                      <span className={`text-xs px-2 py-1 rounded border font-medium whitespace-nowrap ${statusColors[inv.status as keyof typeof statusColors] || statusColors.pending}`}>
+                                        {statusLabels[inv.status as keyof typeof statusLabels] || '⏳ Pendiente'}
+                                      </span>
+                                      {(inv.status === 'pending' || inv.status === 'rejected') && (
+                                        <button
+                                          onClick={async () => {
+                                            const result = await cancelInvitation(inv.id)
+                                            if (result.error) {
+                                              setAlertData({
+                                                title: 'Error',
+                                                message: 'No se pudo cancelar la invitación',
+                                                variant: 'error'
+                                              })
+                                            } else {
+                                              setAlertData({
+                                                title: 'Invitación cancelada',
+                                                message: 'La invitación fue cancelada. Ahora puedes volver a invitar.',
+                                                variant: 'success'
+                                              })
+                                            }
+                                            setShowAlert(true)
+                                          }}
+                                          className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition whitespace-nowrap"
+                                          title="Cancelar invitación"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      )}
                                       <button
-                                        onClick={async () => {
-                                          const result = await cancelInvitation(inv.id)
-                                          if (result.error) {
-                                            setAlertData({
-                                              title: 'Error',
-                                              message: 'No se pudo cancelar la invitación',
-                                              variant: 'error'
-                                            })
-                                          } else {
-                                            setAlertData({
-                                              title: 'Invitación cancelada',
-                                              message: 'La invitación fue cancelada. Ahora puedes volver a invitar.',
-                                              variant: 'success'
-                                            })
-                                          }
-                                          setShowAlert(true)
+                                        onClick={() => {
+                                          setInvitationToDelete({ id: inv.id, email: inv.email })
+                                          setShowDeleteConfirm(true)
                                         }}
-                                        className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition"
-                                        title="Cancelar invitación"
+                                        className="text-xs px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
+                                        title="Eliminar invitación del historial"
                                       >
-                                        Cancelar
+                                        <Trash2 className="w-3 h-3" />
                                       </button>
-                                    )}
-                                    <button
-                                      onClick={() => {
-                                        setInvitationToDelete({ id: inv.id, email: inv.email })
-                                        setShowDeleteConfirm(true)
-                                      }}
-                                      className="text-xs px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
-                                      title="Eliminar invitación del historial"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
+                                    </div>
                                   </div>
                                 </div>
                               )
@@ -1384,6 +1404,18 @@ export default function ConfigPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
+                <label className="label">Icono (opcional)</label>
+                <EmojiPickerField
+                  value={workspaceIcono}
+                  onChange={setWorkspaceIcono}
+                  placeholder="🏢"
+                  size="md"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Elegí un emoji para identificar fácilmente el workspace
+                </p>
+              </div>
+              <div>
                 <label className="label">Nombre del Workspace</label>
                 <input
                   type="text"
@@ -1398,9 +1430,20 @@ export default function ConfigPage() {
                   Podés crear hasta 2 workspaces compartidos adicionales.
                 </p>
               </div>
+
+              {/* Preview */}
+              {(workspaceName || workspaceIcono) && (
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                  <div className="text-xs text-slate-500 mb-2">Vista previa:</div>
+                  <div className="flex items-center gap-2">
+                    {workspaceIcono && <span className="text-2xl">{workspaceIcono}</span>}
+                    <span className="font-semibold">{workspaceName || 'Nombre del workspace'}</span>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">
-              <button onClick={() => setShowWorkspaceModal(false)} className="btn btn-secondary">
+              <button onClick={() => { setShowWorkspaceModal(false); setWorkspaceName(''); setWorkspaceIcono('') }} className="btn btn-secondary">
                 Cancelar
               </button>
               <button onClick={handleCreateWorkspace} className="btn btn-primary">

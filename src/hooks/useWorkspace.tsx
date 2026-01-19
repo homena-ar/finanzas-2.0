@@ -28,8 +28,8 @@ interface WorkspaceContextType {
   loading: boolean
 
   setCurrentWorkspace: (workspace: Workspace | null) => void
-  createWorkspace: (name: string) => Promise<{ error: any } | { error: null, workspace: Workspace }>
-  updateWorkspace: (id: string, name: string) => Promise<{ error: any }>
+  createWorkspace: (name: string, icono?: string) => Promise<{ error: any } | { error: null, workspace: Workspace }>
+  updateWorkspace: (id: string, name: string, icono?: string | null) => Promise<{ error: any }>
   deleteWorkspace: (id: string) => Promise<{ error: any }>
 
   inviteUser: (workspaceId: string, email: string, permissions: WorkspacePermissions) => Promise<{ error: any }>
@@ -73,6 +73,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         id: doc.id,
         name: doc.data().name,
         owner_id: doc.data().owner_id,
+        icono: doc.data().icono || null,
         created_at: doc.data().created_at instanceof Timestamp 
           ? doc.data().created_at.toDate().toISOString() 
           : doc.data().created_at
@@ -98,6 +99,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                     id: d.id,
                     name: d.data().name,
                     owner_id: d.data().owner_id,
+                    icono: d.data().icono || null,
                     created_at: d.data().created_at instanceof Timestamp 
                       ? d.data().created_at.toDate().toISOString() 
                       : d.data().created_at
@@ -248,7 +250,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [currentWorkspace?.id, user?.uid, members.length]) // Solo cuando cambia el ID del workspace o del usuario
 
-  const createWorkspace = useCallback(async (name: string) => {
+  const createWorkspace = useCallback(async (name: string, icono?: string) => {
     if (!user) return { error: new Error('No user') }
 
     const misWorkspaces = workspaces.filter(w => w.owner_id === user.uid)
@@ -259,6 +261,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const docRef = await addDoc(workspacesRef, {
         name,
         owner_id: user.uid,
+        icono: icono || null,
         created_at: serverTimestamp()
       })
 
@@ -275,7 +278,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const newWorkspace = { 
         id: docRef.id, 
         name, 
-        owner_id: user.uid, 
+        owner_id: user.uid,
+        icono: icono || null,
         created_at: new Date().toISOString() 
       }
       
@@ -480,8 +484,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user, workspaces])
 
-  const updateWorkspace = useCallback(async (id: string, name: string) => {
-    try { await updateDoc(doc(db, 'workspaces', id), { name }); await fetchAll(); return { error: null } } catch (e) { return { error: e } }
+  const updateWorkspace = useCallback(async (id: string, name: string, icono?: string | null) => {
+    try { 
+      const updateData: { name: string; icono?: string | null } = { name }
+      if (icono !== undefined) {
+        updateData.icono = icono
+      }
+      await updateDoc(doc(db, 'workspaces', id), updateData)
+      await fetchAll()
+      return { error: null } 
+    } catch (e) { return { error: e } }
   }, [fetchAll])
 
   const deleteWorkspace = useCallback(async (id: string) => {

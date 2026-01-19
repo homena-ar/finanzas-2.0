@@ -469,7 +469,12 @@ export default function AhorrosPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Ahorros y Metas</h1>
-        <p className="text-slate-500">Construí tu futuro 🚀</p>
+        <p className="text-slate-500">
+          {currentWorkspace ? (
+            <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
+          ) : null}
+          Construí tu futuro 🚀
+        </p>
       </div>
 
       {/* Patrimonio Hero - SEPARADO */}

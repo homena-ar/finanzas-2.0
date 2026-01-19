@@ -121,6 +121,12 @@ export default function GastosPage() {
     }
   }, [searchParams])
 
+  // Limpiar selección de gastos cuando cambia el workspace
+  useEffect(() => {
+    setSelectedGastos(new Set())
+    setSelectedImpuestosGastos(new Set())
+  }, [currentWorkspace?.id])
+
   // Form states
   const [gastoForm, setGastoForm] = useState({
     descripcion: '', tarjeta_id: '', categoria_id: '', monto: '',
@@ -1117,7 +1123,12 @@ export default function GastosPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Gastos</h1>
-        <p className="text-slate-500">Consumos de {getMonthName(currentMonth)}</p>
+        <p className="text-slate-500">
+          {currentWorkspace ? (
+            <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
+          ) : null}
+          Consumos de {getMonthName(currentMonth)}
+        </p>
       </div>
 
       {/* Consumos Section */}
@@ -1139,19 +1150,19 @@ export default function GastosPage() {
         </div>
 
         {/* Filters */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-3">
+        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-2 items-center">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar..."
-              className="input pl-9 w-40"
+              className="pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors w-32"
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
             />
           </div>
           <select
-            className="input w-auto"
+            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
             value={filters.tarjeta}
             onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
           >
@@ -1159,7 +1170,7 @@ export default function GastosPage() {
             {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
           </select>
           <select
-            className="input w-auto"
+            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
             value={filters.moneda}
             onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
           >
@@ -1168,7 +1179,7 @@ export default function GastosPage() {
             <option value="USD">USD</option>
           </select>
           <select
-            className="input w-auto"
+            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
             value={filters.tag}
             onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
           >
@@ -1177,7 +1188,7 @@ export default function GastosPage() {
           </select>
           {currentWorkspace && members.length > 0 && (
             <select
-              className="input w-auto"
+              className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
               value={filters.colaborador}
               onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
             >
@@ -1200,7 +1211,7 @@ export default function GastosPage() {
             </select>
           )}
           <select
-            className="input w-auto"
+            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
             value={filters.sort}
             onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
           >
@@ -1212,13 +1223,13 @@ export default function GastosPage() {
 
         {/* Acciones masivas */}
         {selectedGastos.size > 0 && (
-          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between flex-wrap gap-2">
+          <div className="p-3 sm:p-4 bg-indigo-50 border-b border-indigo-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-sm font-semibold text-indigo-900">
               {selectedGastos.size} gasto{selectedGastos.size !== 1 ? 's' : ''} seleccionado{selectedGastos.size !== 1 ? 's' : ''}
             </span>
-            <div className="flex gap-2 items-center flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-indigo-900">Cambiar cuenta:</label>
+                <label className="text-xs font-semibold text-indigo-900 whitespace-nowrap shrink-0">Cambiar cuenta:</label>
                 <select
                   onChange={async (e) => {
                     const tarjetaId = e.target.value || null
@@ -1230,7 +1241,7 @@ export default function GastosPage() {
                     setSelectedGastos(new Set())
                     e.target.value = ''
                   }}
-                  className="input text-xs h-8 min-w-[150px]"
+                  className="input text-xs h-8 flex-1 min-w-0 sm:min-w-[150px] sm:max-w-[200px]"
                   defaultValue=""
                 >
                   <option value="">Seleccionar cuenta...</option>
@@ -1242,26 +1253,28 @@ export default function GastosPage() {
                   ))}
                 </select>
               </div>
-              <button
-                onClick={() => {
-                  setPagoMasivoForm({
-                    fecha_pago: new Date().toISOString().split('T')[0],
-                    medio_pago: '',
-                    comprobante: null,
-                    medio_pago_custom: ''
-                  })
-                  setShowPagoMasivoModal(true)
-                }}
-                className="btn btn-success btn-sm"
-              >
-                <CheckCircle2 className="w-4 h-4" /> Registrar Pago Masivo
-              </button>
-              <button
-                onClick={() => setShowDeleteMasivoModal(true)}
-                className="btn btn-danger btn-sm"
-              >
-                <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
-              </button>
+              <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  onClick={() => {
+                    setPagoMasivoForm({
+                      fecha_pago: new Date().toISOString().split('T')[0],
+                      medio_pago: '',
+                      comprobante: null,
+                      medio_pago_custom: ''
+                    })
+                    setShowPagoMasivoModal(true)
+                  }}
+                  className="btn btn-success btn-sm flex-1 sm:flex-none whitespace-nowrap"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Registrar Pago Masivo
+                </button>
+                <button
+                  onClick={() => setShowDeleteMasivoModal(true)}
+                  className="btn btn-danger btn-sm flex-1 sm:flex-none whitespace-nowrap"
+                >
+                  <Trash2 className="w-4 h-4" /> Eliminar Seleccionados
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2579,7 +2592,7 @@ export default function GastosPage() {
                                     if (cuotaActual && totalCuotas && totalCuotas > cuotaActual) {
                                       return (
                                         <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                          {cuotasRestantes} cuotas restantes (cuotas {cuotaActual} a {totalCuotas} de {totalCuotas})
+                                          {cuotasRestantes} cuotas restantes (cuotas {cuotaActual} a {totalCuotas})
                                         </span>
                                       )
                                     } else {

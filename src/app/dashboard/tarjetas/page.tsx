@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useData } from '@/hooks/useData'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { Plus, Edit2, Trash2, X, CreditCard } from 'lucide-react'
 import { Tarjeta } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
@@ -17,12 +18,14 @@ function getCardGradient(tipo: string): string {
 }
 
 export default function TarjetasPage() {
+  const { currentWorkspace } = useWorkspace()
   const { tarjetas, addTarjeta, updateTarjeta, deleteTarjeta, loading } = useData()
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Tarjeta | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '', esCuenta: false
+    nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '', vencimiento: '', esCuenta: false,
+    notificar_cierre: false, notificar_vencimiento: false
   })
 
   // Modal states
@@ -34,7 +37,7 @@ export default function TarjetasPage() {
   console.log('💳 [TarjetasPage] Render - loading:', loading)
 
   const resetForm = () => {
-    setForm({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '', esCuenta: false })
+    setForm({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: '', vencimiento: '', esCuenta: false, notificar_cierre: false, notificar_vencimiento: false })
   }
 
   const openEdit = (t: Tarjeta) => {
@@ -45,7 +48,10 @@ export default function TarjetasPage() {
       banco: t.banco || '',
       digitos: t.digitos || '',
       cierre: t.cierre ? String(t.cierre) : '',
-      esCuenta: t.tipo === 'other'
+      vencimiento: t.vencimiento ? String(t.vencimiento) : '',
+      esCuenta: t.tipo === 'other',
+      notificar_cierre: t.notificar_cierre || false,
+      notificar_vencimiento: t.notificar_vencimiento || false
     })
     setShowModal(true)
   }
@@ -68,7 +74,10 @@ export default function TarjetasPage() {
       tipo: (form.esCuenta ? 'other' : form.tipo) as 'visa' | 'mastercard' | 'amex' | 'other',
       banco: form.banco || null,
       digitos: form.digitos || null,
-      cierre: form.cierre ? parseInt(form.cierre) : null
+      cierre: form.cierre ? parseInt(form.cierre) : null,
+      vencimiento: form.vencimiento ? parseInt(form.vencimiento) : null,
+      notificar_cierre: form.notificar_cierre,
+      notificar_vencimiento: form.notificar_vencimiento
     }
 
     try {
@@ -156,7 +165,12 @@ export default function TarjetasPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Cuentas</h1>
-          <p className="text-slate-500">Administrá tus cuentas y tarjetas ({tarjetas.length})</p>
+          <p className="text-slate-500">
+            {currentWorkspace ? (
+              <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
+            ) : null}
+            Administrá tus cuentas y tarjetas ({tarjetas.length})
+          </p>
         </div>
         <button onClick={() => { resetForm(); setEditing(null); setShowModal(true) }} className="btn btn-primary">
           <Plus className="w-4 h-4" /> Nueva Cuenta
@@ -238,13 +252,27 @@ export default function TarjetasPage() {
                   <div className="text-xs opacity-60 uppercase">Banco</div>
                   <div className="font-semibold">{t.banco || '-'}</div>
                 </div>
-                {t.cierre && (
-                  <div className="text-right">
-                    <div className="text-xs opacity-60 uppercase">Cierre</div>
-                    <div className="font-semibold">Día {t.cierre}</div>
-                  </div>
-                )}
+                <div className="text-right flex gap-4">
+                  {t.cierre && (
+                    <div>
+                      <div className="text-xs opacity-60 uppercase">Cierre</div>
+                      <div className="font-semibold">Día {t.cierre}</div>
+                    </div>
+                  )}
+                  {t.vencimiento && (
+                    <div>
+                      <div className="text-xs opacity-60 uppercase">Venc.</div>
+                      <div className="font-semibold">Día {t.vencimiento}</div>
+                    </div>
+                  )}
+                </div>
               </div>
+              {(t.notificar_cierre || t.notificar_vencimiento) && (
+                <div className="mt-2 pt-2 border-t border-white/20 flex gap-2 text-xs opacity-70">
+                  {t.notificar_cierre && <span>🔔 Cierre</span>}
+                  {t.notificar_vencimiento && <span>🔔 Vencimiento</span>}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -354,6 +382,53 @@ export default function TarjetasPage() {
                     value={form.cierre}
                     onChange={e => setForm(f => ({ ...f, cierre: e.target.value }))}
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Día de vencimiento de pago</label>
+                  <input
+                    type="number"
+                    className="input"
+                    min={1}
+                    max={31}
+                    placeholder="25"
+                    value={form.vencimiento}
+                    onChange={e => setForm(f => ({ ...f, vencimiento: e.target.value }))}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Fecha límite para pagar</p>
+                </div>
+              </div>
+
+              {/* Notificaciones */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h4 className="font-semibold text-sm mb-3">🔔 Notificaciones por correo</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.notificar_cierre}
+                      onChange={e => setForm(f => ({ ...f, notificar_cierre: e.target.checked }))}
+                      className="w-4 h-4 accent-indigo-500 rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Recordar cierre</span>
+                      <p className="text-xs text-slate-500">Recibirás un email 2 días antes del cierre</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.notificar_vencimiento}
+                      onChange={e => setForm(f => ({ ...f, notificar_vencimiento: e.target.checked }))}
+                      className="w-4 h-4 accent-indigo-500 rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Recordar vencimiento</span>
+                      <p className="text-xs text-slate-500">Recibirás un email 2 días antes del vencimiento de pago</p>
+                    </div>
+                  </label>
                 </div>
               </div>
               

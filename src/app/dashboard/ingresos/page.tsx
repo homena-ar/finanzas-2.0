@@ -434,7 +434,12 @@ export default function IngresosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Ingresos</h1>
-          <p className="text-slate-500">{getMonthName(currentMonth)} - {ingresosMes.length} registros</p>
+          <p className="text-slate-500">
+            {currentWorkspace ? (
+              <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
+            ) : null}
+            {getMonthName(currentMonth)} - {ingresosMes.length} registros
+          </p>
         </div>
         <button
           onClick={() => { resetForm(); setEditing(null); setShowModal(true) }}

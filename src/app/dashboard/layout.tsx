@@ -136,23 +136,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <button onClick={() => setSidebarOpen(true)} className="p-2">
           <Menu className="w-6 h-6" />
         </button>
-        <div className="flex items-center gap-2">
-          <svg className="w-6 h-6" viewBox="0 0 100 100" fill="none">
-            <defs>
-              <linearGradient id="grad-mobile" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style={{ stopColor: '#6366f1', stopOpacity: 1 }} />
-                <stop offset="100%" style={{ stopColor: '#8b5cf6', stopOpacity: 1 }} />
-              </linearGradient>
-            </defs>
-            <g fill="url(#grad-mobile)">
-              <rect x="25" y="45" width="10" height="30" rx="2"/>
-              <rect x="45" y="35" width="10" height="40" rx="2"/>
-              <rect x="65" y="25" width="10" height="50" rx="2"/>
-            </g>
-          </svg>
-          <span className="font-bold">FinControl</span>
+        <div className="flex items-center gap-2 min-w-0 flex-1 mx-2">
+          {currentWorkspace?.icono ? (
+            <span className="text-2xl shrink-0">{currentWorkspace.icono}</span>
+          ) : (
+            <svg className="w-6 h-6 shrink-0" viewBox="0 0 100 100" fill="none">
+              <defs>
+                <linearGradient id="grad-mobile" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{ stopColor: '#6366f1', stopOpacity: 1 }} />
+                  <stop offset="100%" style={{ stopColor: '#8b5cf6', stopOpacity: 1 }} />
+                </linearGradient>
+              </defs>
+              <g fill="url(#grad-mobile)">
+                <rect x="25" y="45" width="10" height="30" rx="2"/>
+                <rect x="45" y="35" width="10" height="40" rx="2"/>
+                <rect x="65" y="25" width="10" height="50" rx="2"/>
+              </g>
+            </svg>
+          )}
+          <div className="min-w-0 overflow-hidden">
+            <span className="font-bold block">FinControl</span>
+            {currentWorkspace ? (
+              <span className="text-[10px] text-indigo-600 font-medium truncate block">{currentWorkspace.name}</span>
+            ) : (
+              <span className="text-[10px] text-slate-500 font-medium truncate block">{personalWorkspaceName}</span>
+            )}
+          </div>
         </div>
-        <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold">
+        <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold shrink-0">
           💵 {formatMoney(dolar)}
         </div>
       </header>
@@ -271,10 +282,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       `}
                     >
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
-                          isOwner ? 'bg-indigo-500' : 'bg-purple-500'
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          workspace.icono ? '' : (isOwner ? 'bg-indigo-500' : 'bg-purple-500')
                         }`}>
-                          {workspace.name.charAt(0).toUpperCase()}
+                          {workspace.icono ? (
+                            <span className="text-xl">{workspace.icono}</span>
+                          ) : (
+                            <span className="text-white font-bold">{workspace.name.charAt(0).toUpperCase()}</span>
+                          )}
                         </div>
                         <div className="overflow-hidden">
                           <div className="text-sm font-medium text-slate-900 truncate">{workspace.name}</div>

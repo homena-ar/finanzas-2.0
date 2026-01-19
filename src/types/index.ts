@@ -19,6 +19,9 @@ export interface Tarjeta {
   banco: string | null
   digitos: string | null
   cierre: number | null
+  vencimiento: number | null // Día de vencimiento de pago
+  notificar_cierre: boolean // Recibir notificación de cierre
+  notificar_vencimiento: boolean // Recibir notificación de vencimiento
   created_at: string
 }
 
@@ -166,6 +169,7 @@ export interface Workspace {
   id: string
   name: string
   owner_id: string
+  icono: string | null // Emoji o URL de imagen para identificar el workspace
   created_at: string
 }
 

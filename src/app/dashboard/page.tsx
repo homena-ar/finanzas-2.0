@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { formatMoney, getMonthName, fetchDolar, getTagClass, getMonthKey } from '@/lib/utils'
 import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X, ChevronRight } from 'lucide-react'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -15,6 +16,7 @@ ChartJS.register(ArcElement, Tooltip, Legend)
 export default function DashboardPage() {
   const router = useRouter()
   const { profile } = useAuth()
+  const { currentWorkspace } = useWorkspace()
   const {
     tarjetas, categorias, gastos, loading, currentMonth, monthKey, changeMonth,
     getGastosMes, getImpuestosMes
@@ -179,12 +181,24 @@ export default function DashboardPage() {
   const day = today.getDate()
   
   tarjetas.forEach(t => {
+    // Alertas de cierre
     if (t.cierre) {
       const diff = t.cierre - day
       if (diff > 0 && diff <= 5) {
         alerts.push({ type: 'warning', icon: '📅', title: `Cierre ${t.nombre}`, desc: `Faltan ${diff} días` })
       } else if (diff === 0) {
         alerts.push({ type: 'danger', icon: '🚨', title: `¡HOY cierra ${t.nombre}!`, desc: 'Último día' })
+      }
+    }
+    // Alertas de vencimiento de pago
+    if (t.vencimiento) {
+      const diffVenc = t.vencimiento - day
+      if (diffVenc > 0 && diffVenc <= 5) {
+        alerts.push({ type: 'warning', icon: '💳', title: `Vence pago ${t.nombre}`, desc: `Faltan ${diffVenc} días para pagar` })
+      } else if (diffVenc === 0) {
+        alerts.push({ type: 'danger', icon: '🚨', title: `¡HOY vence pago ${t.nombre}!`, desc: 'Último día para pagar' })
+      } else if (diffVenc === -1) {
+        alerts.push({ type: 'danger', icon: '⚠️', title: `¡Venció pago ${t.nombre}!`, desc: 'El pago venció ayer' })
       }
     }
   })
@@ -231,7 +245,12 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Resumen</h1>
-          <p className="text-slate-500">Vista general de {getMonthName(currentMonth)}</p>
+          <p className="text-slate-500">
+            {currentWorkspace ? (
+              <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
+            ) : null}
+            Vista general de {getMonthName(currentMonth)}
+          </p>
         </div>
         <button onClick={exportToExcel} className="btn btn-success">
           <Download className="w-4 h-4" />
