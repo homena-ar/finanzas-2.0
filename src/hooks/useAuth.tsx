@@ -30,6 +30,57 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Función para traducir errores de Firebase a mensajes amigables en español
+function getFirebaseErrorMessage(error: any): string {
+  if (!error) return 'Ocurrió un error desconocido'
+  
+  const errorCode = error.code || ''
+  const errorMessage = error.message || String(error)
+  
+  // Traducir códigos de error comunes de Firebase
+  switch (errorCode) {
+    case 'auth/invalid-email':
+      return 'El correo electrónico no es válido'
+    case 'auth/user-disabled':
+      return 'Esta cuenta ha sido deshabilitada'
+    case 'auth/user-not-found':
+      return 'No existe una cuenta con este correo electrónico'
+    case 'auth/wrong-password':
+      return 'La contraseña es incorrecta'
+    case 'auth/invalid-credential':
+    case 'auth/invalid-login-credentials':
+      return 'Email o contraseña incorrectos'
+    case 'auth/email-already-in-use':
+      return 'Ya existe una cuenta con este correo electrónico'
+    case 'auth/weak-password':
+      return 'La contraseña es muy débil. Debe tener al menos 6 caracteres'
+    case 'auth/operation-not-allowed':
+      return 'Esta operación no está permitida'
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos. Por favor intentá más tarde'
+    case 'auth/network-request-failed':
+      return 'Error de conexión. Verificá tu internet'
+    case 'auth/popup-closed-by-user':
+      return 'La ventana de autenticación fue cerrada'
+    case 'auth/cancelled-popup-request':
+      return 'La solicitud de autenticación fue cancelada'
+    default:
+      // Si el mensaje ya está en español o es un mensaje personalizado, devolverlo tal cual
+      if (errorMessage.includes('Email o contraseña') || 
+          errorMessage.includes('correo') || 
+          errorMessage.includes('contraseña')) {
+        return errorMessage
+      }
+      // Si es un mensaje genérico de Firebase, devolver uno más amigable
+      if (errorMessage.includes('Invalid login credentials') || 
+          errorMessage.includes('invalid-credential')) {
+        return 'Email o contraseña incorrectos'
+      }
+      // Mensaje genérico para otros errores
+      return 'Ocurrió un error. Por favor intentá nuevamente'
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -130,7 +181,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       console.error('🔐 [Firebase useAuth] signIn ERROR:', error)
       setLoading(false)
-      return { error }
+      // Traducir el error a un mensaje amigable
+      const friendlyError = new Error(getFirebaseErrorMessage(error))
+      return { error: friendlyError }
     }
   }
 
@@ -186,13 +239,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Create default categorias
       await createDefaultCategorias(userCredential.user.uid)
 
-      // Enviar correo de verificación de Firebase
+      // Enviar correo de verificación personalizado (en lugar del de Firebase)
       try {
-        await sendEmailVerification(userCredential.user)
-        console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado')
+        // Generar link de verificación usando nuestro endpoint
+        const linkResponse = await fetch('/api/generate-verification-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        })
+        
+        if (linkResponse.ok) {
+          const linkData = await linkResponse.json()
+          const verificationLink = linkData.verificationLink
+          
+          // Enviar correo de verificación personalizado
+          const verificationResponse = await fetch('/api/send-verification-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: email,
+              userName: userName,
+              verificationLink: verificationLink
+            })
+          })
+          
+          if (verificationResponse.ok) {
+            console.log('✅ [Firebase useAuth] Correo de verificación personalizado enviado')
+          } else {
+            console.error('⚠️ [Firebase useAuth] Error enviando correo de verificación:', await verificationResponse.text())
+            // Fallback: usar correo de Firebase si falla el personalizado
+            await sendEmailVerification(userCredential.user)
+            console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado (fallback)')
+          }
+        } else {
+          console.error('⚠️ [Firebase useAuth] Error generando link de verificación:', await linkResponse.text())
+          // Fallback: usar correo de Firebase si falla la generación del link
+          await sendEmailVerification(userCredential.user)
+          console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado (fallback)')
+        }
       } catch (emailError) {
-        console.error('⚠️ [Firebase useAuth] Error enviando email de verificación de Firebase:', emailError)
-        // No fallar el registro si el email falla
+        console.error('⚠️ [Firebase useAuth] Error enviando email de verificación:', emailError)
+        // Fallback: usar correo de Firebase si hay un error
+        try {
+          await sendEmailVerification(userCredential.user)
+          console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado (fallback)')
+        } catch (fallbackError) {
+          console.error('❌ [Firebase useAuth] Error en fallback de verificación:', fallbackError)
+        }
       }
 
       // Enviar correo de bienvenida personalizado
@@ -220,7 +313,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null }
     } catch (error: any) {
       console.error('🔐 [Firebase useAuth] signUp ERROR:', error)
-      return { error }
+      // Traducir el error a un mensaje amigable
+      const friendlyError = new Error(getFirebaseErrorMessage(error))
+      return { error: friendlyError }
     }
   }
 
@@ -257,22 +352,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null }
     } catch (error: any) {
       console.error('❌ [Firebase useAuth] sendPasswordReset ERROR:', error)
-      return { error }
+      // Traducir el error a un mensaje amigable
+      const friendlyError = new Error(getFirebaseErrorMessage(error))
+      return { error: friendlyError }
     }
   }
 
   const resendVerificationEmail = async () => {
     console.log('🔐 [Firebase useAuth] resendVerificationEmail called')
-    if (!auth.currentUser) {
+    if (!auth.currentUser || !auth.currentUser.email) {
       return { error: new Error('No hay usuario autenticado') }
     }
+    
+    const email = auth.currentUser.email
+    const userName = email.split('@')[0]
+    
     try {
-      await firebaseSendEmailVerification(auth.currentUser)
-      console.log('✅ [Firebase useAuth] Verification email resent')
-      return { error: null }
+      // Generar link de verificación usando nuestro endpoint
+      const linkResponse = await fetch('/api/generate-verification-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      
+      if (linkResponse.ok) {
+        const linkData = await linkResponse.json()
+        const verificationLink = linkData.verificationLink
+        
+        // Enviar correo de verificación personalizado
+        const verificationResponse = await fetch('/api/send-verification-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            userName: userName,
+            verificationLink: verificationLink
+          })
+        })
+        
+        if (verificationResponse.ok) {
+          console.log('✅ [Firebase useAuth] Correo de verificación personalizado reenviado')
+          return { error: null }
+        } else {
+          console.error('⚠️ [Firebase useAuth] Error enviando correo de verificación:', await verificationResponse.text())
+          // Fallback: usar correo de Firebase
+          await firebaseSendEmailVerification(auth.currentUser)
+          console.log('✅ [Firebase useAuth] Email de verificación de Firebase reenviado (fallback)')
+          return { error: null }
+        }
+      } else {
+        console.error('⚠️ [Firebase useAuth] Error generando link de verificación:', await linkResponse.text())
+        // Fallback: usar correo de Firebase
+        await firebaseSendEmailVerification(auth.currentUser)
+        console.log('✅ [Firebase useAuth] Email de verificación de Firebase reenviado (fallback)')
+        return { error: null }
+      }
     } catch (error: any) {
       console.error('❌ [Firebase useAuth] resendVerificationEmail ERROR:', error)
-      return { error }
+      // Fallback: usar correo de Firebase si hay un error
+      try {
+        await firebaseSendEmailVerification(auth.currentUser)
+        console.log('✅ [Firebase useAuth] Email de verificación de Firebase reenviado (fallback)')
+        return { error: null }
+      } catch (fallbackError: any) {
+        // Traducir el error a un mensaje amigable
+        const friendlyError = new Error(getFirebaseErrorMessage(fallbackError))
+        return { error: friendlyError }
+      }
     }
   }
 

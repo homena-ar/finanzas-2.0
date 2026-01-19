@@ -76,11 +76,26 @@ npm run build
 ## ⚙️ Variables de Entorno
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://yzhmctutglxnamzgwyrp.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
+# Firebase (requeridas)
+NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_dominio
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
+
+# Firebase Admin SDK (requerida para correos personalizados)
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}  # Ver CONFIGURACION_CORREOS_PERSONALIZADOS.md
+
+# Resend (para correos)
 RESEND_API_KEY=tu_resend_api_key
-RESEND_FROM_EMAIL=noreply@fin.nexuno.com.ar  # Opcional: Email desde el cual se envían las invitaciones (por defecto: noreply@fin.nexuno.com.ar)
-GOOGLE_GEMINI_API_KEY=tu_google_gemini_api_key  # Opcional: Para funcionalidad de lectura automática con IA
+RESEND_FROM_EMAIL=noreply@fin.nexuno.com.ar
+
+# URL de la aplicación
+NEXT_PUBLIC_APP_URL=https://fin.nexuno.com.ar
+
+# Google Gemini (opcional)
+GOOGLE_GEMINI_API_KEY=tu_google_gemini_api_key  # Para funcionalidad de lectura automática con IA
 ```
 
 > 📖 **Nota**: Para usar la funcionalidad de lectura automática con IA, consulta [CONFIGURACION_IA_GOOGLE.md](./CONFIGURACION_IA_GOOGLE.md)

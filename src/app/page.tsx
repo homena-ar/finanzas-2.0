@@ -38,9 +38,7 @@ export default function LoginPage() {
       const { error, needsVerification } = await signIn(email, password)
       if (error) {
         const message = error instanceof Error ? error.message : String(error)
-        setError(message === 'Invalid login credentials'
-          ? 'Email o contraseña incorrectos'
-          : message)
+        setError(message)
         setLoading(false)
       } else if (needsVerification) {
         // Redirigir a la página de verificación
@@ -81,7 +79,7 @@ export default function LoginPage() {
       const message = error instanceof Error ? error.message : String(error)
       setError(message)
     } else {
-      setForgotPasswordSuccess('¡Correo enviado! Revisá tu bandeja de entrada para restablecer tu contraseña.')
+      setForgotPasswordSuccess('¡Correo enviado! Revisá tu bandeja de entrada (y la carpeta de spam) para restablecer tu contraseña.')
       setForgotPasswordEmail('')
     }
     setForgotPasswordLoading(false)
