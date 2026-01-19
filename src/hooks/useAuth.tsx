@@ -412,9 +412,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error(`Error al enviar correo: ${errorData.error || 'Error desconocido'}`)
         }
       } else {
-        const errorData = JSON.parse(linkResponseText)
+        let errorData
+        try {
+          errorData = JSON.parse(linkResponseText)
+        } catch (parseError) {
+          console.error('❌ [Firebase useAuth] Error parseando respuesta:', linkResponseText)
+          throw new Error(`Error al generar link: ${linkResponseText.substring(0, 200)}`)
+        }
         console.error('❌ [Firebase useAuth] Error generando link de recuperación:', errorData)
-        throw new Error(`Error al generar link: ${errorData.error || 'Error desconocido'}`)
+        const errorMessage = errorData.error || 'Error desconocido'
+        const errorDetails = errorData.details ? ` - ${errorData.details}` : ''
+        throw new Error(`${errorMessage}${errorDetails}`)
       }
     } catch (error: any) {
       console.error('❌ [Firebase useAuth] Error completo en proceso de recuperación:', error)

@@ -66,6 +66,21 @@ export async function POST(request: NextRequest) {
 
     console.log('🔑 [API] Generando link de recuperación de contraseña para:', email)
 
+    // Verificar que el usuario existe antes de generar el link
+    try {
+      const user = await admin.auth().getUserByEmail(email)
+      console.log('✅ [API] Usuario encontrado:', user.uid)
+    } catch (userError: any) {
+      if (userError.code === 'auth/user-not-found') {
+        console.error('❌ [API] Usuario no encontrado:', email)
+        return NextResponse.json(
+          { error: 'No existe una cuenta con este correo electrónico' },
+          { status: 404 }
+        )
+      }
+      throw userError
+    }
+
     // Generar el link de recuperación de contraseña
     // NO especificamos URL personalizada para evitar el error "Domain not allowlisted"
     // Firebase usará su configuración por defecto
@@ -73,28 +88,37 @@ export async function POST(request: NextRequest) {
       handleCodeInApp: false,
     }
 
+    console.log('🔑 [API] Generando link de recuperación...')
     const resetLink = await admin.auth().generatePasswordResetLink(
       email,
       actionCodeSettings
     )
 
+    console.log('✅ [API] Link de recuperación generado exitosamente')
     return NextResponse.json({ 
       success: true,
       resetLink 
     })
   } catch (error: any) {
     console.error('❌ [API] Error generando link de recuperación:', error)
+    console.error('❌ [API] Error code:', error.code)
+    console.error('❌ [API] Error message:', error.message)
+    console.error('❌ [API] Error stack:', error.stack)
     
     // Manejar errores específicos
     if (error.code === 'auth/user-not-found') {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
+        { error: 'No existe una cuenta con este correo electrónico' },
         { status: 404 }
       )
     }
     
     return NextResponse.json(
-      { error: 'Error al generar link de recuperación', details: error.message },
+      { 
+        error: 'Error al generar link de recuperación', 
+        details: error.message,
+        code: error.code || 'unknown'
+      },
       { status: 500 }
     )
   }

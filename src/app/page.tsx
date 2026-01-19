@@ -77,7 +77,14 @@ export default function LoginPage() {
     const { error } = await sendPasswordReset(forgotPasswordEmail)
     if (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setError(message)
+      // Traducir mensajes específicos
+      if (message.includes('user-not-found') || message.includes('no existe una cuenta')) {
+        setError('No existe una cuenta con este correo electrónico')
+      } else if (message.includes('too-many-requests') || message.includes('demasiados intentos')) {
+        setError('Demasiados intentos. Por favor esperá unos minutos antes de intentar nuevamente.')
+      } else {
+        setError(message)
+      }
     } else {
       setForgotPasswordSuccess('¡Correo enviado! Revisá tu bandeja de entrada (y la carpeta de spam) para restablecer tu contraseña.')
       setForgotPasswordEmail('')
