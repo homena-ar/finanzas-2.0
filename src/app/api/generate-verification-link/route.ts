@@ -77,19 +77,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar el link de verificación de email
-    // NO especificamos URL personalizada para evitar el error "Domain not allowlisted"
-    // Firebase usará su configuración por defecto (continúa funcionando, pero con dominio firebaseapp.com)
-    // Si quieres usar tu dominio personalizado, agrégalo en Firebase Console → Authentication → Settings → Authorized domains
+    // Firebase requiere una URL válida, usamos el dominio autorizado o el de Firebase por defecto
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'
     const actionCodeSettings: any = {
+      url: `${appUrl}/verificar-email?verified=true`,
       handleCodeInApp: false,
     }
-
-    // NOTA: Para usar dominio personalizado, descomenta estas líneas DESPUÉS de agregar
-    // el dominio en Firebase Console → Authentication → Settings → Authorized domains
-    // const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    // if (appUrl) {
-    //   actionCodeSettings.url = `${appUrl}/verificar-email?verified=true`
-    // }
 
     const verificationLink = await admin.auth().generateEmailVerificationLink(
       email,

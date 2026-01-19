@@ -82,9 +82,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar el link de recuperación de contraseña
-    // NO especificamos URL personalizada para evitar el error "Domain not allowlisted"
-    // Firebase usará su configuración por defecto
+    // Firebase requiere una URL válida, usamos el dominio autorizado o el de Firebase por defecto
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'
     const actionCodeSettings: any = {
+      url: `${appUrl}/?resetPassword=true`,
       handleCodeInApp: false,
     }
 
