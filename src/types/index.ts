@@ -8,6 +8,8 @@ export interface Profile {
   ahorro_usd: number
   ingresos_habilitado?: boolean
   personal_workspace_name?: string
+  personal_workspace_icono?: string | null
+  personal_workspace_logo?: string | null // data URL (PNG/JPG/WebP)
   created_at: string
 }
 
@@ -170,6 +172,7 @@ export interface Workspace {
   name: string
   owner_id: string
   icono: string | null // Emoji o URL de imagen para identificar el workspace
+  logo?: string | null // data URL (PNG/JPG/WebP)
   created_at: string
 }
 

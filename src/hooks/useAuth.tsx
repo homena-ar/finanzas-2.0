@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ahorro_pesos: 0,
           ahorro_usd: 0,
           ingresos_habilitado: false,
+          personal_workspace_icono: null,
+          personal_workspace_logo: null,
           created_at: new Date().toISOString()
         }
         await setDoc(profileRef, defaultProfile)
@@ -144,6 +146,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ahorro_pesos: 0,
         ahorro_usd: 0,
         ingresos_habilitado: false,
+        personal_workspace_icono: null,
+        personal_workspace_logo: null,
         created_at: new Date().toISOString()
       }
       await setDoc(doc(db, 'profiles', userCredential.user.uid), defaultProfile)

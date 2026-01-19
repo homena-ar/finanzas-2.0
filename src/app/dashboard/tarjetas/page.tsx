@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { useAuth } from '@/hooks/useAuth'
 import { Plus, Edit2, Trash2, X, CreditCard } from 'lucide-react'
 import { Tarjeta } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
@@ -19,6 +20,7 @@ function getCardGradient(tipo: string): string {
 
 export default function TarjetasPage() {
   const { currentWorkspace } = useWorkspace()
+  const { profile } = useAuth()
   const { tarjetas, addTarjeta, updateTarjeta, deleteTarjeta, loading } = useData()
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Tarjeta | null>(null)
@@ -166,9 +168,7 @@ export default function TarjetasPage() {
         <div>
           <h1 className="text-2xl font-bold">Cuentas</h1>
           <p className="text-slate-500">
-            {currentWorkspace ? (
-              <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
-            ) : null}
+            <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
             Administrá tus cuentas y tarjetas ({tarjetas.length})
           </p>
         </div>

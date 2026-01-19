@@ -2,11 +2,13 @@
 
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 export default function ProyeccionPage() {
   const { currentWorkspace } = useWorkspace()
+  const { profile } = useAuth()
   const { gastos, tarjetas, currentMonth } = useData()
 
   // Gastos fijos - ordenados: primero USD mayor a menor, luego ARS mayor a menor
@@ -81,9 +83,7 @@ export default function ProyeccionPage() {
       <motion.div variants={itemVariants}>
         <h1 className="text-2xl font-bold">Proyección</h1>
         <p className="text-slate-500">
-          {currentWorkspace ? (
-            <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
-          ) : null}
+          <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
           Mirá cómo vienen los próximos meses
         </p>
       </motion.div>

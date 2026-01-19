@@ -11,7 +11,7 @@ import { ConfirmModal, AlertModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 
 export default function IngresosPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { currentWorkspace, members } = useWorkspace()
   const {
     ingresos, categoriasIngresos, tagsIngresos,
@@ -435,9 +435,7 @@ export default function IngresosPage() {
         <div>
           <h1 className="text-2xl font-bold">Ingresos</h1>
           <p className="text-slate-500">
-            {currentWorkspace ? (
-              <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
-            ) : null}
+            <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
             {getMonthName(currentMonth)} - {ingresosMes.length} registros
           </p>
         </div>

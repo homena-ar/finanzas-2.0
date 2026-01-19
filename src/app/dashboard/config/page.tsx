@@ -44,6 +44,8 @@ export default function ConfigPage() {
 
   // Nombre Espacio Personal
   const [personalName, setPersonalName] = useState('')
+  const [personalIcono, setPersonalIcono] = useState('')
+  const [personalLogo, setPersonalLogo] = useState<string | null>(null)
 
   // Modal states
   const [showAlert, setShowAlert] = useState(false)
@@ -64,6 +66,7 @@ export default function ConfigPage() {
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
   const [workspaceName, setWorkspaceName] = useState('')
   const [workspaceIcono, setWorkspaceIcono] = useState('')
+  const [workspaceLogo, setWorkspaceLogo] = useState<string | null>(null)
   
   // Invite modal states
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -107,8 +110,18 @@ export default function ConfigPage() {
       setBudgetUsd(profile.budget_usd ? String(profile.budget_usd) : '')
       setIngresosEnabled(profile.ingresos_habilitado || false)
       setPersonalName(profile.personal_workspace_name || '')
+      setPersonalIcono(profile.personal_workspace_icono || '')
+      setPersonalLogo(profile.personal_workspace_logo || null)
     }
   }, [profile])
+
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo'))
+      reader.readAsDataURL(file)
+    })
 
   const handleSaveIngresos = async () => {
     setSavingIngresos(true)
@@ -130,7 +143,11 @@ export default function ConfigPage() {
   const handleSavePersonalName = async () => {
     if (!personalName.trim()) return
     setSaving(true)
-    await updateProfile({ personal_workspace_name: personalName })
+    await updateProfile({ 
+      personal_workspace_name: personalName,
+      personal_workspace_icono: personalIcono || null,
+      personal_workspace_logo: personalLogo || null,
+    })
     setSaving(false)
     setAlertData({
       title: 'Nombre actualizado',
@@ -236,7 +253,7 @@ export default function ConfigPage() {
       return
     }
 
-    const result = await createWorkspace(workspaceName, workspaceIcono || undefined)
+    const result = await createWorkspace(workspaceName, workspaceIcono || undefined, workspaceLogo || null)
 
     if (result.error) {
       setAlertData({
@@ -252,6 +269,7 @@ export default function ConfigPage() {
       })
       setWorkspaceName('')
       setWorkspaceIcono('')
+      setWorkspaceLogo(null)
       setShowWorkspaceModal(false)
     }
 
@@ -570,10 +588,11 @@ export default function ConfigPage() {
     }
   }
 
-  const handleEditWorkspace = (workspaceId: string, currentName: string, currentIcono?: string | null) => {
+  const handleEditWorkspace = (workspaceId: string, currentName: string, currentIcono?: string | null, currentLogo?: string | null) => {
     setEditingWorkspaceId(workspaceId)
     setEditingWorkspaceName(currentName)
     setWorkspaceIcono(currentIcono || '')
+    setWorkspaceLogo(currentLogo || null)
   }
 
   const handleSaveWorkspaceName = async () => {
@@ -581,7 +600,7 @@ export default function ConfigPage() {
       return
     }
 
-    const result = await updateWorkspace(editingWorkspaceId, editingWorkspaceName, workspaceIcono || null)
+    const result = await updateWorkspace(editingWorkspaceId, editingWorkspaceName, workspaceIcono || null, workspaceLogo || null)
 
     if (result.error) {
       setAlertData({
@@ -598,6 +617,7 @@ export default function ConfigPage() {
       setEditingWorkspaceId(null)
       setEditingWorkspaceName('')
       setWorkspaceIcono('')
+      setWorkspaceLogo(null)
     }
 
     setShowAlert(true)
@@ -607,6 +627,7 @@ export default function ConfigPage() {
     setEditingWorkspaceId(null)
     setEditingWorkspaceName('')
     setWorkspaceIcono('')
+    setWorkspaceLogo(null)
   }
 
   // Permisos disponibles para el selector con explicaciones
@@ -653,17 +674,97 @@ export default function ConfigPage() {
       {/* Sección Nombre de Espacio Personal */}
       <div className="card p-5">
         <h3 className="font-bold mb-4">🏠 Espacio Personal</h3>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            className="input flex-1"
-            placeholder="Ej: Mis Finanzas, Casa, etc."
-            value={personalName}
-            onChange={e => setPersonalName(e.target.value)}
-          />
-          <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary">
-            <Edit2 className="w-4 h-4" /> Renombrar
-          </button>
+        <div className="space-y-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">Icono (opcional)</label>
+              <EmojiPickerField
+                value={personalIcono}
+                onChange={setPersonalIcono}
+                placeholder="🏠"
+                size="md"
+              />
+              <p className="text-xs text-slate-500 mt-1">Podés usar emoji o subir un logo</p>
+            </div>
+            <div>
+              <label className="label">Logo (opcional)</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="input"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    // límite suave para evitar Firestore muy grande
+                    const maxBytes = 250 * 1024
+                    if (file.size > maxBytes) {
+                      setAlertData({
+                        title: 'Imagen muy grande',
+                        message: 'Usá un logo cuadrado y liviano (recomendado 256x256 y menos de 250KB).',
+                        variant: 'warning'
+                      })
+                      setShowAlert(true)
+                      e.target.value = ''
+                      return
+                    }
+                    try {
+                      const dataUrl = await fileToDataUrl(file)
+                      setPersonalLogo(dataUrl)
+                    } catch {
+                      setAlertData({
+                        title: 'Error',
+                        message: 'No se pudo cargar la imagen',
+                        variant: 'error'
+                      })
+                      setShowAlert(true)
+                    }
+                  }}
+                />
+                {personalLogo && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm whitespace-nowrap"
+                    onClick={() => setPersonalLogo(null)}
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Recomendado: 256x256 (PNG) / fondo transparente</p>
+            </div>
+          </div>
+
+          {(personalName || personalIcono || personalLogo) && (
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <div className="text-xs text-slate-500 mb-2">Vista previa:</div>
+              <div className="flex items-center gap-2">
+                {personalLogo ? (
+                  <img src={personalLogo} alt="Logo" className="w-9 h-9 rounded-lg object-cover border border-slate-200" />
+                ) : personalIcono ? (
+                  <span className="text-2xl">{personalIcono}</span>
+                ) : (
+                  <div className="w-9 h-9 rounded-lg bg-slate-200 flex items-center justify-center text-slate-700 font-bold">
+                    {(personalName || 'E').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="font-semibold">{personalName || 'Espacio Personal'}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className="input flex-1"
+              placeholder="Ej: Mis Finanzas, Casa, etc."
+              value={personalName}
+              onChange={e => setPersonalName(e.target.value)}
+            />
+            <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary">
+              <Save className="w-4 h-4" /> Guardar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -707,6 +808,48 @@ export default function ConfigPage() {
                                 placeholder="🏢"
                                 size="sm"
                               />
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="input input-sm text-xs"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0]
+                                    if (!file) return
+                                    const maxBytes = 250 * 1024
+                                    if (file.size > maxBytes) {
+                                      setAlertData({
+                                        title: 'Imagen muy grande',
+                                        message: 'Usá un logo cuadrado liviano (recomendado 256x256 y menos de 250KB).',
+                                        variant: 'warning'
+                                      })
+                                      setShowAlert(true)
+                                      e.target.value = ''
+                                      return
+                                    }
+                                    try {
+                                      const dataUrl = await fileToDataUrl(file)
+                                      setWorkspaceLogo(dataUrl)
+                                    } catch {
+                                      setAlertData({
+                                        title: 'Error',
+                                        message: 'No se pudo cargar la imagen',
+                                        variant: 'error'
+                                      })
+                                      setShowAlert(true)
+                                    }
+                                  }}
+                                />
+                                {workspaceLogo && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm whitespace-nowrap"
+                                    onClick={() => setWorkspaceLogo(null)}
+                                  >
+                                    Quitar
+                                  </button>
+                                )}
+                              </div>
                               <input
                                 type="text"
                                 value={editingWorkspaceName}
@@ -726,12 +869,29 @@ export default function ConfigPage() {
                               </button>
                             </div>
                           </div>
-                          <p className="text-xs text-slate-500">Elegí un emoji para identificar el workspace (opcional)</p>
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            {workspaceLogo ? (
+                              <>
+                                <span>Logo cargado:</span>
+                                <img src={workspaceLogo} alt="Logo" className="w-6 h-6 rounded object-cover border border-slate-200" />
+                              </>
+                            ) : (
+                              <span>Podés elegir un emoji o subir un logo (opcional)</span>
+                            )}
+                          </div>
                         </div>
                       ) : (
                         <>
                           <div className="flex flex-wrap items-center gap-2">
-                            {ws.icono && <span className="text-xl">{ws.icono}</span>}
+                            {ws.logo ? (
+                              <img src={ws.logo} alt="Logo" className="w-7 h-7 rounded-lg object-cover border border-slate-200" />
+                            ) : ws.icono ? (
+                              <span className="text-xl">{ws.icono}</span>
+                            ) : (
+                              <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs">
+                                {ws.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
                             <h4 className="font-semibold break-words">{ws.name}</h4>
                             
                             {/* ETIQUETA DE ROL */}
@@ -748,7 +908,7 @@ export default function ConfigPage() {
                             {isOwner && (
                               <div className="flex gap-1">
                                 <button
-                                  onClick={() => handleEditWorkspace(ws.id, ws.name, ws.icono)}
+                                  onClick={() => handleEditWorkspace(ws.id, ws.name, ws.icono, ws.logo)}
                                   className="p-1 hover:bg-slate-200 rounded transition"
                                   title="Editar workspace"
                                 >
@@ -1416,6 +1576,52 @@ export default function ConfigPage() {
                 </p>
               </div>
               <div>
+                <label className="label">Logo (opcional)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const maxBytes = 250 * 1024
+                      if (file.size > maxBytes) {
+                        setAlertData({
+                          title: 'Imagen muy grande',
+                          message: 'Usá un logo cuadrado y liviano (recomendado 256x256 y menos de 250KB).',
+                          variant: 'warning'
+                        })
+                        setShowAlert(true)
+                        e.target.value = ''
+                        return
+                      }
+                      try {
+                        const dataUrl = await fileToDataUrl(file)
+                        setWorkspaceLogo(dataUrl)
+                      } catch {
+                        setAlertData({
+                          title: 'Error',
+                          message: 'No se pudo cargar la imagen',
+                          variant: 'error'
+                        })
+                        setShowAlert(true)
+                      }
+                    }}
+                  />
+                  {workspaceLogo && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm whitespace-nowrap"
+                      onClick={() => setWorkspaceLogo(null)}
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Recomendado: 256x256 (PNG) / fondo transparente</p>
+              </div>
+              <div>
                 <label className="label">Nombre del Workspace</label>
                 <input
                   type="text"
@@ -1432,18 +1638,26 @@ export default function ConfigPage() {
               </div>
 
               {/* Preview */}
-              {(workspaceName || workspaceIcono) && (
+              {(workspaceName || workspaceIcono || workspaceLogo) && (
                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                   <div className="text-xs text-slate-500 mb-2">Vista previa:</div>
                   <div className="flex items-center gap-2">
-                    {workspaceIcono && <span className="text-2xl">{workspaceIcono}</span>}
+                    {workspaceLogo ? (
+                      <img src={workspaceLogo} alt="Logo" className="w-9 h-9 rounded-lg object-cover border border-slate-200" />
+                    ) : workspaceIcono ? (
+                      <span className="text-2xl">{workspaceIcono}</span>
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-slate-200 flex items-center justify-center text-slate-700 font-bold">
+                        {(workspaceName || 'W').charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span className="font-semibold">{workspaceName || 'Nombre del workspace'}</span>
                   </div>
                 </div>
               )}
             </div>
             <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">
-              <button onClick={() => { setShowWorkspaceModal(false); setWorkspaceName(''); setWorkspaceIcono('') }} className="btn btn-secondary">
+              <button onClick={() => { setShowWorkspaceModal(false); setWorkspaceName(''); setWorkspaceIcono(''); setWorkspaceLogo(null) }} className="btn btn-secondary">
                 Cancelar
               </button>
               <button onClick={handleCreateWorkspace} className="btn btn-primary">

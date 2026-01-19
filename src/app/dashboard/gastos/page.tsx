@@ -23,7 +23,7 @@ export default function GastosPage() {
   console.log('🔵🔵🔵 [GastosPage] COMPONENT RENDER')
 
   const searchParams = useSearchParams()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { currentWorkspace, members } = useWorkspace() // Traemos info del workspace
   const {
     tarjetas, categorias, tags, mediosPago,
@@ -1117,6 +1117,7 @@ export default function GastosPage() {
   }
 
   const totalImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
+  const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
 
   return (
     <div className="space-y-6">
@@ -1124,9 +1125,7 @@ export default function GastosPage() {
       <div>
         <h1 className="text-2xl font-bold">Gastos</h1>
         <p className="text-slate-500">
-          {currentWorkspace ? (
-            <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
-          ) : null}
+          <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || personalWorkspaceName}</span> · </>
           Consumos de {getMonthName(currentMonth)}
         </p>
       </div>

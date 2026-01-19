@@ -68,6 +68,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Nombre del espacio personal (desde perfil o default)
   const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
+  const personalWorkspaceIcono = profile?.personal_workspace_icono || null
+  const personalWorkspaceLogo = profile?.personal_workspace_logo || null
 
   // Build navigation items based on permissions
   // Para ingresos: en espacio personal requiere ingresos_habilitado, en workspace solo requiere permisos
@@ -137,8 +139,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Menu className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2 min-w-0 flex-1 mx-2">
-          {currentWorkspace?.icono ? (
+          {currentWorkspace?.logo ? (
+            <img src={currentWorkspace.logo} alt="Logo" className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0" />
+          ) : currentWorkspace?.icono ? (
             <span className="text-2xl shrink-0">{currentWorkspace.icono}</span>
+          ) : personalWorkspaceLogo ? (
+            <img src={personalWorkspaceLogo} alt="Logo" className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0" />
+          ) : personalWorkspaceIcono ? (
+            <span className="text-2xl shrink-0">{personalWorkspaceIcono}</span>
           ) : (
             <svg className="w-6 h-6 shrink-0" viewBox="0 0 100 100" fill="none">
               <defs>
@@ -215,14 +223,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }`}
             >
               <div className="flex items-center gap-2 overflow-hidden">
+                {/* Avatar del espacio (logo > emoji > inicial) */}
                 {currentWorkspace ? (
-                  currentWorkspace.owner_id === user.uid ? (
-                    <Shield className="w-4 h-4 text-indigo-600 shrink-0" />
+                  currentWorkspace.logo ? (
+                    <img src={currentWorkspace.logo} alt="Logo" className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" />
+                  ) : currentWorkspace.icono ? (
+                    <div className="w-8 h-8 rounded-lg bg-white/60 border border-slate-200 flex items-center justify-center shrink-0">
+                      <span className="text-xl">{currentWorkspace.icono}</span>
+                    </div>
                   ) : (
-                    <UserCheck className="w-4 h-4 text-purple-600 shrink-0" />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
+                      currentWorkspace.owner_id === user.uid ? 'bg-indigo-500' : 'bg-purple-500'
+                    }`}>
+                      {currentWorkspace.name.charAt(0).toUpperCase()}
+                    </div>
                   )
+                ) : personalWorkspaceLogo ? (
+                  <img src={personalWorkspaceLogo} alt="Logo" className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" />
+                ) : personalWorkspaceIcono ? (
+                  <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-700 shrink-0">
+                    <span className="text-xl">{personalWorkspaceIcono}</span>
+                  </div>
                 ) : (
-                  <Building2 className="w-4 h-4 text-slate-600 shrink-0" />
+                  <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+                    <Building2 className="w-4 h-4" />
+                  </div>
                 )}
                 <div className="text-left overflow-hidden">
                   <div className="text-[10px] uppercase font-bold text-slate-500">
@@ -251,8 +276,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   `}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-600">
-                      <Building2 className="w-4 h-4" />
+                    <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-600 overflow-hidden">
+                      {personalWorkspaceLogo ? (
+                        <img src={personalWorkspaceLogo} alt="Logo" className="w-full h-full object-cover" />
+                      ) : personalWorkspaceIcono ? (
+                        <span className="text-xl">{personalWorkspaceIcono}</span>
+                      ) : (
+                        <Building2 className="w-4 h-4" />
+                      )}
                     </div>
                     <div>
                       <div className="text-sm font-medium text-slate-900">{personalWorkspaceName}</div>
@@ -282,10 +313,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       `}
                     >
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          workspace.icono ? '' : (isOwner ? 'bg-indigo-500' : 'bg-purple-500')
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${
+                          workspace.logo || workspace.icono ? 'bg-transparent' : (isOwner ? 'bg-indigo-500' : 'bg-purple-500')
                         }`}>
-                          {workspace.icono ? (
+                          {workspace.logo ? (
+                            <img src={workspace.logo} alt="Logo" className="w-full h-full object-cover border border-slate-200 rounded-lg" />
+                          ) : workspace.icono ? (
                             <span className="text-xl">{workspace.icono}</span>
                           ) : (
                             <span className="text-white font-bold">{workspace.name.charAt(0).toUpperCase()}</span>

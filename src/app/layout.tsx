@@ -37,20 +37,15 @@ export const metadata: Metadata = {
     description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares. Gestioná gastos, ingresos, ahorros y proyecciones.',
     siteName: 'FinControl',
     images: [
-      {
-        url: '/og-image.svg',
-        width: 1200,
-        height: 630,
-        alt: 'FinControl - Plataforma de Control Financiero',
-        type: 'image/svg+xml',
-      },
+      // PNG dinámico (mejor compatibilidad WhatsApp/Facebook)
+      { url: '/opengraph-image', width: 1200, height: 630 },
     ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'FinControl - Controlá tus Finanzas',
     description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares.',
-    images: ['/og-image.svg'],
+    images: ['/twitter-image'],
   },
   appleWebApp: {
     capable: true,

@@ -470,9 +470,7 @@ export default function AhorrosPage() {
       <div>
         <h1 className="text-2xl font-bold">Ahorros y Metas</h1>
         <p className="text-slate-500">
-          {currentWorkspace ? (
-            <><span className="text-indigo-600 font-medium">{currentWorkspace.name}</span> · </>
-          ) : null}
+          <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
           Construí tu futuro 🚀
         </p>
       </div>
