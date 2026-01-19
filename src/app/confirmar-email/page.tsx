@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { applyActionCode } from 'firebase/auth'
@@ -8,7 +8,7 @@ import { auth } from '@/lib/firebase'
 import { CheckCircle2, XCircle, Loader2, Mail } from 'lucide-react'
 import Link from 'next/link'
 
-export default function ConfirmarEmailPage() {
+function ConfirmarEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
@@ -119,5 +119,22 @@ export default function ConfirmarEmailPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ConfirmarEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+            <Loader2 className="w-16 h-16 text-indigo-600 mx-auto mb-4 animate-spin" />
+            <h2 className="text-2xl font-bold mb-2">Cargando...</h2>
+          </div>
+        </div>
+      </div>
+    }>
+      <ConfirmarEmailContent />
+    </Suspense>
   )
 }
