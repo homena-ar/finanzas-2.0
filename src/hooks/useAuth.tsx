@@ -123,12 +123,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('🔐 [Firebase useAuth] Setting up auth listener')
 
+    let previousEmailVerified: boolean | null = null
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔐 [Firebase useAuth] Auth state changed:', firebaseUser ? 'USER LOGGED IN' : 'NO USER')
 
       if (firebaseUser) {
         // Recargar el usuario para obtener el estado más reciente de emailVerified
         await firebaseUser.reload()
+        
+        // Verificar si el correo se acaba de verificar (cambió de false a true)
+        // previousEmailVerified === null significa primera carga, no contar como verificación nueva
+        const emailJustVerified = previousEmailVerified === false && firebaseUser.emailVerified
         
         // Verificar si el correo está verificado
         // NOTA: No cerramos la sesión aquí para permitir acceso a /verificar-email
@@ -139,13 +145,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (firebaseUser.emailVerified) {
           const profileData = await fetchProfile(firebaseUser.uid)
           setProfile(profileData)
+          
+          // Enviar correo de bienvenida si el email se acaba de verificar
+          // Solo si cambió de false a true (no en la primera carga)
+          if (emailJustVerified && firebaseUser.email) {
+            try {
+              const userName = firebaseUser.email.split('@')[0]
+              console.log('🎉 [Firebase useAuth] Email verificado por primera vez, enviando correo de bienvenida...')
+              const welcomeResponse = await fetch('/api/send-welcome-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: firebaseUser.email,
+                  userName: userName
+                })
+              })
+              
+              if (welcomeResponse.ok) {
+                console.log('✅ [Firebase useAuth] Correo de bienvenida enviado después de verificación')
+              } else {
+                console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', await welcomeResponse.text())
+              }
+            } catch (welcomeError) {
+              console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', welcomeError)
+              // No fallar si el email falla
+            }
+          }
         } else {
           // Si no está verificado, no cargar el perfil pero mantener el usuario
           setProfile(null)
         }
+        
+        // Actualizar el estado previo
+        previousEmailVerified = firebaseUser.emailVerified
       } else {
         setUser(null)
         setProfile(null)
+        previousEmailVerified = null
       }
 
       setLoading(false)
@@ -304,26 +340,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Enviar correo de bienvenida personalizado
-      try {
-        const welcomeResponse = await fetch('/api/send-welcome-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: email,
-            userName: userName
-          })
-        })
-        
-        if (welcomeResponse.ok) {
-          console.log('✅ [Firebase useAuth] Correo de bienvenida enviado')
-        } else {
-          console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', await welcomeResponse.text())
-        }
-      } catch (welcomeError) {
-        console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', welcomeError)
-        // No fallar el registro si el email falla
-      }
+      // NO enviar correo de bienvenida aquí - se enviará cuando el usuario verifique su email
+      // Esto evita enviar el correo antes de que el usuario verifique su cuenta
 
       console.log('🔐 [Firebase useAuth] signUp SUCCESS')
       return { error: null }

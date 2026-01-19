@@ -84,14 +84,27 @@ export async function POST(request: NextRequest) {
       handleCodeInApp: false,
     }
 
-    const verificationLink = await admin.auth().generateEmailVerificationLink(
+    const firebaseLink = await admin.auth().generateEmailVerificationLink(
       email,
       actionCodeSettings
     )
 
+    // Extraer el código de acción (oobCode) del link de Firebase
+    const firebaseUrl = new URL(firebaseLink)
+    const oobCode = firebaseUrl.searchParams.get('oobCode')
+    
+    if (!oobCode) {
+      throw new Error('No se pudo extraer el código de verificación del link de Firebase')
+    }
+
+    // Crear nuestro link personalizado con el código extraído
+    const customLink = `${appUrl}/confirmar-email?oobCode=${oobCode}&mode=verifyEmail`
+
+    console.log('✅ [API] Link personalizado generado:', customLink.substring(0, 100) + '...')
+
     return NextResponse.json({ 
       success: true,
-      verificationLink 
+      verificationLink: customLink
     })
   } catch (error: any) {
     console.error('❌ [API] Error generando link de verificación:', error)

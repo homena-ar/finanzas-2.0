@@ -28,6 +28,19 @@ export default function LoginPage() {
     }
   }, [user, authLoading, router])
 
+  // Manejar query params para recuperación de contraseña
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const resetPassword = params.get('resetPassword')
+    const oobCode = params.get('oobCode')
+    const mode = params.get('mode')
+    
+    if (resetPassword || (oobCode && mode === 'resetPassword')) {
+      // Redirigir a la página de restablecer contraseña
+      router.push(`/restablecer-contraseña${oobCode ? `?oobCode=${oobCode}&mode=${mode}` : ''}`)
+    }
+  }, [router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')

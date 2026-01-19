@@ -90,15 +90,27 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔑 [API] Generando link de recuperación...')
-    const resetLink = await admin.auth().generatePasswordResetLink(
+    const firebaseLink = await admin.auth().generatePasswordResetLink(
       email,
       actionCodeSettings
     )
 
-    console.log('✅ [API] Link de recuperación generado exitosamente')
+    // Extraer el código de acción (oobCode) del link de Firebase
+    const firebaseUrl = new URL(firebaseLink)
+    const oobCode = firebaseUrl.searchParams.get('oobCode')
+    
+    if (!oobCode) {
+      throw new Error('No se pudo extraer el código de recuperación del link de Firebase')
+    }
+
+    // Crear nuestro link personalizado con el código extraído
+    const customLink = `${appUrl}/restablecer-contraseña?oobCode=${oobCode}&mode=resetPassword`
+
+    console.log('✅ [API] Link personalizado generado:', customLink.substring(0, 100) + '...')
+
     return NextResponse.json({ 
       success: true,
-      resetLink 
+      resetLink: customLink
     })
   } catch (error: any) {
     console.error('❌ [API] Error generando link de recuperación:', error)
