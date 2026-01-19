@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear nuestro link personalizado con el código extraído
-    const customLink = `${appUrl}/restablecer-contraseña?oobCode=${oobCode}&mode=resetPassword`
+    const customLink = `${appUrl}/restablecer-password?oobCode=${oobCode}&mode=resetPassword`
 
     console.log('✅ [API] Link personalizado generado:', customLink.substring(0, 100) + '...')
 

@@ -37,7 +37,7 @@ export default function LoginPage() {
     
     if (resetPassword || (oobCode && mode === 'resetPassword')) {
       // Redirigir a la página de restablecer contraseña
-      router.push(`/restablecer-contraseña${oobCode ? `?oobCode=${oobCode}&mode=${mode}` : ''}`)
+      router.push(`/restablecer-password${oobCode ? `?oobCode=${oobCode}&mode=${mode}` : ''}`)
     }
   }, [router])
 
