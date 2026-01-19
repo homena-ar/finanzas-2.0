@@ -8,6 +8,7 @@ import { formatMoney, getMonthName } from '@/lib/utils'
 import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
+import { EmojiPickerField } from '@/components/EmojiPickerField'
 
 export default function IngresosPage() {
   const { user } = useAuth()
@@ -736,26 +737,12 @@ export default function IngresosPage() {
                         onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
                       />
                       <div>
-                        <div className="text-xs font-bold text-slate-700 mb-1">Icono (elegí uno o escribí/pegá un emoji)</div>
-                        <div className="grid grid-cols-8 gap-1 mb-2">
-                          {['💵','💰','📊','💼','🏦','📈','🎯','✈️','🏠','🚗','📱','💡','🎁','🔧','📚','🎬'].map(icon => (
-                            <button
-                              key={icon}
-                              type="button"
-                              onClick={() => setNewCategoria(c => ({ ...c, icono: icon }))}
-                              className={`p-1.5 text-lg rounded border-2 transition ${newCategoria.icono === icon ? 'border-indigo-500 bg-indigo-100' : 'border-slate-200 hover:border-slate-300'}`}
-                            >
-                              {icon}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          type="text"
-                          className="input text-lg text-center"
-                          placeholder="O escribí/pegá un emoji"
+                        <div className="text-xs font-bold text-slate-700 mb-1">Icono</div>
+                        <EmojiPickerField
                           value={newCategoria.icono}
-                          onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
-                          maxLength={4}
+                          onChange={v => setNewCategoria(c => ({ ...c, icono: v }))}
+                          placeholder="💵"
+                          size="sm"
                         />
                       </div>
                       <div className="flex gap-2 items-center">

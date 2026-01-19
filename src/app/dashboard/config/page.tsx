@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info } from 'lucide-react'
 import { AlertModal, ConfirmModal } from '@/components/Modal'
+import { EmojiPickerField } from '@/components/EmojiPickerField'
 import type { WorkspacePermissions } from '@/types'
 
 export default function ConfigPage() {
@@ -602,8 +603,6 @@ export default function ConfigPage() {
     setEditingWorkspaceId(null)
     setEditingWorkspaceName('')
   }
-
-  const commonIcons = ['🍔', '🏠', '🚗', '🎮', '👕', '💊', '📚', '✈️', '🎬', '🏋️', '🐕', '💰', '🔧', '📱', '💡']
 
   // Permisos disponibles para el selector con explicaciones
   const permissionOptions = [
@@ -1318,28 +1317,11 @@ export default function ConfigPage() {
 
               <div>
                 <label className="label">Icono</label>
-                <div className="grid grid-cols-8 gap-2 mb-2">
-                  {commonIcons.map(icon => (
-                    <button
-                      key={icon}
-                      onClick={() => setCategoriaForm(f => ({ ...f, icono: icon }))}
-                      className={`p-3 text-2xl rounded-lg border-2 transition flex items-center justify-center ${
-                        categoriaForm.icono === icon
-                          ? 'border-indigo-500 bg-indigo-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  className="input text-2xl text-center"
-                  placeholder="O escribí/pegá un emoji"
+                <EmojiPickerField
                   value={categoriaForm.icono}
-                  onChange={e => setCategoriaForm(f => ({ ...f, icono: e.target.value }))}
-                  maxLength={4}
+                  onChange={v => setCategoriaForm(f => ({ ...f, icono: v }))}
+                  placeholder="😀"
+                  size="md"
                 />
               </div>
 

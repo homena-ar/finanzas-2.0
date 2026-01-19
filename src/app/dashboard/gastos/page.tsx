@@ -9,6 +9,7 @@ import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react'
 import { Gasto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
+import { EmojiPickerField } from '@/components/EmojiPickerField'
 
 // Función helper para calcular mes_facturacion desde una fecha en formato YYYY-MM-DD
 // Evita problemas de zona horaria al parsear directamente la cadena
@@ -1708,26 +1709,12 @@ export default function GastosPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono (elegí uno o escribí/pegá un emoji)</div>
-                      <div className="grid grid-cols-8 gap-1.5 mb-2">
-                        {['💰','🛒','🍔','🏠','🚗','💊','🎮','👕','✈️','📚','🔧','📱','💡','🐕','🎬','🏋️'].map(icon => (
-                          <button
-                            key={icon}
-                            type="button"
-                            onClick={() => setNewCategoria(c => ({ ...c, icono: icon }))}
-                            className={`p-2 text-xl rounded-lg border-2 transition ${newCategoria.icono === icon ? 'border-indigo-500 bg-indigo-100' : 'border-slate-200 hover:border-slate-300'}`}
-                          >
-                            {icon}
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        type="text"
-                        className="input w-full text-xl text-center"
-                        placeholder="O escribí/pegá un emoji"
+                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <EmojiPickerField
                         value={newCategoria.icono}
-                        onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
-                        maxLength={4}
+                        onChange={v => setNewCategoria(c => ({ ...c, icono: v }))}
+                        placeholder="💰"
+                        size="sm"
                       />
                     </div>
                     <div className="flex gap-2">
