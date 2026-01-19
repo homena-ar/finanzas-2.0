@@ -399,3 +399,119 @@ FinControl - Gestiona tus finanzas de forma inteligente`
 
   return { html, text, subject }
 }
+
+export function getPasswordResetTemplate(
+  userName: string,
+  resetLink: string
+): { html: string; text: string; subject: string } {
+  const subject = 'Restablecé tu contraseña - FinControl'
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                🔑 Restablecé tu contraseña
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Hola <strong>${userName}</strong>,
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Recibimos una solicitud para restablecer la contraseña de tu cuenta en FinControl. Si fuiste vos, hacé clic en el botón de abajo para crear una nueva contraseña.
+              </p>
+
+              <!-- Security Warning -->
+              <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 20px; margin: 30px 0;">
+                <h3 style="margin: 0 0 10px 0; color: #991b1b; font-size: 16px; font-weight: 600;">
+                  ⚠️ Importante de seguridad
+                </h3>
+                <ul style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 14px; line-height: 1.8;">
+                  <li style="margin-bottom: 8px;">Si NO solicitaste restablecer tu contraseña, ignorá este correo</li>
+                  <li style="margin-bottom: 8px;">Tu contraseña actual no cambiará hasta que crees una nueva</li>
+                  <li style="margin-bottom: 8px;">Este enlace expirará en 1 hora por seguridad</li>
+                  <li style="margin-bottom: 8px;">Nunca compartas tu contraseña con nadie</li>
+                </ul>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetLink}" 
+                   style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);">
+                  Restablecer mi contraseña
+                </a>
+              </div>
+
+              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si el botón no funciona, copia y pega este enlace en tu navegador:
+              </p>
+              <p style="margin: 10px 0 0 0; color: #ef4444; font-size: 12px; word-break: break-all;">
+                ${resetLink}
+              </p>
+
+              <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 15px; margin: 30px 0;">
+                <p style="margin: 0; color: #1e40af; font-size: 13px; line-height: 1.6;">
+                  <strong>💡 Tip:</strong> Después de restablecer tu contraseña, asegurate de usar una contraseña segura con al menos 8 caracteres, que incluya letras, números y símbolos.
+                </p>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                <strong style="color: #ef4444;">FinControl</strong> - Gestiona tus finanzas de forma inteligente
+              </p>
+              <p style="margin: 0; color: #9ca3af; font-size: 11px;">
+                Este es un email automático. Por favor, no respondas a este mensaje.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Restablecé tu contraseña - FinControl
+
+Hola ${userName},
+
+Recibimos una solicitud para restablecer la contraseña de tu cuenta en FinControl. Si fuiste vos, hacé clic en el enlace de abajo para crear una nueva contraseña.
+
+⚠️ Importante de seguridad:
+- Si NO solicitaste restablecer tu contraseña, ignorá este correo
+- Tu contraseña actual no cambiará hasta que crees una nueva
+- Este enlace expirará en 1 hora por seguridad
+- Nunca compartas tu contraseña con nadie
+
+Restablecé tu contraseña haciendo clic en este enlace:
+${resetLink}
+
+💡 Tip: Después de restablecer tu contraseña, asegurate de usar una contraseña segura con al menos 8 caracteres, que incluya letras, números y símbolos.
+
+FinControl - Gestiona tus finanzas de forma inteligente`
+
+  return { html, text, subject }
+}

@@ -362,15 +362,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendPasswordReset = async (email: string) => {
     console.log('🔐 [Firebase useAuth] sendPasswordReset called')
+    
+    const userName = email.split('@')[0]
+    
     try {
-      await sendPasswordResetEmail(auth, email)
-      console.log('✅ [Firebase useAuth] Password reset email sent')
-      return { error: null }
+      console.log('🔑 [Firebase useAuth] Intentando enviar correo de recuperación personalizado...')
+      
+      // Generar link de recuperación usando nuestro endpoint
+      const linkResponse = await fetch('/api/generate-password-reset-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      
+      const linkResponseText = await linkResponse.text()
+      console.log('🔑 [Firebase useAuth] Respuesta del endpoint de link:', linkResponse.status, linkResponseText.substring(0, 200))
+      
+      if (linkResponse.ok) {
+        const linkData = JSON.parse(linkResponseText)
+        const resetLink = linkData.resetLink
+        
+        if (!resetLink) {
+          console.error('❌ [Firebase useAuth] No se recibió resetLink en la respuesta')
+          throw new Error('No se pudo generar el link de recuperación')
+        }
+        
+        console.log('🔑 [Firebase useAuth] Link generado correctamente, enviando correo...')
+        
+        // Enviar correo de recuperación personalizado
+        const resetResponse = await fetch('/api/send-password-reset-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            userName: userName,
+            resetLink: resetLink
+          })
+        })
+        
+        const resetResponseText = await resetResponse.text()
+        console.log('🔑 [Firebase useAuth] Respuesta del endpoint de correo:', resetResponse.status, resetResponseText.substring(0, 200))
+        
+        if (resetResponse.ok) {
+          console.log('✅ [Firebase useAuth] Correo de recuperación personalizado enviado exitosamente')
+          return { error: null }
+        } else {
+          const errorData = JSON.parse(resetResponseText)
+          console.error('❌ [Firebase useAuth] Error enviando correo de recuperación:', errorData)
+          throw new Error(`Error al enviar correo: ${errorData.error || 'Error desconocido'}`)
+        }
+      } else {
+        const errorData = JSON.parse(linkResponseText)
+        console.error('❌ [Firebase useAuth] Error generando link de recuperación:', errorData)
+        throw new Error(`Error al generar link: ${errorData.error || 'Error desconocido'}`)
+      }
     } catch (error: any) {
-      console.error('❌ [Firebase useAuth] sendPasswordReset ERROR:', error)
-      // Traducir el error a un mensaje amigable
-      const friendlyError = new Error(getFirebaseErrorMessage(error))
-      return { error: friendlyError }
+      console.error('❌ [Firebase useAuth] Error completo en proceso de recuperación:', error)
+      // Fallback: usar correo de Firebase como último recurso
+      console.warn('⚠️ [Firebase useAuth] Usando correo de Firebase como último recurso')
+      try {
+        await sendPasswordResetEmail(auth, email)
+        console.log('✅ [Firebase useAuth] Email de recuperación de Firebase enviado (último recurso)')
+        return { error: null }
+      } catch (fallbackError: any) {
+        console.error('❌ [Firebase useAuth] Error crítico: No se pudo enviar ningún correo de recuperación:', fallbackError)
+        // Traducir el error a un mensaje amigable
+        const friendlyError = new Error(getFirebaseErrorMessage(fallbackError))
+        return { error: friendlyError }
+      }
     }
   }
 
