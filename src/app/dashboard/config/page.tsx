@@ -1336,10 +1336,10 @@ export default function ConfigPage() {
                 <input
                   type="text"
                   className="input text-2xl text-center"
-                  placeholder="O escribí un emoji"
+                  placeholder="O escribí/pegá un emoji"
                   value={categoriaForm.icono}
                   onChange={e => setCategoriaForm(f => ({ ...f, icono: e.target.value }))}
-                  maxLength={2}
+                  maxLength={4}
                 />
               </div>
 

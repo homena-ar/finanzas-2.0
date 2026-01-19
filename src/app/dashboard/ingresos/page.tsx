@@ -679,31 +679,24 @@ export default function IngresosPage() {
             </div>
             <div className="p-4 space-y-4">
               {/* Botón para subir imagen con IA */}
-              <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
-                <ImageIcon className="w-5 h-5 text-purple-600" />
-                <div className="flex-1">
-                  <label className="text-sm font-semibold text-purple-900 cursor-pointer">
-                    📸 Leer con IA desde imagen
-                  </label>
-                  <p className="text-xs text-purple-700">Sube una imagen o PDF de tu resumen bancario o comprobante</p>
+              <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-purple-600" />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-purple-900">📸 Leer con IA</div>
+                    <p className="text-xs text-purple-700">Sube una imagen o PDF de tu resumen bancario o comprobante</p>
+                  </div>
                 </div>
-                <label className="btn btn-primary cursor-pointer relative">
-                  {processingImage ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4" />
-                      Subir
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                    disabled={processingImage}
-                  />
-                </label>
+                <div className="flex gap-2 flex-wrap">
+                  <label className="btn btn-primary cursor-pointer relative btn-sm">
+                    {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📷 Foto / Imagen</>)}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={processingImage} />
+                  </label>
+                  <label className="btn btn-secondary cursor-pointer relative btn-sm border-2 border-purple-300 text-purple-700 hover:bg-purple-50">
+                    {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📄 PDF / Documento</>)}
+                    <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handleImageUpload} disabled={processingImage} />
+                  </label>
+                </div>
               </div>
 
               <div>
@@ -734,7 +727,7 @@ export default function IngresosPage() {
                     <option value="__new__">➕ Nueva categoría...</option>
                   </select>
                   {form.categoria_id === '__new__' && (
-                    <div className="mt-2 p-3 bg-slate-50 rounded-lg space-y-2">
+                    <div className="mt-2 p-3 bg-slate-50 rounded-lg space-y-3">
                       <input
                         type="text"
                         className="input"
@@ -742,17 +735,33 @@ export default function IngresosPage() {
                         value={newCategoria.nombre}
                         onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
                       />
-                      <div className="flex gap-2">
+                      <div>
+                        <div className="text-xs font-bold text-slate-700 mb-1">Icono (elegí uno o escribí/pegá un emoji)</div>
+                        <div className="grid grid-cols-8 gap-1 mb-2">
+                          {['💵','💰','📊','💼','🏦','📈','🎯','✈️','🏠','🚗','📱','💡','🎁','🔧','📚','🎬'].map(icon => (
+                            <button
+                              key={icon}
+                              type="button"
+                              onClick={() => setNewCategoria(c => ({ ...c, icono: icon }))}
+                              className={`p-1.5 text-lg rounded border-2 transition ${newCategoria.icono === icon ? 'border-indigo-500 bg-indigo-100' : 'border-slate-200 hover:border-slate-300'}`}
+                            >
+                              {icon}
+                            </button>
+                          ))}
+                        </div>
                         <input
                           type="text"
-                          className="input w-20"
-                          placeholder="🎯"
+                          className="input text-lg text-center"
+                          placeholder="O escribí/pegá un emoji"
                           value={newCategoria.icono}
                           onChange={e => setNewCategoria(c => ({ ...c, icono: e.target.value }))}
+                          maxLength={4}
                         />
+                      </div>
+                      <div className="flex gap-2 items-center">
                         <input
                           type="color"
-                          className="input w-20"
+                          className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
                           value={newCategoria.color}
                           onChange={e => setNewCategoria(c => ({ ...c, color: e.target.value }))}
                         />
