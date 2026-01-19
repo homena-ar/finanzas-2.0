@@ -98,6 +98,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!loading && !user) {
       router.push('/')
+    } else if (user && !user.emailVerified) {
+      // Si el usuario no tiene el correo verificado, redirigir a la página de verificación
+      router.push('/verificar-email')
     }
   }, [user, loading, router])
 

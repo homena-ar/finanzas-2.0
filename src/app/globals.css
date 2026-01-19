@@ -74,6 +74,7 @@ body {
     -moz-appearance: none !important;
     appearance: none !important;
     font-weight: 400 !important;
+    padding-right: 2.5rem !important; /* Espacio adicional para la flecha del select */
   }
   
   /* Cuando tiene foco - borde indigo suave */

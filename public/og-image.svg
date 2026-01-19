@@ -18,6 +18,10 @@
     <rect x="50" y="175" width="45" height="85" rx="8" fill="white"/>
     <rect x="127" y="125" width="45" height="135" rx="8" fill="white"/>
     <rect x="205" y="75" width="45" height="185" rx="8" fill="white"/>
+    <!-- Line connecting the bars -->
+    <path d="M 47 245 L 99.5 175 L 149.5 125 L 227.5 75" stroke="white" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.9"/>
+    <!-- Circle at the end of the line -->
+    <circle cx="227.5" cy="75" r="6" fill="white" opacity="0.9"/>
   </g>
   
   <!-- Text -->

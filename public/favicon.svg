@@ -15,6 +15,10 @@
   <rect x="100" y="280" width="70" height="140" rx="12" fill="url(#barGrad)"/>
   <rect x="221" y="200" width="70" height="220" rx="12" fill="url(#barGrad)"/>
   <rect x="342" y="120" width="70" height="300" rx="12" fill="url(#barGrad)"/>
+  <!-- Line connecting the bars -->
+  <path d="M 97 345 L 155 280 L 256 200 L 377 120" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.9"/>
+  <!-- Circle at the end of the line -->
+  <circle cx="377" cy="120" r="8" fill="white" opacity="0.9"/>
   <!-- Dollar sign accent -->
   <text x="256" y="95" font-size="48" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Arial, sans-serif" font-weight="bold">$</text>
 </svg>

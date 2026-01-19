@@ -6,7 +6,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  sendEmailVerification as firebaseSendEmailVerification
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -18,10 +20,12 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signIn: (email: string, password: string) => Promise<{ error: any; needsVerification?: boolean }>
   signUp: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   updateProfile: (data: Partial<Profile>) => Promise<void>
+  sendPasswordReset: (email: string) => Promise<{ error: any }>
+  resendVerificationEmail: () => Promise<{ error: any }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -72,9 +76,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔐 [Firebase useAuth] Auth state changed:', firebaseUser ? 'USER LOGGED IN' : 'NO USER')
 
       if (firebaseUser) {
+        // Recargar el usuario para obtener el estado más reciente de emailVerified
+        await firebaseUser.reload()
+        
+        // Verificar si el correo está verificado
+        // NOTA: No cerramos la sesión aquí para permitir acceso a /verificar-email
+        // El bloqueo de acceso al dashboard se hace en el layout
         setUser(firebaseUser)
-        const profileData = await fetchProfile(firebaseUser.uid)
-        setProfile(profileData)
+        
+        // Solo cargar el perfil si el correo está verificado
+        if (firebaseUser.emailVerified) {
+          const profileData = await fetchProfile(firebaseUser.uid)
+          setProfile(profileData)
+        } else {
+          // Si no está verificado, no cargar el perfil pero mantener el usuario
+          setProfile(null)
+        }
       } else {
         setUser(null)
         setProfile(null)
@@ -93,9 +110,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('🔐 [Firebase useAuth] signIn called')
     setLoading(true)
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
       console.log('🔐 [Firebase useAuth] signIn SUCCESS')
-      return { error: null }
+      
+      // Recargar el usuario para obtener el estado más reciente
+      await userCredential.user.reload()
+      
+      // Verificar si el correo está verificado
+      const needsVerification = !userCredential.user.emailVerified
+      if (needsVerification) {
+        console.log('⚠️ [Firebase useAuth] Email no verificado')
+        // No cerramos la sesión aquí, permitimos acceso a /verificar-email
+        // El bloqueo de acceso al dashboard se hace en el layout
+        setLoading(false)
+        return { error: null, needsVerification: true }
+      }
+      
+      return { error: null, needsVerification: false }
     } catch (error: any) {
       console.error('🔐 [Firebase useAuth] signIn ERROR:', error)
       setLoading(false)
@@ -218,10 +249,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const sendPasswordReset = async (email: string) => {
+    console.log('🔐 [Firebase useAuth] sendPasswordReset called')
+    try {
+      await sendPasswordResetEmail(auth, email)
+      console.log('✅ [Firebase useAuth] Password reset email sent')
+      return { error: null }
+    } catch (error: any) {
+      console.error('❌ [Firebase useAuth] sendPasswordReset ERROR:', error)
+      return { error }
+    }
+  }
+
+  const resendVerificationEmail = async () => {
+    console.log('🔐 [Firebase useAuth] resendVerificationEmail called')
+    if (!auth.currentUser) {
+      return { error: new Error('No hay usuario autenticado') }
+    }
+    try {
+      await firebaseSendEmailVerification(auth.currentUser)
+      console.log('✅ [Firebase useAuth] Verification email resent')
+      return { error: null }
+    } catch (error: any) {
+      console.error('❌ [Firebase useAuth] resendVerificationEmail ERROR:', error)
+      return { error }
+    }
+  }
+
   return (
     <AuthContext.Provider value={{
       user, profile, loading,
-      signIn, signUp, signOut, updateProfile
+      signIn, signUp, signOut, updateProfile,
+      sendPasswordReset, resendVerificationEmail
     }}>
       {children}
     </AuthContext.Provider>

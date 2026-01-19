@@ -38,8 +38,17 @@ export const metadata: Metadata = {
     siteName: 'FinControl',
     images: [
       // PNG dinámico (mejor compatibilidad WhatsApp/Facebook)
-      { url: '/og-image.png', width: 1200, height: 630 },
+      { 
+        url: '/og-image.png', 
+        width: 1200, 
+        height: 630,
+        alt: 'FinControl - Plataforma de Control Financiero',
+      },
     ],
+  },
+  other: {
+    // Meta tags adicionales para Facebook
+    'fb:app_id': process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '',
   },
   twitter: {
     card: 'summary_large_image',
@@ -79,6 +88,14 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        {process.env.NEXT_PUBLIC_FACEBOOK_APP_ID && (
+          <meta property="fb:app_id" content={process.env.NEXT_PUBLIC_FACEBOOK_APP_ID} />
+        )}
+        {/* Meta tags adicionales para mejorar compatibilidad con Facebook/WhatsApp */}
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:alt" content="FinControl - Plataforma de Control Financiero" />
       </head>
       <body className="font-sans">
         <AuthProvider>

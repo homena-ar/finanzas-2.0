@@ -1227,7 +1227,7 @@ export default function GastosPage() {
               {selectedGastos.size} gasto{selectedGastos.size !== 1 ? 's' : ''} seleccionado{selectedGastos.size !== 1 ? 's' : ''}
             </span>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto sm:flex-shrink-0">
                 <label className="text-xs font-semibold text-indigo-900 whitespace-nowrap">Cambiar cuenta:</label>
                 <select
                   onChange={async (e) => {
@@ -1240,7 +1240,7 @@ export default function GastosPage() {
                     setSelectedGastos(new Set())
                     e.target.value = ''
                   }}
-                  className="input text-xs h-9 w-full sm:w-auto sm:min-w-[220px]"
+                  className="input text-xs h-9 w-full sm:w-auto sm:min-w-[260px] flex-shrink-0"
                   defaultValue=""
                 >
                   <option value="">Seleccionar cuenta...</option>

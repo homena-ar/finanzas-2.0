@@ -39,7 +39,7 @@ export default function TwitterImage() {
               justifyContent: 'center',
             }}
           >
-            <div style={{ display: 'flex', gap: 22, alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 22, alignItems: 'flex-end', position: 'relative' }}>
               <div
                 style={{
                   width: 40,
@@ -64,6 +64,27 @@ export default function TwitterImage() {
                   background: 'rgba(255,255,255,1)',
                 }}
               />
+              {/* Line connecting the bars */}
+              <svg
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                }}
+              >
+                <path
+                  d="M 2 84 L 31 44 L 60 10 L 102 -4"
+                  stroke="white"
+                  strokeWidth="4"
+                  fill="none"
+                  strokeLinecap="round"
+                  opacity="0.9"
+                />
+                <circle cx="102" cy="-4" r="5" fill="white" opacity="0.9" />
+              </svg>
             </div>
           </div>
  
