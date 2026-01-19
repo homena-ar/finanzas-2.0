@@ -29,18 +29,31 @@ export default function VerificarEmailPage() {
   }, [user, router])
 
   const handleResendVerification = async () => {
+    // Prevenir múltiples llamadas
+    if (loading) return
+    
     setLoading(true)
     setError('')
     setSuccess('')
     
-    const { error } = await resendVerificationEmail()
-    if (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      setError(message)
-    } else {
-      setSuccess('¡Correo reenviado! Revisá tu bandeja de entrada (y la carpeta de spam).')
+    try {
+      const { error } = await resendVerificationEmail()
+      if (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        // Traducir mensaje de "too-many-requests"
+        if (message.includes('too-many-requests') || message.includes('demasiados intentos')) {
+          setError('Demasiados intentos. Por favor esperá unos minutos antes de intentar nuevamente.')
+        } else {
+          setError(message)
+        }
+      } else {
+        setSuccess('¡Correo reenviado! Revisá tu bandeja de entrada (y la carpeta de spam).')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al reenviar el correo. Por favor intentá nuevamente.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleCheckVerification = async () => {
