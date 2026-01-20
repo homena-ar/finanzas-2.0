@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           // Enviar correo de bienvenida si el email se acaba de verificar
           // Solo si cambió de false a true (no en la primera carga)
-          if (emailJustVerified && firebaseUser.email) {
+          if (emailJustVerified && firebaseUser.email && firebaseUser.uid) {
             try {
               const userName = firebaseUser.email.split('@')[0]
               console.log('🎉 [Firebase useAuth] Email verificado por primera vez, enviando correo de bienvenida...')
@@ -157,12 +157,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   to: firebaseUser.email,
-                  userName: userName
+                  userName: userName,
+                  userId: firebaseUser.uid
                 })
               })
               
               if (welcomeResponse.ok) {
-                console.log('✅ [Firebase useAuth] Correo de bienvenida enviado después de verificación')
+                const result = await welcomeResponse.json()
+                if (result.alreadySent) {
+                  console.log('ℹ️ [Firebase useAuth] Correo de bienvenida ya fue enviado anteriormente')
+                } else {
+                  console.log('✅ [Firebase useAuth] Correo de bienvenida enviado después de verificación')
+                }
               } else {
                 console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', await welcomeResponse.text())
               }

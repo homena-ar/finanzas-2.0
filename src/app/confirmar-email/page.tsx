@@ -50,7 +50,7 @@ function ConfirmarEmailContent() {
               // Enviar correo de bienvenida si aún no se envió
               try {
                 const currentUser = auth.currentUser
-                if (currentUser && currentUser.email) {
+                if (currentUser && currentUser.email && currentUser.uid) {
                   const userName = currentUser.email.split('@')[0]
                   console.log('🎉 [ConfirmarEmail] Email ya verificado, verificando correo de bienvenida...')
                   
@@ -59,12 +59,18 @@ function ConfirmarEmailContent() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       to: currentUser.email,
-                      userName: userName
+                      userName: userName,
+                      userId: currentUser.uid
                     })
                   })
                   
                   if (welcomeResponse.ok) {
-                    console.log('✅ [ConfirmarEmail] Correo de bienvenida enviado')
+                    const result = await welcomeResponse.json()
+                    if (result.alreadySent) {
+                      console.log('ℹ️ [ConfirmarEmail] Correo de bienvenida ya fue enviado anteriormente')
+                    } else {
+                      console.log('✅ [ConfirmarEmail] Correo de bienvenida enviado')
+                    }
                   }
                 }
               } catch (welcomeError) {
@@ -95,7 +101,7 @@ function ConfirmarEmailContent() {
           // Enviar correo de bienvenida directamente aquí
           try {
             const currentUser = auth.currentUser
-            if (currentUser && currentUser.email) {
+            if (currentUser && currentUser.email && currentUser.uid) {
               const userName = currentUser.email.split('@')[0]
               console.log('🎉 [ConfirmarEmail] Enviando correo de bienvenida después de verificación...')
               
@@ -104,12 +110,18 @@ function ConfirmarEmailContent() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   to: currentUser.email,
-                  userName: userName
+                  userName: userName,
+                  userId: currentUser.uid
                 })
               })
               
               if (welcomeResponse.ok) {
-                console.log('✅ [ConfirmarEmail] Correo de bienvenida enviado correctamente')
+                const result = await welcomeResponse.json()
+                if (result.alreadySent) {
+                  console.log('ℹ️ [ConfirmarEmail] Correo de bienvenida ya fue enviado anteriormente')
+                } else {
+                  console.log('✅ [ConfirmarEmail] Correo de bienvenida enviado correctamente')
+                }
               } else {
                 console.error('⚠️ [ConfirmarEmail] Error enviando correo de bienvenida:', await welcomeResponse.text())
               }

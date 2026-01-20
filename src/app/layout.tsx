@@ -5,6 +5,7 @@ import { WorkspaceProvider } from '@/hooks/useWorkspace'
 import { DataProvider } from '@/hooks/useData'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import { InstallPWA } from '@/components/InstallPWA'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 // URL base de la aplicación (cambiar según el entorno)
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://fin.nexuno.com.ar'
@@ -102,13 +103,15 @@ export default function RootLayout({
       <body className="font-sans">
         <ServiceWorkerRegistration />
         <InstallPWA />
-        <AuthProvider>
-          <WorkspaceProvider>
-            <DataProvider>
-              {children}
-            </DataProvider>
-          </WorkspaceProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <WorkspaceProvider>
+              <DataProvider>
+                {children}
+              </DataProvider>
+            </WorkspaceProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

@@ -548,7 +548,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     } catch (error) {
       console.error('📊 [Firebase useData] Error fetching data:', error)
+      // No propagar el error para evitar que rompa la UI
+      // Solo loguear y mantener el estado de loading en false
       setLoading(false)
+      // Opcional: Mostrar notificación al usuario si es necesario
+      // Pero no lanzar el error para evitar que el ErrorBoundary lo capture
     }
   }, [user, currentWorkspace])
   // --- FIN FETCHALL ---
