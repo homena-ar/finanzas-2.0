@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/hooks/useAuth'
 import { WorkspaceProvider } from '@/hooks/useWorkspace'
 import { DataProvider } from '@/hooks/useData'
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 
 // URL base de la aplicación (cambiar según el entorno)
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://fin.nexuno.com.ar'
@@ -98,6 +99,7 @@ export default function RootLayout({
         <meta property="og:image:alt" content="FinControl - Plataforma de Control Financiero" />
       </head>
       <body className="font-sans">
+        <ServiceWorkerRegistration />
         <AuthProvider>
           <WorkspaceProvider>
             <DataProvider>
