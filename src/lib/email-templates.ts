@@ -218,6 +218,119 @@ export function getWelcomeEmailTemplate(
                 </ul>
               </div>
 
+              <!-- PWA Installation Section -->
+              <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 28px; margin: 30px 0; border: 2px solid #f59e0b;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <div style="font-size: 48px; margin-bottom: 10px;">📱</div>
+                  <h2 style="margin: 0 0 8px 0; color: #92400e; font-size: 22px; font-weight: 700;">
+                    Instalá FinControl en tu dispositivo
+                  </h2>
+                  <p style="margin: 0; color: #78350f; font-size: 15px; line-height: 1.5;">
+                    Acceso rápido, funcionamiento offline y experiencia mejorada
+                  </p>
+                </div>
+
+                <!-- Benefits -->
+                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                  <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; font-weight: 600;">
+                    ✨ Ventajas de instalar la app:
+                  </h3>
+                  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #92400e;">⚡ Acceso instantáneo:</strong> Accedé desde el ícono en tu pantalla de inicio
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #92400e;">📴 Funciona offline:</strong> Consultá tus datos incluso sin conexión a internet
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #92400e;">🚀 Más rápido:</strong> Carga instantánea y navegación fluida
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #92400e;">🔔 Notificaciones:</strong> Recibí alertas importantes sobre tus finanzas
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #92400e;">💾 Ahorro de datos:</strong> Menor consumo de datos móviles
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- Installation Steps -->
+                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px;">
+                  <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; font-weight: 600;">
+                    📋 Cómo instalar:
+                  </h3>
+                  
+                  <!-- Chrome/Edge Desktop -->
+                  <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                    <div style="display: flex; align-items: start; gap: 12px;">
+                      <div style="background-color: #6366f1; color: #ffffff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px;">
+                        💻
+                      </div>
+                      <div style="flex: 1;">
+                        <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
+                          Chrome o Edge (Escritorio)
+                        </h4>
+                        <ol style="margin: 0; padding-left: 20px; color: #6b7280; font-size: 13px; line-height: 1.8;">
+                          <li style="margin-bottom: 6px;">Buscá el ícono de instalación <strong style="color: #6366f1;">➕</strong> en la barra de direcciones</li>
+                          <li style="margin-bottom: 6px;">O ve a <strong>Menú (⋮)</strong> → <strong>"Instalar FinControl"</strong></li>
+                          <li>Hacé clic en <strong>"Instalar"</strong> y listo</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Android -->
+                  <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                    <div style="display: flex; align-items: start; gap: 12px;">
+                      <div style="background-color: #10b981; color: #ffffff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px;">
+                        🤖
+                      </div>
+                      <div style="flex: 1;">
+                        <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
+                          Android (Chrome)
+                        </h4>
+                        <ol style="margin: 0; padding-left: 20px; color: #6b7280; font-size: 13px; line-height: 1.8;">
+                          <li style="margin-bottom: 6px;">Abrí FinControl en Chrome</li>
+                          <li style="margin-bottom: 6px;">Aparecerá un banner <strong>"Agregar a pantalla de inicio"</strong></li>
+                          <li style="margin-bottom: 6px;">O ve a <strong>Menú (⋮)</strong> → <strong>"Instalar app"</strong></li>
+                          <li>Confirmá la instalación</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- iOS -->
+                  <div>
+                    <div style="display: flex; align-items: start; gap: 12px;">
+                      <div style="background-color: #3b82f6; color: #ffffff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px;">
+                        🍎
+                      </div>
+                      <div style="flex: 1;">
+                        <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
+                          iOS (Safari)
+                        </h4>
+                        <ol style="margin: 0; padding-left: 20px; color: #6b7280; font-size: 13px; line-height: 1.8;">
+                          <li style="margin-bottom: 6px;">Abrí FinControl en Safari</li>
+                          <li style="margin-bottom: 6px;">Tocá el botón <strong>"Compartir"</strong> (□↑) en la parte inferior</li>
+                          <li style="margin-bottom: 6px;">Deslizá y seleccioná <strong>"Agregar a pantalla de inicio"</strong></li>
+                          <li>Tocá <strong>"Agregar"</strong> en la esquina superior derecha</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Important -->
               <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 30px 0;">
                 <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px; font-weight: 600;">
@@ -273,6 +386,34 @@ Comienza a usar FinControl:
 - 🏦 Ahorros: Gestiona tus metas de ahorro
 - 💳 Tarjetas: Organiza tus tarjetas de crédito
 - 📊 Resúmenes: Visualiza tus finanzas con gráficos y proyecciones
+
+📱 INSTALÁ FINCONTROL EN TU DISPOSITIVO
+
+Ventajas de instalar la app:
+- ⚡ Acceso instantáneo desde el ícono en tu pantalla de inicio
+- 📴 Funciona offline - consultá tus datos sin conexión
+- 🚀 Carga más rápida y navegación fluida
+- 🔔 Notificaciones importantes sobre tus finanzas
+- 💾 Menor consumo de datos móviles
+
+Cómo instalar:
+
+💻 Chrome o Edge (Escritorio):
+1. Buscá el ícono de instalación (➕) en la barra de direcciones
+2. O ve a Menú (⋮) → "Instalar FinControl"
+3. Hacé clic en "Instalar"
+
+🤖 Android (Chrome):
+1. Abrí FinControl en Chrome
+2. Aparecerá un banner "Agregar a pantalla de inicio"
+3. O ve a Menú (⋮) → "Instalar app"
+4. Confirmá la instalación
+
+🍎 iOS (Safari):
+1. Abrí FinControl en Safari
+2. Tocá el botón "Compartir" (□↑) en la parte inferior
+3. Deslizá y seleccioná "Agregar a pantalla de inicio"
+4. Tocá "Agregar" en la esquina superior derecha
 
 🔐 Confirma tu email
 Para asegurar la seguridad de tu cuenta, por favor confirma tu dirección de email haciendo clic en el enlace que te enviamos por separado.

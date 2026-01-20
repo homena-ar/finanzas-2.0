@@ -3,6 +3,7 @@
   "short_name": "FinControl",
   "description": "Plataforma profesional para el control de tus finanzas personales y familiares. Gestioná gastos, ingresos, ahorros y proyecciones.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#6366f1",
@@ -26,5 +27,6 @@
       "sizes": "180x180",
       "type": "image/png"
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }
