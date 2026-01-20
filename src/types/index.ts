@@ -197,3 +197,22 @@ export interface WorkspaceInvitation {
   created_at: string
   workspace?: Workspace
 }
+
+// ============================================
+// NOTIFICACIONES
+// ============================================
+
+export interface Notificacion {
+  id: string
+  user_id: string
+  tipo: 'cierre' | 'vencimiento' | 'presupuesto' | 'sistema'
+  titulo: string
+  mensaje: string
+  icono: string
+  leida: boolean
+  tarjeta_id?: string | null
+  fecha_evento?: string | null // Fecha del cierre/vencimiento
+  link?: string | null
+  created_at: string
+  workspace_id?: string
+}

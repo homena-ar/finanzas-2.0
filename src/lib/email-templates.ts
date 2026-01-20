@@ -515,3 +515,257 @@ FinControl - Gestiona tus finanzas de forma inteligente`
 
   return { html, text, subject }
 }
+
+export function getCierreNotificationTemplate(
+  userName: string,
+  tarjetaNombre: string,
+  diaCierre: number,
+  fechaCierre: string
+): { html: string; text: string; subject: string } {
+  const subject = `🔔 Recordatorio: Cierre de ${tarjetaNombre} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                📅 Recordatorio de Cierre
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Hola <strong>${userName}</strong>,
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te recordamos que la tarjeta <strong style="color: #f59e0b;">${tarjetaNombre}</strong> cierra en <strong>2 días</strong> (día ${diaCierre}).
+              </p>
+
+              <!-- Info Box -->
+              <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #f59e0b;">
+                <h2 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px; font-weight: 600;">
+                  📋 Detalles del cierre
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-size: 14px;">💳 Tarjeta</td>
+                    <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
+                      ${tarjetaNombre}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-size: 14px;">📅 Fecha de cierre</td>
+                    <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
+                      ${fechaCierre}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-size: 14px;">⏰ Tiempo restante</td>
+                    <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
+                      2 días
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Tip -->
+              <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 30px 0;">
+                <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px; font-weight: 600;">
+                  💡 Consejo
+                </h3>
+                <p style="margin: 0; color: #1e3a8a; font-size: 14px; line-height: 1.6;">
+                  Revisá tus gastos pendientes antes del cierre para evitar sorpresas en el resumen.
+                </p>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard" 
+                   style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);">
+                  Ver Resumen
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #f59e0b;">FinControl</strong>.
+              </p>
+              <p style="margin: 0; color: #9ca3af; font-size: 11px;">
+                Podés desactivar estas notificaciones en la configuración de tu tarjeta.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Recordatorio: Cierre de ${tarjetaNombre} - FinControl
+
+Hola ${userName},
+
+Te recordamos que la tarjeta ${tarjetaNombre} cierra en 2 días (día ${diaCierre}).
+
+Detalles del cierre:
+- Tarjeta: ${tarjetaNombre}
+- Fecha de cierre: ${fechaCierre}
+- Tiempo restante: 2 días
+
+💡 Consejo: Revisá tus gastos pendientes antes del cierre para evitar sorpresas en el resumen.
+
+${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard
+
+Este es un email automático de FinControl. Podés desactivar estas notificaciones en la configuración de tu tarjeta.`
+
+  return { html, text, subject }
+}
+
+export function getVencimientoNotificationTemplate(
+  userName: string,
+  tarjetaNombre: string,
+  diaVencimiento: number,
+  fechaVencimiento: string
+): { html: string; text: string; subject: string } {
+  const subject = `🔔 Recordatorio: Vencimiento de pago ${tarjetaNombre} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                💳 Recordatorio de Pago
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Hola <strong>${userName}</strong>,
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te recordamos que el vencimiento de pago de <strong style="color: #ef4444;">${tarjetaNombre}</strong> es en <strong>2 días</strong> (día ${diaVencimiento}).
+              </p>
+
+              <!-- Warning Box -->
+              <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #991b1b; font-size: 18px; font-weight: 600;">
+                  ⚠️ Importante
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #7f1d1d; font-size: 14px;">💳 Tarjeta</td>
+                    <td align="right" style="padding: 8px 0; color: #7f1d1d; font-size: 14px; font-weight: 600;">
+                      ${tarjetaNombre}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #7f1d1d; font-size: 14px;">📅 Fecha de vencimiento</td>
+                    <td align="right" style="padding: 8px 0; color: #7f1d1d; font-size: 14px; font-weight: 600;">
+                      ${fechaVencimiento}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #7f1d1d; font-size: 14px;">⏰ Tiempo restante</td>
+                    <td align="right" style="padding: 8px 0; color: #7f1d1d; font-size: 14px; font-weight: 600;">
+                      2 días
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Tip -->
+              <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 30px 0;">
+                <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px; font-weight: 600;">
+                  💡 Consejo
+                </h3>
+                <p style="margin: 0; color: #1e3a8a; font-size: 14px; line-height: 1.6;">
+                  Programá el pago con anticipación para evitar intereses y cargos por mora.
+                </p>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard" 
+                   style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);">
+                  Ver Resumen
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #ef4444;">FinControl</strong>.
+              </p>
+              <p style="margin: 0; color: #9ca3af; font-size: 11px;">
+                Podés desactivar estas notificaciones en la configuración de tu tarjeta.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Recordatorio: Vencimiento de pago ${tarjetaNombre} - FinControl
+
+Hola ${userName},
+
+Te recordamos que el vencimiento de pago de ${tarjetaNombre} es en 2 días (día ${diaVencimiento}).
+
+⚠️ Importante:
+- Tarjeta: ${tarjetaNombre}
+- Fecha de vencimiento: ${fechaVencimiento}
+- Tiempo restante: 2 días
+
+💡 Consejo: Programá el pago con anticipación para evitar intereses y cargos por mora.
+
+${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard
+
+Este es un email automático de FinControl. Podés desactivar estas notificaciones en la configuración de tu tarjeta.`
+
+  return { html, text, subject }
+}

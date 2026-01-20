@@ -10,6 +10,8 @@ import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
 import * as XLSX from 'xlsx'
+import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -175,42 +177,134 @@ export default function DashboardPage() {
   const budgetPct = hasBudget ? (gastadoTotalARS / budgetTotalARS) * 100 : 0
   const budgetStatus = budgetPct >= 100 ? 'danger' : budgetPct >= 80 ? 'warning' : 'ok'
 
-  // Alertas
-  const alerts: { type: string; icon: string; title: string; desc: string }[] = []
-  const today = new Date()
-  const day = today.getDate()
-  
-  tarjetas.forEach(t => {
-    // Alertas de cierre
-    if (t.cierre) {
-      const diff = t.cierre - day
-      if (diff > 0 && diff <= 5) {
-        alerts.push({ type: 'warning', icon: '📅', title: `Cierre ${t.nombre}`, desc: `Faltan ${diff} días` })
-      } else if (diff === 0) {
-        alerts.push({ type: 'danger', icon: '🚨', title: `¡HOY cierra ${t.nombre}!`, desc: 'Último día' })
-      }
-    }
-    // Alertas de vencimiento de pago
-    if (t.vencimiento) {
-      const diffVenc = t.vencimiento - day
-      if (diffVenc > 0 && diffVenc <= 5) {
-        alerts.push({ type: 'warning', icon: '💳', title: `Vence pago ${t.nombre}`, desc: `Faltan ${diffVenc} días para pagar` })
-      } else if (diffVenc === 0) {
-        alerts.push({ type: 'danger', icon: '🚨', title: `¡HOY vence pago ${t.nombre}!`, desc: 'Último día para pagar' })
-      } else if (diffVenc === -1) {
-        alerts.push({ type: 'danger', icon: '⚠️', title: `¡Venció pago ${t.nombre}!`, desc: 'El pago venció ayer' })
-      }
-    }
-  })
+  // Generar notificaciones para alertas importantes
+  useEffect(() => {
+    if (!profile || loading) return
 
-  if (hasBudget && budgetPct >= 90) {
-    alerts.push({
-      type: budgetPct >= 100 ? 'danger' : 'warning',
-      icon: '💸',
-      title: budgetPct >= 100 ? '¡Presupuesto excedido!' : 'Cerca del límite',
-      desc: `${formatMoney(totalPagar)} / ${formatMoney(budgetARS)}`
-    })
-  }
+    const generateNotifications = async () => {
+      const today = new Date()
+      const day = today.getDate()
+      const isWorkspaceMode = currentWorkspace !== null
+      const workspaceFilter = isWorkspaceMode
+        ? where('workspace_id', '==', currentWorkspace.id)
+        : where('user_id', '==', profile.id)
+
+      // Verificar notificaciones existentes para evitar duplicados
+      const notificacionesRef = collection(db, 'notificaciones')
+      const existingQuery = query(notificacionesRef, workspaceFilter)
+      const existingSnap = await getDocs(existingQuery)
+      const existingIds = new Set(existingSnap.docs.map(d => d.data().tarjeta_id).filter(Boolean))
+
+      const notificationsToCreate: Array<{
+        tipo: 'cierre' | 'vencimiento' | 'presupuesto'
+        titulo: string
+        mensaje: string
+        icono: string
+        tarjeta_id?: string
+        fecha_evento?: Date
+      }> = []
+
+      // Notificaciones de tarjetas
+      tarjetas.forEach(t => {
+        // Alertas de cierre (hoy o mañana)
+        if (t.cierre) {
+          const diff = t.cierre - day
+          if (diff === 0 && !existingIds.has(t.id)) {
+            notificationsToCreate.push({
+              tipo: 'cierre',
+              titulo: `¡HOY cierra ${t.nombre}!`,
+              mensaje: 'Último día para agregar gastos al resumen',
+              icono: '🚨',
+              tarjeta_id: t.id,
+              fecha_evento: today
+            })
+          } else if (diff === 1 && !existingIds.has(t.id)) {
+            notificationsToCreate.push({
+              tipo: 'cierre',
+              titulo: `Cierre ${t.nombre} mañana`,
+              mensaje: 'Mañana cierra esta tarjeta',
+              icono: '📅',
+              tarjeta_id: t.id,
+              fecha_evento: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+            })
+          }
+        }
+        // Alertas de vencimiento (hoy, mañana o vencido)
+        if (t.vencimiento) {
+          const diffVenc = t.vencimiento - day
+          if (diffVenc === 0 && !existingIds.has(t.id)) {
+            notificationsToCreate.push({
+              tipo: 'vencimiento',
+              titulo: `¡HOY vence pago ${t.nombre}!`,
+              mensaje: 'Último día para pagar',
+              icono: '🚨',
+              tarjeta_id: t.id,
+              fecha_evento: today
+            })
+          } else if (diffVenc === 1 && !existingIds.has(t.id)) {
+            notificationsToCreate.push({
+              tipo: 'vencimiento',
+              titulo: `Vence pago ${t.nombre} mañana`,
+              mensaje: 'Mañana vence el pago de esta tarjeta',
+              icono: '💳',
+              tarjeta_id: t.id,
+              fecha_evento: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+            })
+          } else if (diffVenc === -1 && !existingIds.has(t.id)) {
+            notificationsToCreate.push({
+              tipo: 'vencimiento',
+              titulo: `¡Venció pago ${t.nombre}!`,
+              mensaje: 'El pago venció ayer',
+              icono: '⚠️',
+              tarjeta_id: t.id,
+              fecha_evento: new Date(today.getTime() - 24 * 60 * 60 * 1000)
+            })
+          }
+        }
+      })
+
+      // Notificación de presupuesto
+      if (hasBudget && budgetPct >= 90) {
+        const budgetNotifExists = existingSnap.docs.some(d => {
+          const data = d.data()
+          return data.tipo === 'presupuesto' && !data.leida
+        })
+        if (!budgetNotifExists) {
+          notificationsToCreate.push({
+            tipo: 'presupuesto',
+            titulo: budgetPct >= 100 ? '¡Presupuesto excedido!' : 'Cerca del límite',
+            mensaje: `${formatMoney(totalPagar)} / ${formatMoney(budgetARS)}`,
+            icono: '💸'
+          })
+        }
+      }
+
+      // Crear notificaciones
+      for (const notif of notificationsToCreate) {
+        const notifData: any = {
+          user_id: profile.id,
+          tipo: notif.tipo,
+          titulo: notif.titulo,
+          mensaje: notif.mensaje,
+          icono: notif.icono,
+          leida: false,
+          link: '/dashboard',
+          created_at: Timestamp.now()
+        }
+        if (notif.tarjeta_id) notifData.tarjeta_id = notif.tarjeta_id
+        if (notif.fecha_evento) notifData.fecha_evento = Timestamp.fromDate(notif.fecha_evento)
+        if (isWorkspaceMode) notifData.workspace_id = currentWorkspace.id
+
+        try {
+          await addDoc(notificacionesRef, notifData)
+        } catch (error) {
+          console.error('Error creando notificación:', error)
+        }
+      }
+    }
+
+    generateNotifications()
+  }, [tarjetas, profile, hasBudget, budgetPct, totalPagar, budgetARS, currentWorkspace, loading])
 
   // Chart data por categoría
   const catTotals: Record<string, number> = {}
@@ -256,27 +350,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div className="space-y-2">
-          {alerts.map((alert, i) => (
-            <div 
-              key={i}
-              className={`flex items-center gap-4 p-4 rounded-xl ${
-                alert.type === 'danger' 
-                  ? 'bg-red-50 border border-red-200 text-red-800'
-                  : 'bg-amber-50 border border-amber-200 text-amber-800'
-              }`}
-            >
-              <span className="text-2xl">{alert.icon}</span>
-              <div>
-                <div className="font-bold">{alert.title}</div>
-                <div className="text-sm opacity-80">{alert.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Budget Progress - Solo si está habilitado */}
       {hasBudget && (

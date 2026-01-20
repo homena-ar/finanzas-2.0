@@ -13,6 +13,7 @@ import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { WorkspacePermissions } from '@/types'
+import { NotificationsBell } from '@/components/NotificationsBell'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
@@ -174,8 +175,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
           </div>
         </div>
-        <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold shrink-0">
-          💵 {formatMoney(dolar)}
+        <div className="flex items-center gap-2">
+          <NotificationsBell />
+          <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold shrink-0">
+            💵 {formatMoney(dolar)}
+          </div>
         </div>
       </header>
 
@@ -408,8 +412,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
+      {/* Desktop Header */}
+      <header className="hidden lg:flex fixed top-0 left-64 right-0 h-16 bg-white border-b border-slate-200 z-30 items-center justify-end px-6 gap-4">
+        <NotificationsBell />
+        <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold">
+          💵 {formatMoney(dolar)}
+        </div>
+      </header>
+
       {/* Main Content */}
-      <main className="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
+      <main className="lg:ml-64 pt-16 lg:pt-16 min-h-screen">
         <div className="p-4 lg:p-6">
           {children}
         </div>
