@@ -273,7 +273,7 @@ export function getWelcomeEmailTemplate(
                   <!-- Chrome/Edge Desktop -->
                   <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background-color: #6366f1; color: #ffffff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px;">
+                      <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #ffffff; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; margin-top: 2px; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
                         💻
                       </div>
                       <div style="flex: 1;">
@@ -292,7 +292,7 @@ export function getWelcomeEmailTemplate(
                   <!-- Android -->
                   <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background-color: #10b981; color: #ffffff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px;">
+                      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; margin-top: 2px; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);">
                         🤖
                       </div>
                       <div style="flex: 1;">
@@ -312,7 +312,7 @@ export function getWelcomeEmailTemplate(
                   <!-- iOS -->
                   <div>
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background-color: #3b82f6; color: #ffffff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px;">
+                      <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; margin-top: 2px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);">
                         🍎
                       </div>
                       <div style="flex: 1;">
@@ -329,16 +329,6 @@ export function getWelcomeEmailTemplate(
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- Important -->
-              <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 30px 0;">
-                <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px; font-weight: 600;">
-                  🔐 Confirma tu email
-                </h3>
-                <p style="margin: 0; color: #1e3a8a; font-size: 14px; line-height: 1.6;">
-                  Para asegurar la seguridad de tu cuenta, por favor confirma tu dirección de email haciendo clic en el enlace que te enviamos por separado.
-                </p>
               </div>
 
               <!-- CTA Button -->
@@ -414,9 +404,6 @@ Cómo instalar:
 2. Tocá el botón "Compartir" (□↑) en la parte inferior
 3. Deslizá y seleccioná "Agregar a pantalla de inicio"
 4. Tocá "Agregar" en la esquina superior derecha
-
-🔐 Confirma tu email
-Para asegurar la seguridad de tu cuenta, por favor confirma tu dirección de email haciendo clic en el enlace que te enviamos por separado.
 
 ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard
 

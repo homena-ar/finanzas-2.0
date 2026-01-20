@@ -282,21 +282,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await createDefaultCategorias(userCredential.user.uid)
 
       // Enviar correo de verificación personalizado (en lugar del de Firebase)
-      // NO enviamos el correo automático de Firebase, solo usamos el personalizado
-      try {
-        console.log('📧 [Firebase useAuth] Intentando enviar correo personalizado...')
-        
-        // Generar link de verificación usando nuestro endpoint
-        const linkResponse = await fetch('/api/generate-verification-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        })
-        
-        const linkResponseText = await linkResponse.text()
-        console.log('📧 [Firebase useAuth] Respuesta del endpoint de link:', linkResponse.status, linkResponseText.substring(0, 200))
-        
-        if (linkResponse.ok) {
+      // Esperar un momento para asegurar que Firebase Admin SDK pueda encontrar el usuario
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      let emailSent = false
+      let lastError: any = null
+      
+      // Intentar enviar correo personalizado con retry
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`📧 [Firebase useAuth] Intento ${attempt}/3 de enviar correo personalizado...`)
+          
+          // Generar link de verificación usando nuestro endpoint
+          const linkResponse = await fetch('/api/generate-verification-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          })
+          
+          const linkResponseText = await linkResponse.text()
+          console.log('📧 [Firebase useAuth] Respuesta del endpoint de link:', linkResponse.status, linkResponseText.substring(0, 200))
+          
+          if (!linkResponse.ok) {
+            const errorData = JSON.parse(linkResponseText)
+            console.error(`❌ [Firebase useAuth] Error generando link (intento ${attempt}):`, errorData)
+            lastError = errorData
+            
+            // Si es "user-not-found" y aún hay intentos, esperar y reintentar
+            if (errorData.error?.includes('no encontrado') && attempt < 3) {
+              const waitTime = attempt * 1000 // 1s, 2s
+              console.log(`⏳ [Firebase useAuth] Esperando ${waitTime}ms antes de reintentar...`)
+              await new Promise(resolve => setTimeout(resolve, waitTime))
+              continue
+            }
+            throw new Error(`Error al generar link: ${errorData.error || 'Error desconocido'}`)
+          }
+          
           const linkData = JSON.parse(linkResponseText)
           const verificationLink = linkData.verificationLink
           
@@ -321,29 +342,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const verificationResponseText = await verificationResponse.text()
           console.log('📧 [Firebase useAuth] Respuesta del endpoint de correo:', verificationResponse.status, verificationResponseText.substring(0, 200))
           
-          if (verificationResponse.ok) {
-            console.log('✅ [Firebase useAuth] Correo de verificación personalizado enviado exitosamente')
-          } else {
+          if (!verificationResponse.ok) {
             const errorData = JSON.parse(verificationResponseText)
-            console.error('❌ [Firebase useAuth] Error enviando correo de verificación:', errorData)
+            console.error(`❌ [Firebase useAuth] Error enviando correo (intento ${attempt}):`, errorData)
+            lastError = errorData
             throw new Error(`Error al enviar correo: ${errorData.error || 'Error desconocido'}`)
           }
-        } else {
-          const errorData = JSON.parse(linkResponseText)
-          console.error('❌ [Firebase useAuth] Error generando link de verificación:', errorData)
-          throw new Error(`Error al generar link: ${errorData.error || 'Error desconocido'}`)
+          
+          console.log('✅ [Firebase useAuth] Correo de verificación personalizado enviado exitosamente')
+          emailSent = true
+          break // Salir del loop si se envió correctamente
+          
+        } catch (emailError: any) {
+          console.error(`❌ [Firebase useAuth] Error en intento ${attempt}:`, emailError)
+          lastError = emailError
+          
+          // Si es el último intento, usar fallback
+          if (attempt === 3) {
+            console.warn('⚠️ [Firebase useAuth] Todos los intentos fallaron, usando correo de Firebase como último recurso')
+            try {
+              await sendEmailVerification(userCredential.user)
+              console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado (último recurso)')
+              emailSent = true
+            } catch (fallbackError) {
+              console.error('❌ [Firebase useAuth] Error crítico: No se pudo enviar ningún correo de verificación:', fallbackError)
+              // No lanzar error aquí - el registro fue exitoso, solo el correo falló
+            }
+          } else {
+            // Esperar antes del siguiente intento
+            const waitTime = attempt * 1000
+            console.log(`⏳ [Firebase useAuth] Esperando ${waitTime}ms antes del siguiente intento...`)
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+          }
         }
-      } catch (emailError: any) {
-        console.error('❌ [Firebase useAuth] Error completo en proceso de verificación:', emailError)
-        // NO usamos fallback automático - mejor que el usuario vea el error
-        // o podemos intentar enviar el correo de Firebase como último recurso
-        console.warn('⚠️ [Firebase useAuth] Usando correo de Firebase como último recurso')
-        try {
-          await sendEmailVerification(userCredential.user)
-          console.log('✅ [Firebase useAuth] Email de verificación de Firebase enviado (último recurso)')
-        } catch (fallbackError) {
-          console.error('❌ [Firebase useAuth] Error crítico: No se pudo enviar ningún correo de verificación:', fallbackError)
-        }
+      }
+      
+      if (!emailSent) {
+        console.error('❌ [Firebase useAuth] No se pudo enviar el correo de verificación después de todos los intentos')
+        console.error('❌ [Firebase useAuth] Último error:', lastError)
       }
 
       // NO enviar correo de bienvenida aquí - se enviará cuando el usuario verifique su email

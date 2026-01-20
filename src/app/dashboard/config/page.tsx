@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info } from 'lucide-react'
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { AlertModal, ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 import type { WorkspacePermissions } from '@/types'
@@ -99,6 +101,16 @@ export default function ConfigPage() {
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
+
+  // Cambio de contraseña
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   // Inicializar valores del perfil
   useEffect(() => {
@@ -630,6 +642,91 @@ export default function ConfigPage() {
     setWorkspaceLogo(null)
   }
 
+  const handleChangePassword = async () => {
+    if (!user || !user.email) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo identificar tu usuario',
+        variant: 'error'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setAlertData({
+        title: 'Campos incompletos',
+        message: 'Por favor completá todos los campos',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setAlertData({
+        title: 'Contraseña muy corta',
+        message: 'La contraseña debe tener al menos 6 caracteres',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setAlertData({
+        title: 'Contraseñas no coinciden',
+        message: 'Las contraseñas nuevas no coinciden',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      // Reautenticar con la contraseña actual
+      const credential = EmailAuthProvider.credential(user.email, currentPassword)
+      await reauthenticateWithCredential(user, credential)
+
+      // Actualizar la contraseña
+      await updatePassword(user, newPassword)
+
+      setAlertData({
+        title: '¡Contraseña actualizada!',
+        message: 'Tu contraseña fue cambiada exitosamente',
+        variant: 'success'
+      })
+      setShowAlert(true)
+      
+      // Limpiar formulario
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+      setShowPasswordChange(false)
+    } catch (error: any) {
+      console.error('Error cambiando contraseña:', error)
+      let errorMessage = 'Error al cambiar la contraseña'
+      
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = 'La contraseña actual es incorrecta'
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'La contraseña es muy débil. Debe tener al menos 6 caracteres'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+
+      setAlertData({
+        title: 'Error',
+        message: errorMessage,
+        variant: 'error'
+      })
+      setShowAlert(true)
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   // Permisos disponibles para el selector con explicaciones
   const permissionOptions = [
     { 
@@ -766,6 +863,111 @@ export default function ConfigPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Sección Cambio de Contraseña */}
+      <div className="card p-5">
+        <h3 className="font-bold mb-4">🔐 Seguridad</h3>
+        {!showPasswordChange ? (
+          <button
+            onClick={() => setShowPasswordChange(true)}
+            className="btn btn-secondary"
+          >
+            <Lock className="w-4 h-4" /> Cambiar contraseña
+          </button>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="label">Contraseña actual</label>
+              <div className="relative">
+                <input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  className="input w-full pr-10"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Ingresá tu contraseña actual"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Nueva contraseña</label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  className="input w-full pr-10"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Confirmar nueva contraseña</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className="input w-full pr-10"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Repetí la nueva contraseña"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+                className="btn btn-primary"
+              >
+                {changingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" /> Guardar
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowPasswordChange(false)
+                  setCurrentPassword('')
+                  setNewPassword('')
+                  setConfirmNewPassword('')
+                }}
+                disabled={changingPassword}
+                className="btn btn-secondary"
+              >
+                <X className="w-4 h-4" /> Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sección de Workspaces */}

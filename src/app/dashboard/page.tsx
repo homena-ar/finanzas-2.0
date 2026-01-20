@@ -184,8 +184,9 @@ export default function DashboardPage() {
     const generateNotifications = async () => {
       const today = new Date()
       const day = today.getDate()
-      const isWorkspaceMode = currentWorkspace !== null
-      const workspaceFilter = isWorkspaceMode
+      // Validar que currentWorkspace tenga id válido antes de usarlo
+      const isWorkspaceMode = currentWorkspace !== null && currentWorkspace.id !== undefined && currentWorkspace.id !== null
+      const workspaceFilter = isWorkspaceMode && currentWorkspace?.id
         ? where('workspace_id', '==', currentWorkspace.id)
         : where('user_id', '==', profile.id)
 

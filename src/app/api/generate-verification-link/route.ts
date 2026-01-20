@@ -66,12 +66,31 @@ export async function POST(request: NextRequest) {
 
     console.log('📧 [API] Generando link de verificación para:', email)
 
-    // Obtener el usuario por email
-    const user = await admin.auth().getUserByEmail(email)
+    // Obtener el usuario por email con retry (puede haber un pequeño delay después de crear el usuario)
+    let user
+    let retries = 3
+    let delay = 500 // 500ms entre intentos
+    
+    while (retries > 0) {
+      try {
+        user = await admin.auth().getUserByEmail(email)
+        console.log('✅ [API] Usuario encontrado en intento', 4 - retries)
+        break
+      } catch (error: any) {
+        retries--
+        if (error.code === 'auth/user-not-found' && retries > 0) {
+          console.log(`⚠️ [API] Usuario no encontrado, reintentando en ${delay}ms... (intentos restantes: ${retries})`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          delay *= 1.5 // Aumentar el delay exponencialmente
+        } else {
+          throw error
+        }
+      }
+    }
     
     if (!user) {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
+        { error: 'Usuario no encontrado después de varios intentos. Por favor esperá unos segundos e intentá nuevamente.' },
         { status: 404 }
       )
     }

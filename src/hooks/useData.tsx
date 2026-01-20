@@ -165,8 +165,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.log('📊 [Firebase useData] Fetching data for workspace:', currentWorkspace?.name || 'Personal')
       const startTime = Date.now()
 
-      const isWorkspaceMode = currentWorkspace !== null
-      const workspaceFilter = isWorkspaceMode
+      // Validar que currentWorkspace tenga id válido antes de usarlo
+      const isWorkspaceMode = currentWorkspace !== null && currentWorkspace.id !== undefined && currentWorkspace.id !== null
+      const workspaceFilter = isWorkspaceMode && currentWorkspace?.id
         ? where('workspace_id', '==', currentWorkspace.id)
         : where('user_id', '==', user.uid)
 
@@ -178,7 +179,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         tarjetas: 'admin' 
       };
 
-      if (isWorkspaceMode) {
+      if (isWorkspaceMode && currentWorkspace?.id) {
         // Si el usuario es el dueño del workspace, tiene permisos de admin automáticamente
         const isOwner = currentWorkspace.owner_id === user.uid;
         
