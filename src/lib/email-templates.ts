@@ -273,8 +273,8 @@ export function getWelcomeEmailTemplate(
                   <!-- Chrome/Edge Desktop -->
                   <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #ffffff; width: 40px; height: 40px; min-width: 40px; min-height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3); font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">
-                        <span style="display:block; line-height: 1;">💻</span>
+                      <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
+                        <span style="font-size: 24px; line-height: 1; display: block; text-align: center; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">💻</span>
                       </div>
                       <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
@@ -292,8 +292,8 @@ export function getWelcomeEmailTemplate(
                   <!-- Android -->
                   <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; width: 40px; height: 40px; min-width: 40px; min-height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">
-                        <span style="display:block; line-height: 1;">🤖</span>
+                      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);">
+                        <span style="font-size: 24px; line-height: 1; display: block; text-align: center; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">🤖</span>
                       </div>
                       <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
@@ -312,8 +312,8 @@ export function getWelcomeEmailTemplate(
                   <!-- iOS -->
                   <div>
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; width: 40px; height: 40px; min-width: 40px; min-height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">
-                        <span style="display:block; line-height: 1;">🍎</span>
+                      <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);">
+                        <span style="font-size: 24px; line-height: 1; display: block; text-align: center; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">🍎</span>
                       </div>
                       <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
