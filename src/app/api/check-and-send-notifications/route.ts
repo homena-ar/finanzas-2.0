@@ -104,10 +104,11 @@ export async function GET(request: NextRequest) {
       tarjetaNombre: string
       dia: number
       fecha: string
+      workspaceId?: string
     }> = []
 
     tarjetasSnap.docs.forEach(doc => {
-      const data = doc.data() as Tarjeta
+      const data = doc.data() as Tarjeta & { workspace_id?: string }
       
       // Verificar cierre (si está habilitado y el día coincide)
       if (data.notificar_cierre && data.cierre === targetDay) {
@@ -117,8 +118,9 @@ export async function GET(request: NextRequest) {
           userId: data.user_id,
           tarjetaId: doc.id,
           tarjetaNombre: data.nombre,
-          dia: data.cierre!,
-          fecha: fechaCierre
+          dia: targetDay, // Usar el día calculado (targetDay) en lugar del día de la tarjeta
+          fecha: fechaCierre,
+          workspaceId: data.workspace_id // Incluir workspace_id si existe
         })
       }
 
@@ -130,8 +132,9 @@ export async function GET(request: NextRequest) {
           userId: data.user_id,
           tarjetaId: doc.id,
           tarjetaNombre: data.nombre,
-          dia: data.vencimiento!,
-          fecha: fechaVencimiento
+          dia: targetDay, // Usar el día calculado (targetDay) en lugar del día de la tarjeta
+          fecha: fechaVencimiento,
+          workspaceId: data.workspace_id // Incluir workspace_id si existe
         })
       }
     })
@@ -193,7 +196,7 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
           // Crear notificación en Firestore
-          await firestore.collection('notificaciones').add({
+          const notificacionData: Record<string, any> = {
             user_id: notif.userId,
             tipo: notif.tipo,
             titulo: notif.tipo === 'cierre' 
@@ -208,7 +211,12 @@ export async function GET(request: NextRequest) {
             fecha_evento: admin.firestore.Timestamp.fromDate(targetDate),
             link: '/dashboard',
             created_at: admin.firestore.Timestamp.now()
-          })
+          }
+          // Incluir workspace_id si existe (necesario para permisos)
+          if (notif.workspaceId) {
+            notificacionData.workspace_id = notif.workspaceId
+          }
+          await firestore.collection('notificaciones').add(notificacionData)
 
           results.push({ success: true, notif })
         } else {

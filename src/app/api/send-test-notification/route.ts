@@ -24,11 +24,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Datos de prueba
+    // Datos de prueba - calcular fecha correcta (2 días desde hoy)
+    const today = new Date()
+    const targetDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
+    const targetDay = targetDate.getDate()
+    const fecha = `${targetDay}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`
+    
     const userName = 'Usuario de Prueba'
     const tarjetaNombre = 'Tarjeta de Prueba'
-    const dia = 15
-    const fecha = new Date().toLocaleDateString('es-AR')
+    const dia = targetDay // Usar el día calculado correctamente
 
     let emailTemplate
     if (tipo === 'cierre') {

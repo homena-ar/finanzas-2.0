@@ -26,23 +26,27 @@ export function NotificationsBell() {
                             currentWorkspace.id !== undefined && 
                             currentWorkspace.id !== null
     
-    let workspaceFilter
+    let q
     
     if (isWorkspaceMode && currentWorkspace?.id) {
-      workspaceFilter = where('workspace_id', '==', currentWorkspace.id)
+      // En modo workspace: buscar notificaciones del workspace
+      const notificacionesRef = collection(db, 'notificaciones')
+      q = query(
+        notificacionesRef,
+        where('workspace_id', '==', currentWorkspace.id),
+        orderBy('created_at', 'desc')
+      )
     } else {
-      // Validar que user.uid no sea undefined
+      // En modo personal: buscar notificaciones del usuario SIN workspace_id
+      // (las notificaciones con workspace_id no deberían aparecer en modo personal)
       if (!user.uid) return
-      workspaceFilter = where('user_id', '==', user.uid)
+      const notificacionesRef = collection(db, 'notificaciones')
+      q = query(
+        notificacionesRef,
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      )
     }
-
-    // Query para obtener notificaciones
-    const notificacionesRef = collection(db, 'notificaciones')
-    const q = query(
-      notificacionesRef,
-      workspaceFilter,
-      orderBy('created_at', 'desc')
-    )
 
     // Suscribirse a cambios en tiempo real
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -60,6 +64,7 @@ export function NotificationsBell() {
           tarjeta_id: data.tarjeta_id || null,
           fecha_evento: data.fecha_evento?.toDate?.()?.toISOString() || data.fecha_evento || null,
           link: data.link || null,
+          workspace_id: data.workspace_id || undefined, // Incluir workspace_id si existe
           created_at: data.created_at instanceof Timestamp 
             ? data.created_at.toDate().toISOString() 
             : data.created_at

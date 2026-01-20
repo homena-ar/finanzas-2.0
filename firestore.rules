@@ -480,6 +480,7 @@ service cloud.firestore {
     // ============================================
     match /notificaciones/{notificacionId} {
       // Read: own notifications (user_id) OR workspace notifications (workspace_id)
+      // Prioridad: si user_id coincide, siempre se puede leer
       allow read: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
