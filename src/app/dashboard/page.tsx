@@ -10,7 +10,7 @@ import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
 import * as XLSX from 'xlsx'
-import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore'
+import { Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
@@ -177,152 +177,9 @@ export default function DashboardPage() {
   const budgetPct = hasBudget ? (gastadoTotalARS / budgetTotalARS) * 100 : 0
   const budgetStatus = budgetPct >= 100 ? 'danger' : budgetPct >= 80 ? 'warning' : 'ok'
 
-  // Generar notificaciones para alertas importantes
-  useEffect(() => {
-    if (!profile || !user?.uid || loading) return
-
-    const generateNotifications = async () => {
-      try {
-        const today = new Date()
-        const day = today.getDate()
-
-        // Solo consideramos "workspace mode" si hay un id string no vacío
-        const workspaceId =
-          typeof currentWorkspace?.id === 'string' && currentWorkspace.id.length > 0
-            ? currentWorkspace.id
-            : null
-        const isWorkspaceMode = !!workspaceId
-
-        // IMPORTANTE: usamos user.uid (no profile.id) para evitar undefined
-        const workspaceFilter = isWorkspaceMode
-          ? where('workspace_id', '==', workspaceId)
-          : where('user_id', '==', user.uid)
-
-        // Verificar notificaciones existentes para evitar duplicados
-        const notificacionesRef = collection(db, 'notificaciones')
-        const existingQuery = query(notificacionesRef, workspaceFilter)
-        const existingSnap = await getDocs(existingQuery)
-        const existingIds = new Set(existingSnap.docs.map(d => d.data().tarjeta_id).filter(Boolean))
-
-        const notificationsToCreate: Array<{
-          tipo: 'cierre' | 'vencimiento' | 'presupuesto'
-          titulo: string
-          mensaje: string
-          icono: string
-          tarjeta_id?: string
-          fecha_evento?: Date
-        }> = []
-
-        // Notificaciones de tarjetas
-        tarjetas.forEach(t => {
-        // Alertas de cierre (hoy o mañana)
-        if (t.cierre) {
-          const diff = t.cierre - day
-          if (diff === 0 && !existingIds.has(t.id)) {
-            notificationsToCreate.push({
-              tipo: 'cierre',
-              titulo: `¡HOY cierra ${t.nombre}!`,
-              mensaje: 'Último día para agregar gastos al resumen',
-              icono: '🚨',
-              tarjeta_id: t.id,
-              fecha_evento: today
-            })
-          } else if (diff === 1 && !existingIds.has(t.id)) {
-            notificationsToCreate.push({
-              tipo: 'cierre',
-              titulo: `Cierre ${t.nombre} mañana`,
-              mensaje: 'Mañana cierra esta tarjeta',
-              icono: '📅',
-              tarjeta_id: t.id,
-              fecha_evento: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-            })
-          }
-        }
-        // Alertas de vencimiento (hoy, mañana o vencido)
-        if (t.vencimiento) {
-          const diffVenc = t.vencimiento - day
-          if (diffVenc === 0 && !existingIds.has(t.id)) {
-            notificationsToCreate.push({
-              tipo: 'vencimiento',
-              titulo: `¡HOY vence pago ${t.nombre}!`,
-              mensaje: 'Último día para pagar',
-              icono: '🚨',
-              tarjeta_id: t.id,
-              fecha_evento: today
-            })
-          } else if (diffVenc === 1 && !existingIds.has(t.id)) {
-            notificationsToCreate.push({
-              tipo: 'vencimiento',
-              titulo: `Vence pago ${t.nombre} mañana`,
-              mensaje: 'Mañana vence el pago de esta tarjeta',
-              icono: '💳',
-              tarjeta_id: t.id,
-              fecha_evento: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-            })
-          } else if (diffVenc === -1 && !existingIds.has(t.id)) {
-            notificationsToCreate.push({
-              tipo: 'vencimiento',
-              titulo: `¡Venció pago ${t.nombre}!`,
-              mensaje: 'El pago venció ayer',
-              icono: '⚠️',
-              tarjeta_id: t.id,
-              fecha_evento: new Date(today.getTime() - 24 * 60 * 60 * 1000)
-            })
-          }
-        }
-      })
-
-      // Notificación de presupuesto
-      if (hasBudget && budgetPct >= 90) {
-        const budgetNotifExists = existingSnap.docs.some(d => {
-          const data = d.data()
-          return data.tipo === 'presupuesto' && !data.leida
-        })
-        if (!budgetNotifExists) {
-          notificationsToCreate.push({
-            tipo: 'presupuesto',
-            titulo: budgetPct >= 100 ? '¡Presupuesto excedido!' : 'Cerca del límite',
-            mensaje: `${formatMoney(totalPagar)} / ${formatMoney(budgetARS)}`,
-            icono: '💸'
-          })
-        }
-      }
-
-        // Crear notificaciones
-        for (const notif of notificationsToCreate) {
-          const notifData: any = {
-            user_id: user.uid,
-            tipo: notif.tipo,
-            titulo: notif.titulo,
-            mensaje: notif.mensaje,
-            icono: notif.icono,
-            leida: false,
-            link: '/dashboard',
-            created_at: Timestamp.now()
-          }
-          if (notif.tarjeta_id) notifData.tarjeta_id = notif.tarjeta_id
-          if (notif.fecha_evento) notifData.fecha_evento = Timestamp.fromDate(notif.fecha_evento)
-          if (isWorkspaceMode) notifData.workspace_id = workspaceId
-
-          try {
-            await addDoc(notificacionesRef, notifData)
-          } catch (error) {
-            console.error('Error creando notificación:', error)
-          }
-        }
-      } catch (error: any) {
-        // Evitar "Uncaught (in promise)" que rompe la navegación
-        console.error('❌ [ResumenPage] Error en generateNotifications:', {
-          error: error?.message || String(error),
-          code: error?.code,
-          workspaceId: currentWorkspace?.id,
-          userId: user?.uid
-        })
-      }
-    }
-
-    generateNotifications()
-  }, [tarjetas, profile, user?.uid, hasBudget, budgetPct, totalPagar, budgetARS, currentWorkspace?.id, loading])
+  // NOTIFICACIONES (DESACTIVADO TEMPORALMENTE):
+  // La generación automática desde el cliente provoca permission-denied en algunos entornos/workspaces viejos.
+  // Las notificaciones deberían generarse vía backend (Admin SDK / cron) para evitar problemas de reglas.
 
   // Chart data por categoría
   const catTotals: Record<string, number> = {}
