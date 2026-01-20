@@ -172,88 +172,103 @@ export async function GET(request: NextRequest) {
           }
         })
       }
-      
-      if (!profile || !profile.email) {
-        console.warn('⚠️ [Cron] Perfil no encontrado para usuario:', notif.userId, 'Tarjeta:', notif.tarjetaNombre)
-        results.push({ success: false, notif, error: 'Perfil no encontrado' })
-        continue
+
+      // Fallback: intentar obtener el usuario desde Firebase Auth si no hay perfil
+      let profileEmail = profile?.email || null
+      let profileName = profile?.nombre || null
+
+      if (!profileEmail) {
+        try {
+          const authUser = await admin.auth().getUser(notif.userId)
+          profileEmail = authUser.email || null
+          profileName = profileName || authUser.displayName || (authUser.email ? authUser.email.split('@')[0] : null)
+        } catch (e) {
+          console.warn('⚠️ [Cron] No se pudo obtener usuario de Auth para', notif.userId)
+        }
+      }
+
+      // Si no tenemos email, continuamos sin enviar correo, pero sí campanita/push
+      if (!profileEmail) {
+        console.warn('⚠️ [Cron] Perfil sin email, se omite envío de correo. userId:', notif.userId, 'Tarjeta:', notif.tarjetaNombre)
       }
 
       try {
         // Llamar a la API de envío de correo
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-notification-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tipo: notif.tipo,
-            userName: profile.nombre,
-            userEmail: profile.email,
-            tarjetaNombre: notif.tarjetaNombre,
-            dia: notif.dia,
-            fecha: notif.fecha
-          })
-        })
-
-        if (response.ok) {
-          // Crear notificación en Firestore (campanita)
-          const notificacionData: Record<string, any> = {
-            user_id: notif.userId,
-            tipo: notif.tipo,
-            titulo: notif.tipo === 'cierre' 
-              ? `Cierre de ${notif.tarjetaNombre}`
-              : `Vencimiento de pago ${notif.tarjetaNombre}`,
-            mensaje: notif.tipo === 'cierre'
-              ? `La tarjeta ${notif.tarjetaNombre} cierra en 2 días (día ${notif.dia})`
-              : `El vencimiento de pago de ${notif.tarjetaNombre} es en 2 días (día ${notif.dia})`,
-            icono: notif.tipo === 'cierre' ? '📅' : '💳',
-            leida: false,
-            tarjeta_id: notif.tarjetaId,
-            fecha_evento: admin.firestore.Timestamp.fromDate(targetDate),
-            link: '/dashboard',
-            created_at: admin.firestore.Timestamp.now()
-          }
-          // Incluir workspace_id si existe (necesario para permisos)
-          if (notif.workspaceId) {
-            notificacionData.workspace_id = notif.workspaceId
-          }
-          await firestore.collection('notificaciones').add(notificacionData)
-
-          // Enviar notificación push
-          try {
-            const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-push-notification`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: notif.userId,
-                title: notif.tipo === 'cierre' 
-                  ? `🔔 Cierre de ${notif.tarjetaNombre}`
-                  : `💳 Vencimiento de ${notif.tarjetaNombre}`,
-                body: notif.tipo === 'cierre'
-                  ? `La tarjeta cierra en 2 días (día ${notif.dia})`
-                  : `El vencimiento de pago es en 2 días (día ${notif.dia})`,
-                url: '/dashboard',
-                tag: `${notif.tipo}-${notif.tarjetaId}`,
-                workspaceId: notif.workspaceId
-              })
+        // Enviar correo solo si tenemos email
+        if (profileEmail) {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-notification-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: notif.tipo,
+              userName: profileName || profileEmail.split('@')[0],
+              userEmail: profileEmail,
+              tarjetaNombre: notif.tarjetaNombre,
+              dia: notif.dia,
+              fecha: notif.fecha
             })
+          })
 
-            if (pushResponse.ok) {
-              const pushResult = await pushResponse.json()
-              console.log(`✅ [Cron] Push notification enviada: ${pushResult.sent}/${pushResult.total}`)
-            } else {
-              console.warn('⚠️ [Cron] Error enviando push notification:', await pushResponse.text())
-            }
-          } catch (pushError: any) {
-            console.warn('⚠️ [Cron] Excepción enviando push notification:', pushError.message)
-            // No fallar si el push falla (el correo y la campanita ya se enviaron)
+          if (!response.ok) {
+            const error = await response.json()
+            console.error('❌ [Cron] Error enviando notificación (email):', error)
           }
-
-          results.push({ success: true, notif })
-        } else {
-          const error = await response.json()
-          console.error('❌ [Cron] Error enviando notificación:', error)
-          results.push({ success: false, notif, error })
         }
+
+        // Crear notificación en Firestore (campanita)
+        const notificacionData: Record<string, any> = {
+          user_id: notif.userId,
+          tipo: notif.tipo,
+          titulo: notif.tipo === 'cierre' 
+            ? `Cierre de ${notif.tarjetaNombre}`
+            : `Vencimiento de pago ${notif.tarjetaNombre}`,
+          mensaje: notif.tipo === 'cierre'
+            ? `La tarjeta ${notif.tarjetaNombre} cierra en 2 días (día ${notif.dia})`
+            : `El vencimiento de pago de ${notif.tarjetaNombre} es en 2 días (día ${notif.dia})`,
+          icono: notif.tipo === 'cierre' ? '📅' : '💳',
+          leida: false,
+          tarjeta_id: notif.tarjetaId,
+          fecha_evento: admin.firestore.Timestamp.fromDate(targetDate),
+          link: '/dashboard',
+          created_at: admin.firestore.Timestamp.now()
+        }
+        // Incluir workspace_id si existe (necesario para permisos)
+        if (notif.workspaceId) {
+          notificacionData.workspace_id = notif.workspaceId
+        }
+        await firestore.collection('notificaciones').add(notificacionData)
+
+        // Enviar notificación push
+        try {
+          const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-push-notification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: notif.userId,
+              title: notif.tipo === 'cierre' 
+                ? `🔔 Cierre de ${notif.tarjetaNombre}`
+                : `💳 Vencimiento de ${notif.tarjetaNombre}`,
+              body: notif.tipo === 'cierre'
+                ? `La tarjeta cierra en 2 días (día ${notif.dia})`
+                : `El vencimiento de pago es en 2 días (día ${notif.dia})`,
+              url: '/dashboard',
+              tag: `${notif.tipo}-${notif.tarjetaId}`,
+              workspaceId: notif.workspaceId
+            })
+          })
+
+          if (pushResponse.ok) {
+            const pushResult = await pushResponse.json()
+            console.log(`✅ [Cron] Push notification enviada: ${pushResult.sent}/${pushResult.total}`)
+          } else {
+            console.warn('⚠️ [Cron] Error enviando push notification:', await pushResponse.text())
+          }
+        } catch (pushError: any) {
+          console.warn('⚠️ [Cron] Excepción enviando push notification:', pushError.message)
+          // No fallar si el push falla (el correo y la campanita ya se enviaron)
+        }
+
+        results.push({ success: true, notif })
       } catch (error: any) {
         console.error('❌ [Cron] Excepción enviando notificación:', error)
         results.push({ success: false, notif, error: error.message })

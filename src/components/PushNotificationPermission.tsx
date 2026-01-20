@@ -122,7 +122,7 @@ export function PushNotificationPermission() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 animate-fade-in">
+    <div className="fixed bottom-4 right-4 z-50 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 max-w-sm">
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shrink-0">
