@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, createContext, useContext, ReactNode } from 'react'
 import {
   collection,
   query,
@@ -140,7 +140,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // --- FUNCIÓN FETCHALL PRINCIPAL ---
   const fetchAll = useCallback(async () => {
-    console.log('📊 [Firebase useData] fetchAll called')
+    console.log('📊 [Firebase useData] fetchAll called', {
+      userId: user?.uid,
+      workspaceId: currentWorkspace?.id,
+      workspaceName: currentWorkspace?.name,
+      workspaceOwner: currentWorkspace?.owner_id
+    })
     
     // 1. Limpieza de estados para evitar "fantasmas" al cambiar de usuario/workspace
     setMovimientos([])
@@ -157,19 +162,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     setLoading(true)
     try {
-      if (!user) {
+      if (!user || !user.uid) {
+        console.warn('📊 [Firebase useData] No user or user.uid, aborting fetchAll')
         setLoading(false)
         return
       }
 
-      console.log('📊 [Firebase useData] Fetching data for workspace:', currentWorkspace?.name || 'Personal')
+      console.log('📊 [Firebase useData] Fetching data for workspace:', currentWorkspace?.name || 'Personal', {
+        workspaceId: currentWorkspace?.id,
+        userId: user.uid
+      })
       const startTime = Date.now()
 
       // Validar que currentWorkspace tenga id válido antes de usarlo
-      const isWorkspaceMode = currentWorkspace !== null && currentWorkspace.id !== undefined && currentWorkspace.id !== null
+      const isWorkspaceMode = currentWorkspace !== null && 
+                              currentWorkspace.id !== undefined && 
+                              currentWorkspace.id !== null &&
+                              typeof currentWorkspace.id === 'string' &&
+                              currentWorkspace.id.length > 0
+      
+      console.log('📊 [Firebase useData] Workspace mode:', {
+        isWorkspaceMode,
+        currentWorkspace: currentWorkspace ? {
+          id: currentWorkspace.id,
+          name: currentWorkspace.name,
+          owner_id: currentWorkspace.owner_id
+        } : null
+      })
+      
       const workspaceFilter = isWorkspaceMode && currentWorkspace?.id
         ? where('workspace_id', '==', currentWorkspace.id)
         : where('user_id', '==', user.uid)
+      
+      console.log('📊 [Firebase useData] Workspace filter type:', isWorkspaceMode ? 'workspace_id' : 'user_id')
 
       // 2. OBTENER PERMISOS
       let permissions: WorkspacePermissions = { 
@@ -179,9 +204,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         tarjetas: 'admin' 
       };
 
+      // Determinar si el usuario es dueño del workspace (para usar en toda la función)
+      const isOwner = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
+
       if (isWorkspaceMode && currentWorkspace?.id) {
         // Si el usuario es el dueño del workspace, tiene permisos de admin automáticamente
-        const isOwner = currentWorkspace.owner_id === user.uid;
         
         if (isOwner) {
           // El dueño siempre tiene permisos de admin
@@ -216,9 +243,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // --- AHORROS (Movimientos y Metas) ---
       if (permissions.ahorros !== 'ninguno') {
         // Movimientos
-        const movimientosRef = collection(db, 'movimientos_ahorro')
-        const movimientosQuery = query(movimientosRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const movimientosSnap = await getDocs(movimientosQuery)
+        try {
+          console.log('📊 [Firebase useData] Fetching movimientos_ahorro...')
+          const movimientosRef = collection(db, 'movimientos_ahorro')
+          const movimientosQuery = query(movimientosRef, workspaceFilter, orderBy('created_at', 'desc'))
+          const movimientosSnap = await getDocs(movimientosQuery)
+          console.log('✅ [Firebase useData] Movimientos fetched:', movimientosSnap.docs.length)
         
         let movimientosDocs = isWorkspaceMode ? movimientosSnap.docs : movimientosSnap.docs.filter(d => !d.data().workspace_id)
         
@@ -248,11 +278,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
           movimientosData = movimientosData.filter(m => m.user_id === user.uid)
         }
         setMovimientos(movimientosData)
+        } catch (error: any) {
+          console.error('❌ [Firebase useData] Error fetching movimientos_ahorro:', {
+            error: error.message,
+            code: error.code,
+            workspaceId: currentWorkspace?.id,
+            userId: user.uid
+          })
+          // Continuar con otras colecciones
+        }
 
         // Metas
-        const metasRef = collection(db, 'metas')
-        const metasQuery = query(metasRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const metasSnap = await getDocs(metasQuery)
+        try {
+          console.log('📊 [Firebase useData] Fetching metas...')
+          const metasRef = collection(db, 'metas')
+          const metasQuery = query(metasRef, workspaceFilter, orderBy('created_at', 'desc'))
+          const metasSnap = await getDocs(metasQuery)
+          console.log('✅ [Firebase useData] Metas fetched:', metasSnap.docs.length)
         let metasDocs = isWorkspaceMode ? metasSnap.docs : metasSnap.docs.filter(d => !d.data().workspace_id)
         
         let metasData = metasDocs.map(doc => {
@@ -277,13 +319,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
           metasData = metasData.filter(m => m.user_id === user.uid)
         }
         setMetas(metasData)
+        } catch (error: any) {
+          console.error('❌ [Firebase useData] Error fetching metas:', {
+            error: error.message,
+            code: error.code,
+            workspaceId: currentWorkspace?.id,
+            userId: user.uid
+          })
+        }
       }
 
       // --- TARJETAS ---
       if (permissions.tarjetas !== 'ninguno') {
-        const tarjetasRef = collection(db, 'tarjetas')
-        const tarjetasQuery = query(tarjetasRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const tarjetasSnap = await getDocs(tarjetasQuery)
+        try {
+          console.log('📊 [Firebase useData] Fetching tarjetas...')
+          const tarjetasRef = collection(db, 'tarjetas')
+          const tarjetasQuery = query(tarjetasRef, workspaceFilter, orderBy('created_at', 'desc'))
+          const tarjetasSnap = await getDocs(tarjetasQuery)
+          console.log('✅ [Firebase useData] Tarjetas fetched:', tarjetasSnap.docs.length)
         let tarjetasDocs = isWorkspaceMode ? tarjetasSnap.docs : tarjetasSnap.docs.filter(d => !d.data().workspace_id)
 
         let tarjetasData = tarjetasDocs.map(doc => {
@@ -304,14 +357,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
           tarjetasData = tarjetasData.filter(t => t.user_id === user.uid)
         }
         setTarjetas(tarjetasData)
+        } catch (error: any) {
+          console.error('❌ [Firebase useData] Error fetching tarjetas:', {
+            error: error.message,
+            code: error.code,
+            workspaceId: currentWorkspace?.id,
+            userId: user.uid
+          })
+        }
       }
 
       // --- GASTOS E IMPUESTOS ---
       if (permissions.gastos !== 'ninguno') {
         // Gastos
-        const gastosRef = collection(db, 'gastos')
-        const gastosQuery = query(gastosRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const gastosSnap = await getDocs(gastosQuery)
+        try {
+          console.log('📊 [Firebase useData] Fetching gastos...')
+          const gastosRef = collection(db, 'gastos')
+          const gastosQuery = query(gastosRef, workspaceFilter, orderBy('created_at', 'desc'))
+          const gastosSnap = await getDocs(gastosQuery)
+          console.log('✅ [Firebase useData] Gastos fetched:', gastosSnap.docs.length)
         let gastosDocs = isWorkspaceMode ? gastosSnap.docs : gastosSnap.docs.filter(d => !d.data().workspace_id)
 
         let gastosData = gastosDocs.map(doc => {
@@ -343,11 +407,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
           gastosData = gastosData.filter(g => g.user_id === user.uid)
         }
         setGastos(gastosData)
+        } catch (error: any) {
+          console.error('❌ [Firebase useData] Error fetching gastos:', {
+            error: error.message,
+            code: error.code,
+            workspaceId: currentWorkspace?.id,
+            userId: user.uid
+          })
+        }
 
         // Impuestos
-        const impuestosRef = collection(db, 'impuestos')
-        const impuestosQuery = query(impuestosRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const impuestosSnap = await getDocs(impuestosQuery)
+        try {
+          console.log('📊 [Firebase useData] Fetching impuestos...')
+          const impuestosRef = collection(db, 'impuestos')
+          const impuestosQuery = query(impuestosRef, workspaceFilter, orderBy('created_at', 'desc'))
+          const impuestosSnap = await getDocs(impuestosQuery)
+          console.log('✅ [Firebase useData] Impuestos fetched:', impuestosSnap.docs.length)
         let impuestosDocs = isWorkspaceMode ? impuestosSnap.docs : impuestosSnap.docs.filter(d => !d.data().workspace_id)
 
         let impuestosData = impuestosDocs.map(doc => {
@@ -367,12 +442,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
           impuestosData = impuestosData.filter(i => i.user_id === user.uid)
         }
         setImpuestos(impuestosData)
+        } catch (error: any) {
+          console.error('❌ [Firebase useData] Error fetching impuestos:', {
+            error: error.message,
+            code: error.code,
+            workspaceId: currentWorkspace?.id,
+            userId: user.uid
+          })
+        }
       }
 
       // --- CONFIGURACIÓN (Categorías y Tags) ---
-      const categoriasRef = collection(db, 'categorias')
-      const categoriasQuery = query(categoriasRef, workspaceFilter, orderBy('created_at', 'desc'))
-      const categoriasSnap = await getDocs(categoriasQuery)
+      try {
+        console.log('📊 [Firebase useData] Fetching categorias...')
+        const categoriasRef = collection(db, 'categorias')
+        const categoriasQuery = query(categoriasRef, workspaceFilter, orderBy('created_at', 'desc'))
+        const categoriasSnap = await getDocs(categoriasQuery)
+        console.log('✅ [Firebase useData] Categorias fetched:', categoriasSnap.docs.length)
       let categoriasDocs = isWorkspaceMode ? categoriasSnap.docs : categoriasSnap.docs.filter(d => !d.data().workspace_id)
 
       let categoriasData = categoriasDocs.map(doc => ({
@@ -385,8 +471,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       })) as Categoria[]
 
       // Crear categorías por defecto si no existen (y tengo permiso de admin o es personal o soy dueño)
-      const isOwner = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
-      const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwner
+      const isOwnerCategorias = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
+      const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwnerCategorias
       
       if (categoriasData.length === 0 && canCreateCategories) {
         console.log('📂 [Firebase useData] No categories found - Creating default categories')
@@ -426,11 +512,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })) as Categoria[]
       }
       setCategorias(categoriasData)
+      } catch (error: any) {
+        console.error('❌ [Firebase useData] Error fetching categorias:', {
+          error: error.message,
+          code: error.code,
+          workspaceId: currentWorkspace?.id,
+          userId: user.uid
+        })
+      }
 
       // Tags
-      const tagsRef = collection(db, 'tags')
-      const tagsQuery = query(tagsRef, workspaceFilter, orderBy('created_at', 'desc'))
-      const tagsSnap = await getDocs(tagsQuery)
+      try {
+        console.log('📊 [Firebase useData] Fetching tags...')
+        const tagsRef = collection(db, 'tags')
+        const tagsQuery = query(tagsRef, workspaceFilter, orderBy('created_at', 'desc'))
+        const tagsSnap = await getDocs(tagsQuery)
+        console.log('✅ [Firebase useData] Tags fetched:', tagsSnap.docs.length)
       const tagsDocs = isWorkspaceMode ? tagsSnap.docs : tagsSnap.docs.filter(d => !d.data().workspace_id)
       const tagsData = tagsDocs.map(doc => ({
           id: doc.id,
@@ -439,6 +536,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
       })) as Tag[]
       setTags(tagsData)
+      } catch (error: any) {
+        console.error('❌ [Firebase useData] Error fetching tags:', {
+          error: error.message,
+          code: error.code,
+          workspaceId: currentWorkspace?.id,
+          userId: user.uid
+        })
+      }
 
       // Medios Pago
       let mediosPagoData: MedioPago[] = []
@@ -460,9 +565,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       // --- INGRESOS ---
       if (permissions.ingresos !== 'ninguno') {
-        const ingresosRef = collection(db, 'ingresos')
-        const ingresosQuery = query(ingresosRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const ingresosSnap = await getDocs(ingresosQuery)
+        try {
+          console.log('📊 [Firebase useData] Fetching ingresos...')
+          const ingresosRef = collection(db, 'ingresos')
+          const ingresosQuery = query(ingresosRef, workspaceFilter, orderBy('created_at', 'desc'))
+          const ingresosSnap = await getDocs(ingresosQuery)
+          console.log('✅ [Firebase useData] Ingresos fetched:', ingresosSnap.docs.length)
         let ingresosDocs = isWorkspaceMode ? ingresosSnap.docs : ingresosSnap.docs.filter(d => !d.data().workspace_id)
 
         let ingresosData = ingresosDocs.map(doc => {
@@ -485,12 +593,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ingresosData = ingresosData.filter(i => i.user_id === user.uid)
         }
         setIngresos(ingresosData)
+        } catch (error: any) {
+          console.error('❌ [Firebase useData] Error fetching ingresos:', {
+            error: error.message,
+            code: error.code,
+            workspaceId: currentWorkspace?.id,
+            userId: user.uid
+          })
+        }
       }
 
       // Configuración de Ingresos (Categorías y Tags)
-      const categoriasIngresosRef = collection(db, 'categorias_ingresos')
-      const categoriasIngresosQuery = query(categoriasIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
-      const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
+      try {
+        console.log('📊 [Firebase useData] Fetching categorias_ingresos...')
+        const categoriasIngresosRef = collection(db, 'categorias_ingresos')
+        const categoriasIngresosQuery = query(categoriasIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
+        const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
+        console.log('✅ [Firebase useData] Categorias ingresos fetched:', categoriasIngresosSnap.docs.length)
       let categoriasIngresosDocs = isWorkspaceMode ? categoriasIngresosSnap.docs : categoriasIngresosSnap.docs.filter(d => !d.data().workspace_id)
       
       let categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
@@ -502,7 +621,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
       })) as CategoriaIngreso[]
 
-      const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwner
+      const isOwnerIngresos = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
+      const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwnerIngresos
       if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos) {
          const defaultCategoriasIngresos = [
           { nombre: 'Salario', icono: '💼', color: '#3b82f6' },
@@ -533,10 +653,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })) as CategoriaIngreso[]
       }
       setCategoriasIngresos(categoriasIngresosData)
+      } catch (error: any) {
+        console.error('❌ [Firebase useData] Error fetching categorias_ingresos:', {
+          error: error.message,
+          code: error.code,
+          workspaceId: currentWorkspace?.id,
+          userId: user.uid
+        })
+      }
 
-      const tagsIngresosRef = collection(db, 'tags_ingresos')
-      const tagsIngresosQuery = query(tagsIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
-      const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
+      try {
+        console.log('📊 [Firebase useData] Fetching tags_ingresos...')
+        const tagsIngresosRef = collection(db, 'tags_ingresos')
+        const tagsIngresosQuery = query(tagsIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
+        const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
+        console.log('✅ [Firebase useData] Tags ingresos fetched:', tagsIngresosSnap.docs.length)
       const tagsIngresosDocs = isWorkspaceMode ? tagsIngresosSnap.docs : tagsIngresosSnap.docs.filter(d => !d.data().workspace_id)
       const tagsIngresosData = tagsIngresosDocs.map(doc => ({
           id: doc.id,
@@ -545,13 +676,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
       })) as TagIngreso[]
       setTagsIngresos(tagsIngresosData)
+      } catch (error: any) {
+        console.error('❌ [Firebase useData] Error fetching tags_ingresos:', {
+          error: error.message,
+          code: error.code,
+          workspaceId: currentWorkspace?.id,
+          userId: user.uid
+        })
+      }
 
       const endTime = Date.now()
-      console.log('📊 [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
+      console.log('✅ [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
       setLoading(false)
 
-    } catch (error) {
-      console.error('📊 [Firebase useData] Error fetching data:', error)
+    } catch (error: any) {
+      console.error('❌ [Firebase useData] Error general en fetchAll:', {
+        error: error.message,
+        code: error.code,
+        stack: error.stack,
+        workspaceId: currentWorkspace?.id,
+        workspaceName: currentWorkspace?.name,
+        userId: user?.uid,
+        isWorkspaceMode: currentWorkspace !== null
+      })
       // No propagar el error para evitar que rompa la UI
       // Solo loguear y mantener el estado de loading en false
       setLoading(false)
@@ -561,33 +708,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [user, currentWorkspace])
   // --- FIN FETCHALL ---
 
-  useEffect(() => {
-    console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL')
+  // Usar useRef para rastrear si el componente está montado
+  const isMountedRef = useRef(true)
 
-    // Flag para verificar si el componente sigue montado
-    let isMounted = true
+  useEffect(() => {
+    isMountedRef.current = true
+    
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'PERSONAL')
 
     if (!authLoading && user) {
       console.log('📊 [Firebase useData] User exists - Calling fetchAll')
       fetchAll().catch((error) => {
-        if (isMounted) {
+        if (isMountedRef.current) {
           console.error('📊 [Firebase useData] Error en fetchAll:', error)
         }
       })
     } else if (!authLoading && !user) {
       console.log('📊 [Firebase useData] No user and auth done loading - Setting loading to FALSE')
-      if (isMounted) {
+      if (isMountedRef.current) {
         setLoading(false)
       }
     } else {
       console.log('📊 [Firebase useData] Auth still loading - waiting...')
     }
-
-    // Cleanup function
-    return () => {
-      isMounted = false
-    }
-  }, [user, authLoading, fetchAll])
+  }, [user, authLoading, fetchAll, currentWorkspace])
 
   const addMovimiento = useCallback(async (tipo: 'pesos' | 'usd', monto: number, descripcion?: string) => {
     if (!user) {
