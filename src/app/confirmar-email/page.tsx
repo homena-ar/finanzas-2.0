@@ -140,16 +140,13 @@ function ConfirmarEmailContent() {
           setMessage('Acción no válida.')
         }
       } catch (error: any) {
-        console.error('Error verificando email:', error)
-        
         // Si el error es porque el código ya fue usado, verificar si el correo está verificado
         if (error.code === 'auth/invalid-action-code') {
-          // Recargar usuario para verificar estado actual
           try {
             if (auth.currentUser) {
               await auth.currentUser.reload()
               if (auth.currentUser.emailVerified) {
-                // El código ya fue usado pero el correo está verificado, tratar como éxito
+                // Código ya usado pero el correo está verificado: éxito silencioso (evita ruido en consola)
                 setHasVerified(true)
                 setStatus('success')
                 setMessage('¡Email ya verificado! Redirigiendo...')
@@ -163,8 +160,9 @@ function ConfirmarEmailContent() {
             console.error('Error recargando usuario:', reloadError)
           }
         }
-        
-        // Si llegamos aquí, es un error real
+
+        // Solo loggear cuando no se pudo recuperar
+        console.error('Error verificando email:', error)
         setStatus('error')
         if (error.code === 'auth/expired-action-code') {
           setMessage('El enlace de verificación ha expirado. Por favor solicitá uno nuevo.')

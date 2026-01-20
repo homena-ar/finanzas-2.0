@@ -5,8 +5,9 @@ import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { auth, db } from '@/lib/firebase'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2, Bell } from 'lucide-react'
 import { AlertModal, ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 import type { WorkspacePermissions } from '@/types'
@@ -19,6 +20,7 @@ export default function ConfigPage() {
   } = useData()
   const {
     workspaces,
+    currentWorkspace,
     createWorkspace,
     updateWorkspace,
     deleteWorkspace,
@@ -101,6 +103,12 @@ export default function ConfigPage() {
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
+
+  // Probar notificaciones
+  const [testTipo, setTestTipo] = useState<'cierre' | 'vencimiento'>('cierre')
+  const [testEmail, setTestEmail] = useState('')
+  const [testSending, setTestSending] = useState(false)
+  const [testCampanitaSending, setTestCampanitaSending] = useState(false)
 
   // Cambio de contraseña
   const [showPasswordChange, setShowPasswordChange] = useState(false)
@@ -759,6 +767,61 @@ export default function ConfigPage() {
   // Función para obtener la descripción de un permiso
   const getPermissionDescription = (value: string) => {
     return permissionOptions.find(opt => opt.value === value)?.description || ''
+  }
+
+  const handleSendTestEmail = async () => {
+    const email = testEmail.trim() || profile?.email || user?.email
+    if (!email) {
+      setAlertData({ title: 'Email requerido', message: 'Ingresá un email para la prueba', variant: 'warning' })
+      setShowAlert(true)
+      return
+    }
+    setTestSending(true)
+    try {
+      const res = await fetch('/api/send-test-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: testTipo, email })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAlertData({ title: 'Correo enviado', message: data.message || `Correo de prueba (${testTipo}) enviado a ${email}. Revisá la bandeja y spam.`, variant: 'success' })
+      } else {
+        setAlertData({ title: 'Error', message: data.error || 'No se pudo enviar', variant: 'error' })
+      }
+      setShowAlert(true)
+    } catch (e: any) {
+      setAlertData({ title: 'Error', message: e?.message || 'Error al enviar', variant: 'error' })
+      setShowAlert(true)
+    } finally {
+      setTestSending(false)
+    }
+  }
+
+  const handleCreateTestCampanita = async () => {
+    if (!user?.uid) return
+    setTestCampanitaSending(true)
+    try {
+      const docData: Record<string, unknown> = {
+        user_id: user.uid,
+        tipo: 'sistema',
+        titulo: '[Prueba] Notificación de prueba',
+        mensaje: 'Si ves esto, la campanita funciona correctamente.',
+        icono: '🔔',
+        leida: false,
+        link: '/dashboard',
+        created_at: serverTimestamp()
+      }
+      if (currentWorkspace?.id) docData.workspace_id = currentWorkspace.id
+      await addDoc(collection(db, 'notificaciones'), docData)
+      setAlertData({ title: 'Notificación creada', message: 'Abrí la campanita 🔔 en la barra superior para verla.', variant: 'success' })
+      setShowAlert(true)
+    } catch (e: any) {
+      setAlertData({ title: 'Error', message: e?.message || 'Error al crear', variant: 'error' })
+      setShowAlert(true)
+    } finally {
+      setTestCampanitaSending(false)
+    }
   }
 
   return (
@@ -1660,6 +1723,54 @@ export default function ConfigPage() {
           <button onClick={handleAddTag} className="btn btn-primary">
             <Plus className="w-4 h-4" /> Agregar
           </button>
+        </div>
+      </div>
+
+      {/* Probar notificaciones */}
+      <div className="card p-5">
+        <h3 className="font-bold mb-2">🔔 Probar notificaciones</h3>
+        <p className="text-slate-500 text-sm mb-4">Probá el correo y la campanita sin esperar al cron. Ver <strong>GUIA_PRUEBAS_NOTIFICACIONES.md</strong> para más opciones.</p>
+        <div className="space-y-4">
+          <div>
+            <label className="label text-sm">Correo de prueba</label>
+            <div className="flex flex-wrap gap-2 items-end">
+              <select
+                value={testTipo}
+                onChange={e => setTestTipo(e.target.value as 'cierre' | 'vencimiento')}
+                className="input flex-1 min-w-[180px]"
+              >
+                <option value="cierre">Cierre de tarjeta</option>
+                <option value="vencimiento">Vencimiento de pago</option>
+              </select>
+              <input
+                type="email"
+                className="input flex-1 min-w-[180px]"
+                placeholder={profile?.email || user?.email || 'tu@email.com'}
+                value={testEmail}
+                onChange={e => setTestEmail(e.target.value)}
+              />
+              <button
+                onClick={handleSendTestEmail}
+                disabled={testSending}
+                className="btn btn-primary whitespace-nowrap"
+              >
+                {testSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                {testSending ? ' Enviando...' : ' Enviar correo de prueba'}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="label text-sm">Campanita (in-app)</label>
+            <button
+              onClick={handleCreateTestCampanita}
+              disabled={testCampanitaSending}
+              className="btn btn-secondary"
+            >
+              {testCampanitaSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+              {testCampanitaSending ? ' Creando...' : ' Crear notificación de prueba (campanita)'}
+            </button>
+            <p className="text-xs text-slate-500 mt-1">Abrí la campanita 🔔 en la barra superior para verla.</p>
+          </div>
         </div>
       </div>
 

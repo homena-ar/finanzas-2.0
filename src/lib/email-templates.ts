@@ -273,16 +273,14 @@ export function getWelcomeEmailTemplate(
                   <!-- Chrome/Edge Desktop -->
                   <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
-                        <span style="font-size: 24px; line-height: 1; display: block; text-align: center; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">💻</span>
-                      </div>
+                      <div style="width: 44px; min-width: 44px; height: 44px; text-align: center; line-height: 44px; font-size: 24px; flex-shrink: 0; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">💻</div>
                       <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
                           Chrome o Edge (Escritorio)
                         </h4>
                         <ol style="margin: 0; padding-left: 20px; color: #6b7280; font-size: 13px; line-height: 1.8;">
-                          <li style="margin-bottom: 6px;">Buscá el ícono de instalación <strong style="color: #6366f1;">➕</strong> en la barra de direcciones</li>
-                          <li style="margin-bottom: 6px;">O ve a <strong>Menú (⋮)</strong> → <strong>"Instalar FinControl"</strong></li>
+                          <li style="margin-bottom: 6px;">Buscá el ícono de instalación <strong style="color: #6366f1;">➕</strong> en la barra de direcciones (a veces Chrome no lo muestra; en ese caso usá el menú)</li>
+                          <li style="margin-bottom: 6px;">O ve a <strong>Menú (⋮)</strong> → <strong>"Instalar FinControl"</strong> o <strong>"Instalar app"</strong></li>
                           <li>Hacé clic en <strong>"Instalar"</strong> y listo</li>
                         </ol>
                       </div>
@@ -292,9 +290,7 @@ export function getWelcomeEmailTemplate(
                   <!-- Android -->
                   <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);">
-                        <span style="font-size: 24px; line-height: 1; display: block; text-align: center; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">🤖</span>
-                      </div>
+                      <div style="width: 44px; min-width: 44px; height: 44px; text-align: center; line-height: 44px; font-size: 24px; flex-shrink: 0; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">🤖</div>
                       <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
                           Android (Chrome)
@@ -312,9 +308,7 @@ export function getWelcomeEmailTemplate(
                   <!-- iOS -->
                   <div>
                     <div style="display: flex; align-items: start; gap: 12px;">
-                      <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);">
-                        <span style="font-size: 24px; line-height: 1; display: block; text-align: center; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">🍎</span>
-                      </div>
+                      <div style="width: 44px; min-width: 44px; height: 44px; text-align: center; line-height: 44px; font-size: 24px; flex-shrink: 0; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;">🍎</div>
                       <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #374151; font-size: 15px; font-weight: 600;">
                           iOS (Safari)
@@ -389,9 +383,8 @@ Ventajas de instalar la app:
 Cómo instalar:
 
 💻 Chrome o Edge (Escritorio):
-1. Buscá el ícono de instalación (➕) en la barra de direcciones
-2. O ve a Menú (⋮) → "Instalar FinControl"
-3. Hacé clic en "Instalar"
+1. Buscá el ícono (➕) en la barra de direcciones, o Menú (⋮) → "Instalar FinControl" / "Instalar app"
+2. Hacé clic en "Instalar"
 
 🤖 Android (Chrome):
 1. Abrí FinControl en Chrome

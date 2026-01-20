@@ -46,8 +46,8 @@ node scripts/generate-images.js
 
 **En Chrome/Edge:**
 - Abre la app en el navegador
-- Busca el ícono de "Instalar" en la barra de direcciones
-- O ve a Menú > "Instalar FinControl"
+- Busca el ícono de "Instalar" (➕) en la barra de direcciones
+- **Si no aparece en la barra:** Chrome a veces no muestra el ícono (por engagement, historial de descartes, etc.). Usá **Menú (⋮) → "Instalar FinControl"** o **"Instalar app"**. La app también muestra un aviso flotante de instalación cuando es posible.
 
 **En iOS (Safari):**
 - Abre la app en Safari

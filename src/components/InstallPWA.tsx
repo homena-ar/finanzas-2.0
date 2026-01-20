@@ -58,7 +58,7 @@ export function InstallPWA() {
       // Si no hay prompt automático, mostrar instrucciones
       alert(
         'Para instalar FinControl:\n\n' +
-        'Chrome/Edge: Haz clic en el ícono de instalación (➕) en la barra de direcciones\n\n' +
+        'Chrome/Edge: Ícono (➕) en la barra de direcciones, o Menú (⋮) → "Instalar FinControl" / "Instalar app"\n\n' +
         'Android: Menú (⋮) > "Instalar app" o "Agregar a pantalla de inicio"\n\n' +
         'iOS: Compartir (□↑) > "Agregar a pantalla de inicio"'
       )
