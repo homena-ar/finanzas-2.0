@@ -433,7 +433,7 @@ export default function IngresosPage() {
         const mes = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
         const tagIds = Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || [])
         
-        await addIngreso({
+        const { error } = await addIngreso({
           descripcion: trans.descripcion,
           categoria_id: categoriaId || null,
           monto: trans.monto,
@@ -443,6 +443,11 @@ export default function IngresosPage() {
           tag_ids: tagIds,
           origen: trans.origen || ''
         })
+
+        if (error) {
+          console.error('Error al agregar ingreso desde IA:', error)
+          throw error
+        }
       })
 
       // Si se solicita, agregar el total también
@@ -450,8 +455,8 @@ export default function IngresosPage() {
         const totalFecha = form.fecha
         const totalFechaDate = new Date(totalFecha)
         const totalMes = `${totalFechaDate.getFullYear()}-${String(totalFechaDate.getMonth() + 1).padStart(2, '0')}`
-        addPromises.push(
-          addIngreso({
+        addPromises.push((async () => {
+          const { error } = await addIngreso({
             descripcion: `Total del resumen - ${extractedData.total.periodo || 'Período'}`,
             categoria_id: null,
             monto: extractedData.total.monto,
@@ -461,7 +466,12 @@ export default function IngresosPage() {
             tag_ids: form.tag_ids || [],
             origen: extractedData.total.periodo || ''
           })
-        )
+
+          if (error) {
+            console.error('Error al agregar ingreso TOTAL desde IA:', error)
+            throw error
+          }
+        })())
       }
 
       Promise.all(addPromises)
