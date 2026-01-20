@@ -476,6 +476,42 @@ service cloud.firestore {
     }
 
     // ============================================
+    // NOTIFICACIONES COLLECTION
+    // ============================================
+    match /notificaciones/{notificacionId} {
+      // Read: own notifications (user_id) OR workspace notifications (workspace_id)
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
+      );
+
+      // Create: own notifications OR workspace owner/member can create for workspace
+      allow create: if request.auth != null && (
+        request.resource.data.user_id == request.auth.uid ||
+        (request.resource.data.keys().hasAll(['workspace_id']) &&
+         (isWorkspaceOwner(request.resource.data.workspace_id) ||
+          isWorkspaceMember(request.resource.data.workspace_id)))
+      );
+
+      // Update: own notifications OR workspace owner/member
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
+      );
+
+      // Delete: own notifications OR workspace owner
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceOwner(resource.data.workspace_id))
+      );
+    }
+
+    // ============================================
     // MAIL COLLECTION (for Firebase Extension - Trigger Email)
     // ============================================
     match /mail/{mailId} {

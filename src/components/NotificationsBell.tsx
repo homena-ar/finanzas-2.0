@@ -18,12 +18,21 @@ export function NotificationsBell() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!user) return
+    // Validar que tenemos los datos necesarios antes de construir la query
+    if (!user || !user.uid) return
 
-    const isWorkspaceMode = currentWorkspace !== null
-    const workspaceFilter = isWorkspaceMode
-      ? where('workspace_id', '==', currentWorkspace.id)
-      : where('user_id', '==', user.uid)
+    const isWorkspaceMode = currentWorkspace !== null && currentWorkspace.id
+    let workspaceFilter
+    
+    if (isWorkspaceMode) {
+      // Validar que currentWorkspace.id no sea undefined
+      if (!currentWorkspace.id) return
+      workspaceFilter = where('workspace_id', '==', currentWorkspace.id)
+    } else {
+      // Validar que user.uid no sea undefined
+      if (!user.uid) return
+      workspaceFilter = where('user_id', '==', user.uid)
+    }
 
     // Query para obtener notificaciones
     const notificacionesRef = collection(db, 'notificaciones')
@@ -58,7 +67,13 @@ export function NotificationsBell() {
       setNotifications(notifs)
       setUnreadCount(notifs.filter(n => !n.leida).length)
     }, (error) => {
-      console.error('Error escuchando notificaciones:', error)
+      // Solo loggear errores que no sean de permisos (que se resuelven al cargar)
+      if (error.code !== 'permission-denied') {
+        console.error('Error escuchando notificaciones:', error)
+      }
+      // En caso de error, establecer arrays vacíos para evitar errores de renderizado
+      setNotifications([])
+      setUnreadCount(0)
     })
 
     return () => unsubscribe()
