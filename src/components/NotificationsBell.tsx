@@ -27,24 +27,20 @@ export function NotificationsBell() {
                             currentWorkspace.id !== null
     
     let q
+    const notificacionesRef = collection(db, 'notificaciones')
     
     if (isWorkspaceMode && currentWorkspace?.id) {
-      // En modo workspace: buscar notificaciones del workspace
-      const notificacionesRef = collection(db, 'notificaciones')
+      // En modo workspace: notificaciones del workspace
       q = query(
         notificacionesRef,
-        where('workspace_id', '==', currentWorkspace.id),
-        orderBy('created_at', 'desc')
+        where('workspace_id', '==', currentWorkspace.id)
       )
     } else {
-      // En modo personal: buscar notificaciones del usuario SIN workspace_id
-      // (las notificaciones con workspace_id no deberían aparecer en modo personal)
+      // En modo personal: notificaciones del usuario (con o sin workspace_id)
       if (!user.uid) return
-      const notificacionesRef = collection(db, 'notificaciones')
       q = query(
         notificacionesRef,
-        where('user_id', '==', user.uid),
-        orderBy('created_at', 'desc')
+        where('user_id', '==', user.uid)
       )
     }
 
