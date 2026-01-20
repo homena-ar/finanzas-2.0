@@ -5,6 +5,7 @@ import { WorkspaceProvider } from '@/hooks/useWorkspace'
 import { DataProvider } from '@/hooks/useData'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import { InstallPWA } from '@/components/InstallPWA'
+import { PushNotificationPermission } from '@/components/PushNotificationPermission'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 // URL base de la aplicación (cambiar según el entorno)
@@ -107,6 +108,7 @@ export default function RootLayout({
           <AuthProvider>
             <WorkspaceProvider>
               <DataProvider>
+                <PushNotificationPermission />
                 {children}
               </DataProvider>
             </WorkspaceProvider>

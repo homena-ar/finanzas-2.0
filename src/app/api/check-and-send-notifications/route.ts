@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (response.ok) {
-          // Crear notificación en Firestore
+          // Crear notificación en Firestore (campanita)
           const notificacionData: Record<string, any> = {
             user_id: notif.userId,
             tipo: notif.tipo,
@@ -217,6 +217,36 @@ export async function GET(request: NextRequest) {
             notificacionData.workspace_id = notif.workspaceId
           }
           await firestore.collection('notificaciones').add(notificacionData)
+
+          // Enviar notificación push
+          try {
+            const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-push-notification`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: notif.userId,
+                title: notif.tipo === 'cierre' 
+                  ? `🔔 Cierre de ${notif.tarjetaNombre}`
+                  : `💳 Vencimiento de ${notif.tarjetaNombre}`,
+                body: notif.tipo === 'cierre'
+                  ? `La tarjeta cierra en 2 días (día ${notif.dia})`
+                  : `El vencimiento de pago es en 2 días (día ${notif.dia})`,
+                url: '/dashboard',
+                tag: `${notif.tipo}-${notif.tarjetaId}`,
+                workspaceId: notif.workspaceId
+              })
+            })
+
+            if (pushResponse.ok) {
+              const pushResult = await pushResponse.json()
+              console.log(`✅ [Cron] Push notification enviada: ${pushResult.sent}/${pushResult.total}`)
+            } else {
+              console.warn('⚠️ [Cron] Error enviando push notification:', await pushResponse.text())
+            }
+          } catch (pushError: any) {
+            console.warn('⚠️ [Cron] Excepción enviando push notification:', pushError.message)
+            // No fallar si el push falla (el correo y la campanita ya se enviaron)
+          }
 
           results.push({ success: true, notif })
         } else {

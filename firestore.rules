@@ -513,6 +513,23 @@ service cloud.firestore {
     }
 
     // ============================================
+    // NOTIFICATION TOKENS (Push Notifications)
+    // ============================================
+    match /notification_tokens/{tokenId} {
+      // Read: own tokens
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+
+      // Create: own tokens
+      allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
+
+      // Update: own tokens
+      allow update: if request.auth != null && resource.data.user_id == request.auth.uid;
+
+      // Delete: own tokens
+      allow delete: if request.auth != null && resource.data.user_id == request.auth.uid;
+    }
+
+    // ============================================
     // MAIL COLLECTION (for Firebase Extension - Trigger Email)
     // ============================================
     match /mail/{mailId} {

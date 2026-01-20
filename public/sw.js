@@ -1,4 +1,4 @@
-// Service Worker para FinControl PWA
+// Service Worker para FinControl PWA con Push Notifications
 const CACHE_NAME = 'fincontrol-v2'
 const urlsToCache = [
   '/',
@@ -20,6 +20,71 @@ self.addEventListener('install', (event) => {
           console.warn('⚠️ [SW] Error cacheando algunas URLs:', err)
           // Continuar aunque falle alguna URL
         })
+      })
+  )
+})
+
+// Manejar notificaciones push
+self.addEventListener('push', (event) => {
+  console.log('🔔 [SW] Push notification recibida')
+  
+  if (!event.data) {
+    console.warn('⚠️ [SW] Push sin datos')
+    return
+  }
+
+  let data
+  try {
+    data = event.data.json()
+  } catch (error) {
+    console.error('❌ [SW] Error parseando datos del push:', error)
+    return
+  }
+
+  const title = data.title || 'FinControl'
+  const options = {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || 'fincontrol-notification',
+    data: {
+      url: data.url || '/dashboard',
+      ...data
+    },
+    requireInteraction: false,
+    vibrate: [200, 100, 200]
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  )
+})
+
+// Manejar click en la notificación
+self.addEventListener('notificationclick', (event) => {
+  console.log('👆 [SW] Notificación clickeada')
+  
+  event.notification.close()
+
+  const urlToOpen = event.notification.data?.url || '/dashboard'
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Si ya hay una ventana abierta, enfocarla y navegar
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.focus()
+            if (client.navigate) {
+              client.navigate(urlToOpen)
+            }
+            return
+          }
+        }
+        // Si no hay ventana abierta, abrir una nueva
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen)
+        }
       })
   )
 })
