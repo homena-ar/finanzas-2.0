@@ -158,6 +158,24 @@ export async function GET(request: NextRequest) {
     
     console.log('🔔 [Cron] Perfiles cargados:', profilesMap.size)
 
+    // Resolver base URL para llamadas internas. Usamos, en orden:
+    // 1) NEXT_PUBLIC_APP_URL si está configurada (entorno deploy)
+    // 2) BASE_URL/VERCEL_URL si existe
+    // 3) El origin de la petición (si llega desde nuestro dominio)
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+      request.nextUrl.origin
+
+    if (!baseUrl) {
+      console.error('❌ [Cron] No se pudo resolver el baseUrl para las llamadas internas')
+      return NextResponse.json(
+        { error: 'No se pudo resolver el dominio para las llamadas internas' },
+        { status: 500 }
+      )
+    }
+
     // Enviar notificaciones
     const results = []
     for (const notif of notificationsToSend) {
@@ -196,7 +214,7 @@ export async function GET(request: NextRequest) {
         // Llamar a la API de envío de correo
         // Enviar correo solo si tenemos email
         if (profileEmail) {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-notification-email`, {
+          const response = await fetch(`${baseUrl}/api/send-notification-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -240,7 +258,7 @@ export async function GET(request: NextRequest) {
 
         // Enviar notificación push
         try {
-          const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-push-notification`, {
+          const pushResponse = await fetch(`${baseUrl}/api/send-push-notification`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
