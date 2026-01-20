@@ -78,7 +78,7 @@ export function PushNotificationPermission() {
       })
 
       // Guardar la suscripción en Firestore
-      const tokenData = {
+      const tokenData: Record<string, unknown> = {
         user_id: user.uid,
         subscription: JSON.parse(JSON.stringify(subscription)),
         user_agent: navigator.userAgent,
