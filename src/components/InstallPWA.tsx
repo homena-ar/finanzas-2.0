@@ -1,17 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, X } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+const PWA_DISMISS_SESSION_KEY = 'fincontrol:pwa_install:dismissedAtSession'
+const PWA_LAST_UID_SESSION_KEY = 'fincontrol:pwa_install:lastUidSession'
+const PWA_DISMISS_COOLDOWN_MS = 1000 * 60 * 60 * 24 * 7 // 7 días
+
 export function InstallPWA() {
+  const { user } = useAuth()
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showInstallButton, setShowInstallButton] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+
+  const isDismissedRecently = () => {
+    if (typeof window === 'undefined') return true
+    try {
+      const raw = window.sessionStorage.getItem(PWA_DISMISS_SESSION_KEY)
+      if (!raw) return false
+      const dismissedAt = Number(raw)
+      if (!Number.isFinite(dismissedAt)) return false
+      return Date.now() - dismissedAt < PWA_DISMISS_COOLDOWN_MS
+    } catch {
+      return false
+    }
+  }
 
   useEffect(() => {
     // Verificar si ya está instalado
@@ -24,7 +43,7 @@ export function InstallPWA() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
-      setShowInstallButton(true)
+      if (!isDismissedRecently()) setShowInstallButton(true)
     }
 
     // Escuchar cuando se instala la app
@@ -38,8 +57,8 @@ export function InstallPWA() {
     window.addEventListener('appinstalled', handleAppInstalled)
 
     // Verificar si el prompt ya está disponible después de un delay
-    setTimeout(() => {
-      if (!deferredPrompt && !isInstalled) {
+    const timeoutId = window.setTimeout(() => {
+      if (!isDismissedRecently() && !deferredPrompt && !isInstalled) {
         // Si no hay prompt automático pero la app es instalable, mostrar botón manual
         if ('serviceWorker' in navigator && window.matchMedia('(display-mode: browser)').matches) {
           setShowInstallButton(true)
@@ -48,10 +67,36 @@ export function InstallPWA() {
     }, 3000)
 
     return () => {
+      window.clearTimeout(timeoutId)
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [deferredPrompt, isInstalled])
+
+  // Si cambia el usuario (nuevo ingreso), permitir volver a mostrar el popup
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const lastUid = window.sessionStorage.getItem(PWA_LAST_UID_SESSION_KEY)
+      const currentUid = user?.uid || '__no_user__'
+      if (lastUid && lastUid !== currentUid) {
+        window.sessionStorage.removeItem(PWA_DISMISS_SESSION_KEY)
+      }
+      window.sessionStorage.setItem(PWA_LAST_UID_SESSION_KEY, currentUid)
+    } catch {
+      // ignore
+    }
+  }, [user?.uid])
+
+  const handleDismiss = () => {
+    setShowInstallButton(false)
+    setDeferredPrompt(null)
+    try {
+      window.sessionStorage.setItem(PWA_DISMISS_SESSION_KEY, String(Date.now()))
+    } catch {
+      // ignore
+    }
+  }
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
@@ -109,7 +154,7 @@ export function InstallPWA() {
                 Instalar
               </button>
               <button
-                onClick={() => setShowInstallButton(false)}
+                onClick={handleDismiss}
                 className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
                 aria-label="Cerrar"
               >

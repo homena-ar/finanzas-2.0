@@ -213,7 +213,7 @@ export function getWelcomeEmailTemplate(
                   <li style="margin-bottom: 10px;"><strong>💰 Gastos:</strong> Registra y categoriza tus gastos fácilmente</li>
                   <li style="margin-bottom: 10px;"><strong>💵 Ingresos:</strong> Lleva un control de tus ingresos</li>
                   <li style="margin-bottom: 10px;"><strong>🏦 Ahorros:</strong> Gestiona tus metas de ahorro</li>
-                  <li style="margin-bottom: 10px;"><strong>💳 Tarjetas:</strong> Organiza tus tarjetas de crédito</li>
+                  <li style="margin-bottom: 10px;"><strong>🏦 Cuentas y tarjetas:</strong> Organiza tus cuentas y tarjetas</li>
                   <li style="margin-bottom: 10px;"><strong>📊 Resúmenes:</strong> Visualiza tus finanzas con gráficos y proyecciones</li>
                 </ul>
               </div>
@@ -368,7 +368,7 @@ Comienza a usar FinControl:
 - 💰 Gastos: Registra y categoriza tus gastos fácilmente
 - 💵 Ingresos: Lleva un control de tus ingresos
 - 🏦 Ahorros: Gestiona tus metas de ahorro
-- 💳 Tarjetas: Organiza tus tarjetas de crédito
+- 🏦 Cuentas y tarjetas: Organiza tus cuentas y tarjetas
 - 📊 Resúmenes: Visualiza tus finanzas con gráficos y proyecciones
 
 📱 INSTALÁ FINCONTROL EN TU DISPOSITIVO

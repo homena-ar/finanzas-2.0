@@ -53,6 +53,60 @@ export default function IngresosPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set())
   const [includeTotal, setIncludeTotal] = useState(false)
+  const [editedTransactions, setEditedTransactions] = useState<Map<number, any>>(new Map())
+
+  // IA (preview): creación/edición sin mezclar con el modal principal
+  const [aiShowNewTagInput, setAiShowNewTagInput] = useState(false)
+  const [aiNewTagName, setAiNewTagName] = useState('')
+  const [aiShowNewCategoriaInput, setAiShowNewCategoriaInput] = useState(false)
+  const [aiNewCategoria, setAiNewCategoria] = useState({ nombre: '', icono: '💵', color: '#3b82f6' })
+  const [aiExpandedTransaction, setAiExpandedTransaction] = useState<number | null>(null)
+
+  const findCategoriaIdFromLabel = (label?: string) => {
+    const normalized = (label || '').trim().toLowerCase()
+    if (!normalized) return ''
+    const match = categoriasIngresos.find(
+      c => c.nombre.toLowerCase().includes(normalized) || normalized.includes(c.nombre.toLowerCase())
+    )
+    return match?.id || ''
+  }
+
+  const updateEditedTransaction = (index: number, field: string, value: any) => {
+    const newEdited = new Map(editedTransactions)
+    const current = newEdited.get(index) || {}
+    newEdited.set(index, { ...current, [field]: value })
+    setEditedTransactions(newEdited)
+  }
+
+  const getTransactionTagIds = (index: number) => {
+    const edited = editedTransactions.get(index)
+    if (edited && Array.isArray(edited.tag_ids)) return edited.tag_ids as string[]
+    return form.tag_ids || []
+  }
+
+  const toggleTransactionTag = (index: number, tagId: string) => {
+    const current = getTransactionTagIds(index)
+    const next = current.includes(tagId) ? current.filter(id => id !== tagId) : [...current, tagId]
+    updateEditedTransaction(index, 'tag_ids', next)
+  }
+
+  const handleAddNewTagAI = async () => {
+    if (!aiNewTagName.trim()) return
+    await addTagIngreso(aiNewTagName.trim())
+    setAiNewTagName('')
+    setAiShowNewTagInput(false)
+  }
+
+  const handleAddNewCategoriaAI = async () => {
+    if (!aiNewCategoria.nombre.trim()) return
+    await addCategoriaIngreso({
+      nombre: aiNewCategoria.nombre.trim(),
+      icono: aiNewCategoria.icono,
+      color: aiNewCategoria.color
+    })
+    setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
+    setAiShowNewCategoriaInput(false)
+  }
 
   // Filters
   const [filters, setFilters] = useState({ search: '', colaborador: '', moneda: '' })
@@ -260,6 +314,12 @@ export default function IngresosPage() {
     }
 
     setProcessingImage(true)
+    setEditedTransactions(new Map())
+    setAiExpandedTransaction(null)
+    setAiShowNewTagInput(false)
+    setAiNewTagName('')
+    setAiShowNewCategoriaInput(false)
+    setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
 
     try {
       // Convertir a base64
@@ -288,6 +348,17 @@ export default function IngresosPage() {
         }
 
         setExtractedData(result.data)
+        // Preseleccionar categorías (si la IA sugiere una que coincide con las existentes)
+        if (result.data?.transacciones && Array.isArray(result.data.transacciones)) {
+          const initialEdited = new Map<number, any>()
+          result.data.transacciones.forEach((trans: any, i: number) => {
+            const categoriaId = findCategoriaIdFromLabel(trans?.categoria)
+            if (categoriaId) {
+              initialEdited.set(i, { ...(initialEdited.get(i) || {}), categoria_id: categoriaId })
+            }
+          })
+          if (initialEdited.size > 0) setEditedTransactions(initialEdited)
+        }
         setShowImagePreview(true)
         setProcessingImage(false)
       }
@@ -328,9 +399,13 @@ export default function IngresosPage() {
 
     // Si hay múltiples transacciones (resumen)
     if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
-      const transactionsToAdd = extractedData.transacciones.filter((_: any, index: number) => 
-        selectedTransactions.has(index)
-      )
+      const transactionsToAdd = extractedData.transacciones
+        .map((trans: any, index: number) => {
+          if (!selectedTransactions.has(index)) return null
+          const edited = editedTransactions.get(index)
+          return edited ? { ...trans, ...edited } : { ...trans }
+        })
+        .filter((t: any) => t !== null)
       
       if (transactionsToAdd.length === 0 && !includeTotal) {
         setAlertData({
@@ -345,35 +420,45 @@ export default function IngresosPage() {
       // Agregar cada transacción seleccionada como ingreso individual
       const addPromises = transactionsToAdd.map(async (trans: any) => {
         let categoriaId = ''
-        if (trans.categoria) {
-          const categoriaMatch = categoriasIngresos.find(
-            c => c.nombre.toLowerCase().includes(trans.categoria.toLowerCase()) ||
-            trans.categoria.toLowerCase().includes(c.nombre.toLowerCase())
-          )
-          if (categoriaMatch) {
-            categoriaId = categoriaMatch.id
-          }
+        if (trans.categoria_id) {
+          categoriaId = String(trans.categoria_id)
+        } else if (trans.categoria) {
+          categoriaId = findCategoriaIdFromLabel(trans.categoria)
+        } else if (form.categoria_id && form.categoria_id !== '__new__') {
+          categoriaId = form.categoria_id
         }
+
+        const fecha = trans.fecha || form.fecha
+        const fechaDate = new Date(fecha)
+        const mes = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
+        const tagIds = Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || [])
         
         await addIngreso({
           descripcion: trans.descripcion,
-          categoria_id: categoriaId,
+          categoria_id: categoriaId || null,
           monto: trans.monto,
           moneda: trans.moneda || 'ARS',
-          fecha: trans.fecha || form.fecha,
+          fecha: fecha,
+          mes: mes,
+          tag_ids: tagIds,
           origen: trans.origen || ''
         })
       })
 
       // Si se solicita, agregar el total también
       if (includeTotal && extractedData.total && extractedData.total.monto) {
+        const totalFecha = form.fecha
+        const totalFechaDate = new Date(totalFecha)
+        const totalMes = `${totalFechaDate.getFullYear()}-${String(totalFechaDate.getMonth() + 1).padStart(2, '0')}`
         addPromises.push(
           addIngreso({
             descripcion: `Total del resumen - ${extractedData.total.periodo || 'Período'}`,
-            categoria_id: '',
+            categoria_id: null,
             monto: extractedData.total.monto,
             moneda: extractedData.total.moneda || 'ARS',
-            fecha: form.fecha,
+            fecha: totalFecha,
+            mes: totalMes,
+            tag_ids: form.tag_ids || [],
             origen: extractedData.total.periodo || ''
           })
         )
@@ -386,6 +471,12 @@ export default function IngresosPage() {
           setPreviewImage(null)
           setSelectedTransactions(new Set())
           setIncludeTotal(false)
+          setEditedTransactions(new Map())
+          setAiExpandedTransaction(null)
+          setAiShowNewTagInput(false)
+          setAiNewTagName('')
+          setAiShowNewCategoriaInput(false)
+          setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
           setShowModal(false)
           resetForm()
         })
@@ -427,6 +518,12 @@ export default function IngresosPage() {
     setPreviewImage(null)
     setSelectedTransactions(new Set())
     setIncludeTotal(false)
+    setEditedTransactions(new Map())
+    setAiExpandedTransaction(null)
+    setAiShowNewTagInput(false)
+    setAiNewTagName('')
+    setAiShowNewCategoriaInput(false)
+    setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
   }
 
   return (
@@ -896,7 +993,7 @@ export default function IngresosPage() {
 
       {/* Modal de Vista Previa de Datos Extraídos */}
       {showImagePreview && extractedData && (
-        <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}>
+        <div className="modal-overlay" onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false); setEditedTransactions(new Map()); setAiExpandedTransaction(null); setAiShowNewTagInput(false); setAiNewTagName(''); setAiShowNewCategoriaInput(false); setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' }) }}>
           <div className="modal max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg flex items-center gap-2">
@@ -904,7 +1001,7 @@ export default function IngresosPage() {
                 {extractedData.transacciones ? `Confirmar Transacciones (${extractedData.transacciones.length} encontradas)` : 'Confirmar Datos Extraídos'}
               </h3>
               <button 
-                onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }} 
+                onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false); setEditedTransactions(new Map()); setAiExpandedTransaction(null); setAiShowNewTagInput(false); setAiNewTagName(''); setAiShowNewCategoriaInput(false); setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' }) }} 
                 className="p-1 hover:bg-slate-100 rounded"
               >
                 <X className="w-5 h-5" />
@@ -941,57 +1038,227 @@ export default function IngresosPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {extractedData.transacciones.map((trans: any, index: number) => (
-                      <div 
-                        key={index}
-                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                          selectedTransactions.has(index) 
-                            ? 'border-purple-500 bg-purple-50' 
-                            : 'border-slate-200 hover:border-purple-300 bg-white'
-                        }`}
-                        onClick={() => {
-                          const newSelected = new Set(selectedTransactions)
-                          if (newSelected.has(index)) {
-                            newSelected.delete(index)
-                          } else {
-                            newSelected.add(index)
-                          }
-                          setSelectedTransactions(newSelected)
-                        }}
+                  {/* Crear categorías / tags desde el preview */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
+                    <div className="text-xs font-semibold text-slate-700">🏷️ Categorías y etiquetas</div>
+                    {!aiShowNewCategoriaInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setAiShowNewCategoriaInput(true)}
+                        className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
                       >
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedTransactions.has(index)}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              const newSelected = new Set(selectedTransactions)
-                              if (newSelected.has(index)) {
-                                newSelected.delete(index)
-                              } else {
-                                newSelected.add(index)
-                              }
-                              setSelectedTransactions(newSelected)
-                            }}
-                            className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
+                        + Crear nueva categoría
+                      </button>
+                    ) : (
+                      <div className="space-y-2 p-3 bg-white rounded-lg border border-indigo-200">
+                        <input
+                          type="text"
+                          className="input w-full text-xs h-8"
+                          placeholder="Nombre de categoría"
+                          value={aiNewCategoria.nombre}
+                          onChange={e => setAiNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                        />
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-600 mb-1">Icono</div>
+                          <EmojiPickerField
+                            value={aiNewCategoria.icono}
+                            onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
+                            placeholder="💵"
+                            size="sm"
                           />
-                          <div className="flex-1 space-y-1">
-                            <div className="font-semibold text-slate-900">{trans.descripcion || 'Sin descripción'}</div>
-                            <div className="flex items-center gap-4 text-sm text-slate-600">
-                              <span className="font-medium">{formatMoney(trans.monto || 0)} {trans.moneda || 'ARS'}</span>
-                              <span>{trans.fecha || ''}</span>
-                              {trans.origen && <span className="text-blue-600">📍 {trans.origen}</span>}
-                            </div>
-                            {trans.categoria && (
-                              <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
-                                {trans.categoria}
-                              </span>
-                            )}
-                          </div>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="color"
+                            className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
+                            value={aiNewCategoria.color}
+                            onChange={e => setAiNewCategoria(c => ({ ...c, color: e.target.value }))}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddNewCategoriaAI}
+                            className="btn btn-primary btn-sm"
+                          >
+                            Crear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAiShowNewCategoriaInput(false); setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' }) }}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Cancelar
+                          </button>
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {!aiShowNewTagInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setAiShowNewTagInput(true)}
+                        className="w-full px-3 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-bold hover:bg-orange-100 transition"
+                      >
+                        + Crear nueva etiqueta
+                      </button>
+                    ) : (
+                      <div className="flex gap-2 p-3 bg-white rounded-lg border border-orange-200">
+                        <input
+                          type="text"
+                          className="input flex-1 text-xs h-8"
+                          placeholder="Nombre de etiqueta"
+                          value={aiNewTagName}
+                          onChange={e => setAiNewTagName(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleAddNewTagAI()}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddNewTagAI}
+                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
+                          className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {extractedData.transacciones.map((trans: any, index: number) => {
+                      const descripcion = editedTransactions.get(index)?.descripcion ?? trans.descripcion ?? ''
+                      const monto = editedTransactions.get(index)?.monto ?? trans.monto ?? ''
+                      const moneda = editedTransactions.get(index)?.moneda ?? trans.moneda ?? 'ARS'
+                      const fecha = editedTransactions.get(index)?.fecha ?? trans.fecha ?? ''
+                      const categoriaIdValue = editedTransactions.get(index)?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''
+
+                      return (
+                        <div
+                          key={index}
+                          className={`border rounded-lg p-3 transition-colors ${
+                            selectedTransactions.has(index)
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedTransactions.has(index)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                const newSelected = new Set(selectedTransactions)
+                                if (newSelected.has(index)) newSelected.delete(index)
+                                else newSelected.add(index)
+                                setSelectedTransactions(newSelected)
+                              }}
+                              className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
+                            />
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                className="input w-full text-sm"
+                                value={descripcion}
+                                onChange={(e) => updateEditedTransaction(index, 'descripcion', e.target.value)}
+                                placeholder="Descripción"
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <input
+                                  type="date"
+                                  className="input text-sm"
+                                  value={fecha}
+                                  onChange={(e) => updateEditedTransaction(index, 'fecha', e.target.value)}
+                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="input text-sm flex-1"
+                                    value={monto}
+                                    onChange={(e) => updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                  />
+                                  <select
+                                    className="input text-sm w-24"
+                                    value={moneda}
+                                    onChange={(e) => updateEditedTransaction(index, 'moneda', e.target.value)}
+                                  >
+                                    <option value="ARS">ARS</option>
+                                    <option value="USD">USD</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Categoría</label>
+                                  <select
+                                    className="input text-sm"
+                                    value={categoriaIdValue}
+                                    onChange={(e) => updateEditedTransaction(index, 'categoria_id', e.target.value)}
+                                  >
+                                    <option value="">Sin categoría</option>
+                                    {categoriasIngresos.map(c => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.icono} {c.nombre}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {trans.categoria && (
+                                    <div className="text-[11px] text-slate-500 mt-1">
+                                      Sugerida: <span className="font-semibold">{trans.categoria}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setAiExpandedTransaction(prev => (prev === index ? null : index))}
+                                    className="w-full px-3 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
+                                  >
+                                    {aiExpandedTransaction === index ? 'Ocultar tags' : 'Editar tags'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {aiExpandedTransaction === index && (
+                                <div className="flex flex-wrap gap-2 p-3 bg-white rounded-lg border border-slate-200">
+                                  {tagsIngresos.length === 0 ? (
+                                    <span className="text-xs text-slate-500">No hay etiquetas creadas.</span>
+                                  ) : tagsIngresos.map(t => {
+                                    const selected = getTransactionTagIds(index).includes(t.id)
+                                    return (
+                                      <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => toggleTransactionTag(index, t.id)}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                                          selected
+                                            ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-500'
+                                            : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-slate-300'
+                                        }`}
+                                      >
+                                        {t.nombre}
+                                      </button>
+                                    )
+                                  })}
+                                  <div className="w-full text-[11px] text-slate-500">
+                                    Tip: si no tocás los tags acá, se aplican los tags del ingreso (modal principal).
+                                  </div>
+                                </div>
+                              )}
+
+                              {trans.origen && <div className="text-xs text-blue-700">📍 {trans.origen}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
 
                   {/* Opción para agregar total */}

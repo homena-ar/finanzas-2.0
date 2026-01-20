@@ -92,6 +92,41 @@ export default function GastosPage() {
   const [globalDocumentDate, setGlobalDocumentDate] = useState<string | null>(null)
   const [useGlobalDate, setUseGlobalDate] = useState(false)
 
+  // IA (preview): creación/edición sin mezclar con el modal principal
+  const [aiShowNewTagInput, setAiShowNewTagInput] = useState(false)
+  const [aiNewTagName, setAiNewTagName] = useState('')
+  const [aiShowNewCategoriaInput, setAiShowNewCategoriaInput] = useState(false)
+  const [aiNewCategoria, setAiNewCategoria] = useState({ nombre: '', icono: '💰' })
+  const [aiShowNewTarjetaInput, setAiShowNewTarjetaInput] = useState(false)
+  const [aiNewTarjeta, setAiNewTarjeta] = useState({
+    nombre: '',
+    tipo: 'visa' as 'visa' | 'mastercard' | 'amex' | 'other',
+    banco: '',
+    digitos: ''
+  })
+  const [aiExpandedTransaction, setAiExpandedTransaction] = useState<number | null>(null)
+
+  const findCategoriaIdFromLabel = (label?: string) => {
+    const normalized = (label || '').trim().toLowerCase()
+    if (!normalized) return ''
+    const match = categorias.find(
+      c => c.nombre.toLowerCase().includes(normalized) || normalized.includes(c.nombre.toLowerCase())
+    )
+    return match?.id || ''
+  }
+
+  const getTransactionTagIds = (index: number) => {
+    const edited = editedTransactions.get(index)
+    if (edited && Array.isArray(edited.tag_ids)) return edited.tag_ids as string[]
+    return gastoForm.tag_ids || []
+  }
+
+  const toggleTransactionTag = (index: number, tagId: string) => {
+    const current = getTransactionTagIds(index)
+    const next = current.includes(tagId) ? current.filter(id => id !== tagId) : [...current, tagId]
+    updateEditedTransaction(index, 'tag_ids', next)
+  }
+
   // Debug: Log cuando cambian los selectores
   useEffect(() => {
     console.log('🔵 [GastosPage] selectedTarjetaId cambió:', selectedTarjetaId)
@@ -452,7 +487,7 @@ export default function GastosPage() {
 
   const handleAddNewTarjeta = async () => {
     if (!newTarjeta.nombre.trim()) return
-    await addTarjeta({
+    const result = await addTarjeta({
       nombre: newTarjeta.nombre.trim(),
       tipo: newTarjeta.tipo,
       banco: newTarjeta.banco || null,
@@ -460,9 +495,52 @@ export default function GastosPage() {
       cierre: null
     })
 
-    // La nueva tarjeta estará disponible después de fetchAll que se llama automáticamente
+    if (!result.error && result.id) {
+      setGastoForm(f => ({ ...f, tarjeta_id: result.id as string }))
+    }
     setNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
     setShowNewTarjetaInput(false)
+  }
+
+  const handleAddNewTagAI = async () => {
+    if (!aiNewTagName.trim()) return
+    await addTag(aiNewTagName.trim())
+    setAiNewTagName('')
+    setAiShowNewTagInput(false)
+  }
+
+  const handleAddNewCategoriaAI = async () => {
+    if (!aiNewCategoria.nombre.trim()) return
+    await addCategoria({
+      nombre: aiNewCategoria.nombre.trim(),
+      icono: aiNewCategoria.icono,
+      color: '#6366f1'
+    })
+    setAiNewCategoria({ nombre: '', icono: '💰' })
+    setAiShowNewCategoriaInput(false)
+  }
+
+  const buildDetectedTarjetaName = (t: any) => {
+    const banco = t?.banco ? String(t.banco).trim() : ''
+    const tipo = t?.tipo_tarjeta ? String(t.tipo_tarjeta).trim() : ''
+    const base = [tipo, banco].filter(Boolean).join(' ')
+    return base || 'Nueva cuenta/tarjeta'
+  }
+
+  const handleAddNewTarjetaAI = async () => {
+    if (!aiNewTarjeta.nombre.trim()) return
+    const result = await addTarjeta({
+      nombre: aiNewTarjeta.nombre.trim(),
+      tipo: aiNewTarjeta.tipo,
+      banco: aiNewTarjeta.banco || null,
+      digitos: aiNewTarjeta.digitos || null,
+      cierre: null
+    })
+    if (!result.error && result.id) {
+      setSelectedTarjetaId(result.id as string)
+    }
+    setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setAiShowNewTarjetaInput(false)
   }
 
   const downloadComprobante = (gasto: Gasto) => {
@@ -486,6 +564,23 @@ export default function GastosPage() {
       setGastoError('Por favor, selecciona una imagen o PDF válido')
       return
     }
+
+    // Limpiar estado previo antes de procesar un nuevo archivo
+    setGastoError('')
+    setEditedTransactions(new Map())
+    setEditedImpuestos(new Map())
+    setEditedTotal(null)
+    setAiExpandedTransaction(null)
+    setAiShowNewTagInput(false)
+    setAiNewTagName('')
+    setAiShowNewCategoriaInput(false)
+    setAiNewCategoria({ nombre: '', icono: '💰' })
+    setAiShowNewTarjetaInput(false)
+    setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setDetectedTarjeta(null)
+    setSelectedTarjetaId('')
+    setGlobalDocumentDate(null)
+    setUseGlobalDate(false)
 
     setProcessingImage(true)
     setProgressPercent(0)
@@ -631,6 +726,16 @@ export default function GastosPage() {
           if (result.data.transacciones && Array.isArray(result.data.transacciones)) {
             const allTransactions = new Set<number>(result.data.transacciones.map((_: any, i: number) => i))
             setSelectedTransactions(allTransactions)
+
+            // Preseleccionar categorías (si la IA sugiere una que coincide con las existentes)
+            const initialEdited = new Map<number, any>()
+            result.data.transacciones.forEach((trans: any, i: number) => {
+              const categoriaId = findCategoriaIdFromLabel(trans?.categoria)
+              if (categoriaId) {
+                initialEdited.set(i, { ...(initialEdited.get(i) || {}), categoria_id: categoriaId })
+              }
+            })
+            if (initialEdited.size > 0) setEditedTransactions(initialEdited)
           }
           if (result.data.impuestos && Array.isArray(result.data.impuestos)) {
             const allImpuestos = new Set<number>(result.data.impuestos.map((_: any, i: number) => i))
@@ -690,12 +795,7 @@ export default function GastosPage() {
             setProcessingImage(false)
             setProgressPercent(0)
             setProcessingComplete(false)
-            // Limpiar ediciones anteriores cuando se procesa una nueva imagen
-            setEditedTransactions(new Map())
-            setEditedImpuestos(new Map())
-            setEditedTotal(null)
-            setGlobalDocumentDate(null)
-            setUseGlobalDate(false)
+            // Nota: las ediciones/fecha detectada ya se inicializan arriba; no limpiar acá.
           }, 400)
         } catch (apiError: any) {
           if (progressInterval) clearInterval(progressInterval)
@@ -820,46 +920,34 @@ export default function GastosPage() {
         console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando transacción ${index + 1}:`, trans)
         
         let categoriaId = ''
-        if (trans.categoria) {
-          const categoriaMatch = categorias.find(
-            c => c.nombre.toLowerCase().includes(trans.categoria.toLowerCase()) ||
-            trans.categoria.toLowerCase().includes(c.nombre.toLowerCase())
-          )
-          if (categoriaMatch) {
-            categoriaId = categoriaMatch.id
-          }
+        if (trans.categoria_id) {
+          categoriaId = String(trans.categoria_id)
+        } else if (trans.categoria) {
+          categoriaId = findCategoriaIdFromLabel(trans.categoria)
         }
         
         // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
         const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || gastoForm.fecha)
         const mesFacturacion = getMesFacturacion(fecha)
         
-        // Detectar si es un gasto en cuotas (la IA puede detectar esto o puede estar editado)
-        const cuotasEditadas = editedTransactions.get(index)?.cuotas
-        const cuotaActualEditada = editedTransactions.get(index)?.cuota_actual
-        
         console.log(`🔵 [GastosPage] Transacción ${index + 1} - Datos originales:`, {
           descripcion: trans.descripcion,
           monto: trans.monto,
           cuotas: trans.cuotas,
           cuota_actual: trans.cuota_actual,
-          cuotasEditadas,
-          cuotaActualEditada
         })
         
         // La IA puede devolver cuotas como número, string, null o undefined
-        let totalCuotasDetectadas = cuotasEditadas !== undefined 
-          ? cuotasEditadas 
-          : (trans.cuotas !== null && trans.cuotas !== undefined 
-              ? (typeof trans.cuotas === 'number' ? trans.cuotas : parseInt(String(trans.cuotas))) 
-              : null)
+        let totalCuotasDetectadas =
+          trans.cuotas !== null && trans.cuotas !== undefined
+            ? (typeof trans.cuotas === 'number' ? trans.cuotas : parseInt(String(trans.cuotas)))
+            : null
         
         // Detectar cuota actual si la IA la proporcionó
-        let cuotaActualDetectada = cuotaActualEditada !== undefined
-          ? cuotaActualEditada
-          : (trans.cuota_actual !== null && trans.cuota_actual !== undefined
-              ? (typeof trans.cuota_actual === 'number' ? trans.cuota_actual : parseInt(String(trans.cuota_actual)))
-              : null)
+        let cuotaActualDetectada =
+          trans.cuota_actual !== null && trans.cuota_actual !== undefined
+            ? (typeof trans.cuota_actual === 'number' ? trans.cuota_actual : parseInt(String(trans.cuota_actual)))
+            : null
         
         console.log(`🔵 [GastosPage] Transacción ${index + 1} - Cuotas detectadas:`, {
           totalCuotasDetectadas,
@@ -935,7 +1023,7 @@ export default function GastosPage() {
           cuotas: cuotasFinal,
           cuota_actual: cuotaActualFinal,
           es_fijo: false, // NO marcar como fijo, las cuotas se distribuyen automáticamente
-          tag_ids: gastoForm.tag_ids || [],
+          tag_ids: Array.isArray(trans.tag_ids) ? trans.tag_ids : (gastoForm.tag_ids || []),
           pagado: gastoForm.pagado,
           comercio: trans.comercio || ''
         }
@@ -2301,6 +2389,13 @@ export default function GastosPage() {
                   setEditedImpuestos(new Map());
                   setGlobalDocumentDate(null);
                   setUseGlobalDate(false);
+                  setAiExpandedTransaction(null);
+                  setAiShowNewTagInput(false);
+                  setAiNewTagName('');
+                  setAiShowNewCategoriaInput(false);
+                  setAiNewCategoria({ nombre: '', icono: '💰' });
+                  setAiShowNewTarjetaInput(false);
+                  setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' });
                 }} 
                 className="p-1.5 hover:bg-slate-100 rounded transition-colors"
               >
@@ -2386,6 +2481,74 @@ export default function GastosPage() {
                       </select>
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600">▼</div>
                     </div>
+
+                    {/* Crear cuenta/tarjeta desde el preview */}
+                    {!aiShowNewTarjetaInput ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAiShowNewTarjetaInput(true)
+                          setAiNewTarjeta({
+                            nombre: detectedTarjeta ? buildDetectedTarjetaName(detectedTarjeta) : '',
+                            tipo: 'visa',
+                            banco: detectedTarjeta?.banco ? String(detectedTarjeta.banco) : '',
+                            digitos: detectedTarjeta?.ultimos_digitos ? String(detectedTarjeta.ultimos_digitos) : ''
+                          })
+                        }}
+                        className="mt-2 w-full px-3 py-2 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-xs font-bold hover:bg-purple-100 transition"
+                      >
+                        + Crear nueva cuenta/tarjeta
+                      </button>
+                    ) : (
+                      <div className="mt-2 space-y-2 p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                        <div className="text-xs font-bold text-purple-900">💳 Nueva Cuenta/Tarjeta</div>
+                        <input
+                          type="text"
+                          className="input w-full text-xs h-8"
+                          placeholder="Nombre (Ej: Visa BBVA, Cuenta Banco...)"
+                          value={aiNewTarjeta.nombre}
+                          onChange={e => setAiNewTarjeta(t => ({ ...t, nombre: e.target.value }))}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <select
+                            className="input text-xs h-8"
+                            value={aiNewTarjeta.tipo}
+                            onChange={e => setAiNewTarjeta(t => ({ ...t, tipo: e.target.value as any }))}
+                          >
+                            <option value="visa">💳 Visa</option>
+                            <option value="mastercard">💳 Mastercard</option>
+                            <option value="amex">💳 Amex</option>
+                            <option value="other">🏦 Otra/Cuenta</option>
+                          </select>
+                          <input
+                            type="text"
+                            className="input text-xs h-8"
+                            placeholder="Banco (opcional)"
+                            value={aiNewTarjeta.banco}
+                            onChange={e => setAiNewTarjeta(t => ({ ...t, banco: e.target.value }))}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleAddNewTarjetaAI}
+                            className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 transition"
+                          >
+                            ✓ Crear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAiShowNewTarjetaInput(false)
+                              setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+                            }}
+                            className="flex-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Selector de Fecha/Mes General - Compacto */}
@@ -2456,6 +2619,94 @@ export default function GastosPage() {
                       <p className="text-xs text-indigo-700">
                         Detectada: {new Date(globalDocumentDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
+                    )}
+                  </div>
+
+                  {/* Categorías / Tags (crear) */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-2">
+                    <div className="text-xs font-semibold text-slate-700">🏷️ Categorías y etiquetas</div>
+                    {!aiShowNewCategoriaInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setAiShowNewCategoriaInput(true)}
+                        className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
+                      >
+                        + Crear nueva categoría
+                      </button>
+                    ) : (
+                      <div className="space-y-2 p-3 bg-white rounded-lg border border-indigo-200">
+                        <input
+                          type="text"
+                          className="input w-full text-xs h-8"
+                          placeholder="Nombre de categoría"
+                          value={aiNewCategoria.nombre}
+                          onChange={e => setAiNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                        />
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-600 mb-1">Icono</div>
+                          <EmojiPickerField
+                            value={aiNewCategoria.icono}
+                            onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
+                            placeholder="💰"
+                            size="sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleAddNewCategoriaAI}
+                            className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
+                          >
+                            ✓ Crear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAiShowNewCategoriaInput(false)
+                              setAiNewCategoria({ nombre: '', icono: '💰' })
+                            }}
+                            className="flex-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!aiShowNewTagInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setAiShowNewTagInput(true)}
+                        className="w-full px-3 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-bold hover:bg-orange-100 transition"
+                      >
+                        + Crear nueva etiqueta
+                      </button>
+                    ) : (
+                      <div className="flex gap-2 p-3 bg-white rounded-lg border border-orange-200">
+                        <input
+                          type="text"
+                          className="input flex-1 text-xs h-8"
+                          placeholder="Nombre de etiqueta"
+                          value={aiNewTagName}
+                          onChange={e => setAiNewTagName(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleAddNewTagAI()}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddNewTagAI}
+                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
+                          className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -2607,8 +2858,62 @@ export default function GastosPage() {
                               </div>
                               <div className="flex items-center gap-2 text-xs flex-wrap">
                                 {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
-                                {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{trans.categoria}</span>}
+                                {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Sugerida: {trans.categoria}</span>}
                               </div>
+
+                              {/* Categoría + Tags por transacción */}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Categoría</label>
+                                  <select
+                                    value={editedTransactions.get(index)?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''}
+                                    onChange={(e) => updateEditedTransaction(index, 'categoria_id', e.target.value)}
+                                    className="input w-full text-xs h-7"
+                                  >
+                                    <option value="">Sin categoría</option>
+                                    {categorias.map(c => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.icono} {c.nombre}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="flex items-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setAiExpandedTransaction(prev => (prev === index ? null : index))}
+                                    className="w-full px-3 h-7 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
+                                  >
+                                    {aiExpandedTransaction === index ? 'Ocultar tags' : 'Editar tags'}
+                                  </button>
+                                </div>
+                              </div>
+                              {aiExpandedTransaction === index && (
+                                <div className="flex flex-wrap gap-1.5 p-2 bg-white border border-slate-200 rounded-lg">
+                                  {tags.length === 0 ? (
+                                    <span className="text-xs text-slate-500">No hay etiquetas creadas.</span>
+                                  ) : tags.map(t => {
+                                    const selected = getTransactionTagIds(index).includes(t.id)
+                                    return (
+                                      <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => toggleTransactionTag(index, t.id)}
+                                        className={`px-2 py-1 rounded-full text-[11px] font-bold transition ${
+                                          selected
+                                            ? 'bg-orange-500 text-white'
+                                            : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                                        }`}
+                                      >
+                                        {t.nombre}
+                                      </button>
+                                    )
+                                  })}
+                                  <div className="w-full text-[11px] text-slate-500 pt-1">
+                                    Tip: si no tocás los tags acá, se aplican los tags del gasto (modal principal).
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

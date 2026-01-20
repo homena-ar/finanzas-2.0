@@ -103,9 +103,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans">
         <ServiceWorkerRegistration />
-        <InstallPWA />
         <ErrorBoundary>
           <AuthProvider>
+            <InstallPWA />
             <WorkspaceProvider>
               <DataProvider>
                 <PushNotificationPermission />

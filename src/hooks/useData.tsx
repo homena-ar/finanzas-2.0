@@ -51,7 +51,7 @@ type DataContextType = {
   addGasto: (data: any) => Promise<{ error: any, data?: Gasto }>
   updateGasto: (id: string, data: any) => Promise<{ error: any }>
   deleteGasto: (id: string) => Promise<{ error: any }>
-  addTarjeta: (data: any) => Promise<{ error: any }>
+  addTarjeta: (data: any) => Promise<{ error: any; id?: string }>
   updateTarjeta: (id: string, data: any) => Promise<{ error: any }>
   deleteTarjeta: (id: string) => Promise<{ error: any }>
   addImpuesto: (data: any) => Promise<{ error: any }>
@@ -893,7 +893,9 @@ const addTarjeta = useCallback(async (data: any) => {
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
       if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
-      await addDoc(collection(db, 'tarjetas'), insertData); await fetchAll(); return { error: null }
+      const docRef = await addDoc(collection(db, 'tarjetas'), insertData)
+      await fetchAll()
+      return { error: null, id: docRef.id }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
 

@@ -763,14 +763,14 @@ export default function ConfigPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex flex-col gap-6">
+      <div className="order-0">
         <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="text-slate-500">Personalizá tu experiencia</p>
       </div>
 
       {/* Sección Nombre de Espacio Personal */}
-      <div className="card p-5">
+      <div className="card p-5 order-1">
         <h3 className="font-bold mb-4">🏠 Espacio Personal</h3>
         <div className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
@@ -866,113 +866,8 @@ export default function ConfigPage() {
         </div>
       </div>
 
-      {/* Sección Cambio de Contraseña */}
-      <div className="card p-5">
-        <h3 className="font-bold mb-4">🔐 Seguridad</h3>
-        {!showPasswordChange ? (
-          <button
-            onClick={() => setShowPasswordChange(true)}
-            className="btn btn-secondary"
-          >
-            <Lock className="w-4 h-4" /> Cambiar contraseña
-          </button>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <label className="label">Contraseña actual</label>
-              <div className="relative">
-                <input
-                  type={showCurrentPassword ? 'text' : 'password'}
-                  className="input w-full pr-10"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Ingresá tu contraseña actual"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="label">Nueva contraseña</label>
-              <div className="relative">
-                <input
-                  type={showNewPassword ? 'text' : 'password'}
-                  className="input w-full pr-10"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="label">Confirmar nueva contraseña</label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  className="input w-full pr-10"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  placeholder="Repetí la nueva contraseña"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleChangePassword}
-                disabled={changingPassword}
-                className="btn btn-primary"
-              >
-                {changingPassword ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" /> Guardar
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setShowPasswordChange(false)
-                  setCurrentPassword('')
-                  setNewPassword('')
-                  setConfirmNewPassword('')
-                }}
-                disabled={changingPassword}
-                className="btn btn-secondary"
-              >
-                <X className="w-4 h-4" /> Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Sección de Workspaces */}
-      <div className="card p-5">
+      <div className="card p-5 order-7">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold">🏢 Workspaces Colaborativos</h3>
@@ -1488,7 +1383,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Sección de Ingresos */}
-      <div className="card p-5">
+      <div className="card p-5 order-2">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold">💵 Registro de Ingresos</h3>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -1523,7 +1418,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Presupuesto */}
-      <div className="card p-5">
+      <div className="card p-5 order-3">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold">💰 Presupuesto Mensual</h3>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -1577,7 +1472,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Categorías */}
-      <div className="card p-5">
+      <div className="card p-5 order-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold">📂 Categorías</h3>
@@ -1631,7 +1526,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Tags */}
-      <div className="card p-5">
+      <div className="card p-5 order-5">
         <h3 className="font-bold mb-4">🏷️ Tags Personalizados</h3>
         <p className="text-slate-500 text-sm mb-4">Creá tags para organizar tus gastos</p>
 
@@ -1664,8 +1559,113 @@ export default function ConfigPage() {
         </div>
       </div>
 
+      {/* Sección Cambio de Contraseña */}
+      <div className="card p-5 order-6">
+        <h3 className="font-bold mb-4">🔐 Seguridad</h3>
+        {!showPasswordChange ? (
+          <button
+            onClick={() => setShowPasswordChange(true)}
+            className="btn btn-secondary"
+          >
+            <Lock className="w-4 h-4" /> Cambiar contraseña
+          </button>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="label">Contraseña actual</label>
+              <div className="relative">
+                <input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  className="input w-full pr-10"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Ingresá tu contraseña actual"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Nueva contraseña</label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  className="input w-full pr-10"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Confirmar nueva contraseña</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className="input w-full pr-10"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Repetí la nueva contraseña"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+                className="btn btn-primary"
+              >
+                {changingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" /> Guardar
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowPasswordChange(false)
+                  setCurrentPassword('')
+                  setNewPassword('')
+                  setConfirmNewPassword('')
+                }}
+                disabled={changingPassword}
+                className="btn btn-secondary"
+              >
+                <X className="w-4 h-4" /> Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Info */}
-      <div className="card p-5 bg-slate-50">
+      <div className="card p-5 bg-slate-50 order-8">
         <h3 className="font-bold mb-2">ℹ️ Información</h3>
         <div className="text-sm text-slate-600 space-y-1">
           <p><strong>Email:</strong> {profile?.email}</p>

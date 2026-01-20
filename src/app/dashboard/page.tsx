@@ -6,22 +6,25 @@ import { useData } from '@/hooks/useData'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { formatMoney, getMonthName, fetchDolar, getTagClass, getMonthKey } from '@/lib/utils'
-import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X, ChevronRight } from 'lucide-react'
+import { Download, TrendingUp, CreditCard, Receipt, Pin, DollarSign, Calendar, X, ChevronRight, ArrowUpCircle } from 'lucide-react'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
 import * as XLSX from 'xlsx'
 import { Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import type { WorkspacePermissions } from '@/types'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
 export default function DashboardPage() {
   const router = useRouter()
   const { profile, user } = useAuth()
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, members, loading: workspaceLoading } = useWorkspace()
   const {
-    tarjetas, categorias, gastos, loading, currentMonth, monthKey, changeMonth,
-    getGastosMes, getImpuestosMes
+    tarjetas, categorias, categoriasIngresos,
+    gastos, ingresos,
+    loading, currentMonth, monthKey,
+    getGastosMes, getImpuestosMes, getIngresosMes
   } = useData()
   const [dolar, setDolar] = useState(1050)
   const [showEndingModal, setShowEndingModal] = useState(false)
@@ -30,6 +33,7 @@ export default function DashboardPage() {
 
   // Create lookup maps for categorias and tarjetas
   const categoriaMap = Object.fromEntries(categorias.map(c => [c.id, c]))
+  const categoriaIngresoMap = Object.fromEntries(categoriasIngresos.map(c => [c.id, c]))
   const tarjetaMap = Object.fromEntries(tarjetas.map(t => [t.id, t]))
 
   useEffect(() => {
@@ -37,6 +41,25 @@ export default function DashboardPage() {
       .then(setDolar)
       .catch(err => console.error('Error al obtener cotización del dólar:', err))
   }, [])
+
+  const hasAccess = (section: keyof WorkspacePermissions) => {
+    // Espacio Personal: siempre “permiso”, lo que manda es la config (ingresos_habilitado)
+    if (!currentWorkspace) return true
+    // Dueño del workspace: acceso total
+    if (currentWorkspace.owner_id === user?.uid) return true
+    // Mientras carga, evitar ocultar por flicker
+    if (workspaceLoading) return true
+    // Colaborador: buscar membership del usuario actual en ese workspace
+    const member = members.find(m => m.workspace_id === currentWorkspace.id && m.user_id === user?.uid)
+    return !!member && member.permissions?.[section] !== 'ninguno'
+  }
+
+  // Mostrar ingresos en resumen:
+  // - En espacio personal: depende de ingresos_habilitado
+  // - En workspace: depende de permisos de ingresos (o dueño)
+  const showIngresos = currentWorkspace
+    ? hasAccess('ingresos')
+    : !!profile?.ingresos_habilitado
 
   // Export to Excel function
   const exportToExcel = () => {
@@ -64,6 +87,14 @@ export default function DashboardPage() {
       'Mes': i.mes
     }))
 
+    const ingresosData = showIngresos ? ingresosMes.map(i => ({
+      'Fecha': i.fecha,
+      'Descripción': i.descripcion,
+      'Categoría': categoriaIngresoMap[i.categoria_id || '']?.nombre || 'Sin categoría',
+      'Monto': i.monto,
+      'Moneda': i.moneda
+    })) : []
+
     // Create workbook
     const wb = XLSX.utils.book_new()
 
@@ -75,12 +106,23 @@ export default function DashboardPage() {
     const wsImpuestos = XLSX.utils.json_to_sheet(impuestosData)
     XLSX.utils.book_append_sheet(wb, wsImpuestos, 'Impuestos')
 
+    if (showIngresos) {
+      const wsIngresos = XLSX.utils.json_to_sheet(ingresosData)
+      XLSX.utils.book_append_sheet(wb, wsIngresos, 'Ingresos')
+    }
+
     // Add Summary sheet
     const summaryData = [
       { 'Concepto': 'Gastos ARS', 'Monto': totalARS },
       { 'Concepto': 'Gastos USD', 'Monto': totalUSD },
       { 'Concepto': 'Impuestos', 'Monto': totalImpuestos },
       { 'Concepto': 'Total a Pagar (ARS)', 'Monto': totalPagar },
+      ...(showIngresos ? [
+        { 'Concepto': 'Ingresos ARS', 'Monto': totalIngresosARS },
+        { 'Concepto': 'Ingresos USD', 'Monto': totalIngresosUSD },
+        { 'Concepto': 'Ingresos total (ARS aprox.)', 'Monto': ingresosTotalEnPesos },
+        { 'Concepto': 'Balance (ARS aprox.)', 'Monto': balanceEnPesos },
+      ] : []),
       { 'Concepto': 'Dólar', 'Monto': dolar }
     ]
     const wsSummary = XLSX.utils.json_to_sheet(summaryData)
@@ -103,6 +145,7 @@ export default function DashboardPage() {
 
   const gastosMes = getGastosMes(monthKey)
   const impuestosMes = getImpuestosMes(monthKey)
+  const ingresosMes = getIngresosMes(monthKey)
 
   // Próximo mes
   const nextMonth = new Date(currentMonth)
@@ -197,6 +240,45 @@ export default function DashboardPage() {
       borderWidth: 0
     }]
   }
+
+  // ===================== INGRESOS (si aplica) =====================
+  const totalIngresosARS = showIngresos
+    ? ingresosMes.filter(i => i.moneda === 'ARS').reduce((s, i) => s + i.monto, 0)
+    : 0
+  const totalIngresosUSD = showIngresos
+    ? ingresosMes.filter(i => i.moneda === 'USD').reduce((s, i) => s + i.monto, 0)
+    : 0
+  const ingresosUsdEnPesos = totalIngresosUSD * dolar
+  const ingresosTotalEnPesos = totalIngresosARS + ingresosUsdEnPesos
+  const balanceEnPesos = ingresosTotalEnPesos - totalActual
+
+  // Chart data ingresos por categoría (ARS)
+  const ingCatTotals: Record<string, number> = {}
+  if (showIngresos) {
+    ingresosMes.filter(i => i.moneda === 'ARS').forEach(i => {
+      const catName = categoriaIngresoMap[i.categoria_id || '']?.nombre || 'Otros'
+      ingCatTotals[catName] = (ingCatTotals[catName] || 0) + i.monto
+    })
+  }
+  const ingresosChartData = {
+    labels: Object.keys(ingCatTotals),
+    datasets: [{
+      data: Object.values(ingCatTotals),
+      backgroundColor: ['#10b981', '#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#f59e0b', '#ec4899'],
+      borderWidth: 0
+    }]
+  }
+
+  // Top 5 ingresos (ordenados por ARS aprox)
+  const topIngresos = showIngresos
+    ? [...ingresosMes]
+      .sort((a, b) => {
+        const aArs = a.moneda === 'USD' ? a.monto * dolar : a.monto
+        const bArs = b.moneda === 'USD' ? b.monto * dolar : b.monto
+        return bArs - aArs
+      })
+      .slice(0, 5)
+    : []
 
   // Top 5 gastos (sin contar pagados)
   const topGastos = [...gastosMes]
@@ -383,6 +465,110 @@ export default function DashboardPage() {
           {totalFijosUSD > 0 && <div className="text-xs text-slate-500">{formatMoney(totalFijosUSD, 'USD')}</div>}
         </div>
       </div>
+
+      {/* Ingresos - Resumen (solo si está habilitado / con permisos) */}
+      {showIngresos && (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <ArrowUpCircle className="w-5 h-5 text-emerald-600" />
+              Ingresos
+            </h2>
+            <button
+              onClick={() => router.push('/dashboard/ingresos')}
+              className="btn btn-secondary btn-sm"
+            >
+              Ver ingresos
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="stat-card">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center mb-3">
+                <ArrowUpCircle className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="text-xs text-slate-500 font-semibold uppercase">Ingresos ARS</div>
+              <div className="text-xl font-bold text-emerald-700">{formatMoney(totalIngresosARS)}</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center mb-3">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="text-xs text-slate-500 font-semibold uppercase">Ingresos USD</div>
+              <div className="text-xl font-bold text-emerald-700">{formatMoney(totalIngresosUSD, 'USD')}</div>
+              {totalIngresosUSD > 0 && <div className="text-xs text-slate-500">≈ {formatMoney(ingresosUsdEnPesos)}</div>}
+            </div>
+
+            <div className="stat-card">
+              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mb-3">
+                <TrendingUp className="w-5 h-5 text-slate-600" />
+              </div>
+              <div className="text-xs text-slate-500 font-semibold uppercase">Ingresos total</div>
+              <div className="text-xl font-bold">{formatMoney(ingresosTotalEnPesos)}</div>
+              <div className="text-xs text-slate-500">ARS aprox.</div>
+            </div>
+
+            <div className="stat-card">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${balanceEnPesos >= 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                <TrendingUp className={`w-5 h-5 ${balanceEnPesos >= 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+              </div>
+              <div className="text-xs text-slate-500 font-semibold uppercase">Balance</div>
+              <div className={`text-xl font-bold ${balanceEnPesos >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                {balanceEnPesos >= 0 ? '' : '-'}{formatMoney(Math.abs(balanceEnPesos))}
+              </div>
+              <div className="text-xs text-slate-500">ARS aprox.</div>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="card p-6">
+              <h3 className="font-bold mb-4">📊 Ingresos por Categoría (ARS)</h3>
+              <div className="h-64">
+                {Object.keys(ingCatTotals).length > 0 ? (
+                  <Doughnut
+                    data={ingresosChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { position: 'right' } }
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400">
+                    Sin ingresos ARS este mes
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="card p-6">
+              <h3 className="font-bold mb-4">🔝 Mayores Ingresos</h3>
+              <div className="space-y-3">
+                {topIngresos.length > 0 ? topIngresos.map((ing, i) => (
+                  <div key={ing.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                      i === 0 ? 'bg-gradient-to-br from-emerald-400 to-emerald-600' :
+                      i === 1 ? 'bg-gradient-to-br from-slate-400 to-slate-600' :
+                      i === 2 ? 'bg-gradient-to-br from-teal-400 to-teal-600' :
+                      'bg-emerald-500'
+                    }`}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm truncate">{ing.descripcion}</div>
+                      <div className="text-xs text-slate-500">{categoriaIngresoMap[ing.categoria_id || '']?.nombre || 'Sin categoría'}</div>
+                    </div>
+                    <div className="font-bold text-emerald-700">{formatMoney(ing.monto, ing.moneda)}</div>
+                  </div>
+                )) : (
+                  <div className="text-center text-slate-400 py-8">Sin ingresos este mes</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Charts Row */}
       <div className="grid lg:grid-cols-2 gap-6">
