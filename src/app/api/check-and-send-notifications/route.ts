@@ -123,12 +123,11 @@ export async function GET(request: NextRequest) {
       
       // Si no se encuentra, buscar en todos los perfiles por user_id
       if (!profile) {
-        for (const [key, prof] of profilesMap.entries()) {
-          if (prof.id === notif.userId || key === notif.userId) {
+        profilesMap.forEach((prof, key) => {
+          if (!profile && (prof.id === notif.userId || key === notif.userId)) {
             profile = prof
-            break
           }
-        }
+        })
       }
       
       if (!profile || !profile.email) {
