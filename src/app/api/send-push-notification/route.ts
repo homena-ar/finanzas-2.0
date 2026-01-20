@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('📱 [Push] Intentando enviar', { userId, title, workspaceId })
+
     const firestore = admin.firestore()
     
     // Obtener todos los tokens del usuario
@@ -93,6 +95,8 @@ export async function POST(request: NextRequest) {
         message: 'No hay tokens registrados para este usuario'
       })
     }
+
+    console.log('📱 [Push] Tokens encontrados:', tokensSnap.size)
 
     const payload = JSON.stringify({
       title,

@@ -162,11 +162,21 @@ export async function GET(request: NextRequest) {
     // 1) NEXT_PUBLIC_APP_URL si está configurada (entorno deploy)
     // 2) BASE_URL/VERCEL_URL si existe
     // 3) El origin de la petición (si llega desde nuestro dominio)
-    const baseUrl =
+    // Resolver base URL con fallback seguro (evitar localhost en producción)
+    let baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.BASE_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+      process.env.BASE_URL ||
       request.nextUrl.origin
+
+    // Si quedó apuntando a localhost pero el host de la petición no es localhost, usar el origin
+    const isLocalhost = baseUrl?.includes('localhost') || baseUrl?.includes('127.0.0.1')
+    const requestHost = request.headers.get('host') || ''
+    const requestIsLocal = requestHost.includes('localhost') || requestHost.includes('127.0.0.1')
+    if (isLocalhost && !requestIsLocal) {
+      console.warn('⚠️ [Cron] baseUrl apunta a localhost en entorno no-local, cambiando a request origin')
+      baseUrl = request.nextUrl.origin
+    }
 
     console.log('🔔 [Cron] baseUrl resuelto:', baseUrl)
 
