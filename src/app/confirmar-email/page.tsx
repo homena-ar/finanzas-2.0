@@ -15,8 +15,12 @@ function ConfirmarEmailContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const [oobCode, setOobCode] = useState<string | null>(null)
+  const [hasVerified, setHasVerified] = useState(false)
 
   useEffect(() => {
+    // Si ya verificamos, no hacer nada más
+    if (hasVerified) return
+
     // Extraer el código de acción de la URL
     const code = searchParams.get('oobCode') || searchParams.get('code')
     const mode = searchParams.get('mode')
@@ -34,36 +38,82 @@ function ConfirmarEmailContent() {
       try {
         if (mode === 'verifyEmail') {
           await applyActionCode(auth, code)
+          
+          // Marcar como verificado para evitar ejecuciones múltiples
+          setHasVerified(true)
+          
+          // Recargar el usuario para obtener el estado actualizado
+          if (auth.currentUser) {
+            await auth.currentUser.reload()
+          }
+          
           setStatus('success')
           setMessage('¡Email verificado exitosamente!')
           
-          // El correo de bienvenida se enviará automáticamente cuando el listener de auth detecte el cambio
-          // No lo enviamos aquí para evitar duplicados
+          // Enviar correo de bienvenida directamente aquí
+          // Esto asegura que se envíe incluso si el listener de auth no lo detecta
+          try {
+            const currentUser = auth.currentUser
+            if (currentUser && currentUser.email) {
+              const userName = currentUser.email.split('@')[0]
+              console.log('🎉 [ConfirmarEmail] Enviando correo de bienvenida después de verificación...')
+              
+              const welcomeResponse = await fetch('/api/send-welcome-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: currentUser.email,
+                  userName: userName
+                })
+              })
+              
+              if (welcomeResponse.ok) {
+                console.log('✅ [ConfirmarEmail] Correo de bienvenida enviado correctamente')
+              } else {
+                console.error('⚠️ [ConfirmarEmail] Error enviando correo de bienvenida:', await welcomeResponse.text())
+              }
+            }
+          } catch (welcomeError) {
+            console.error('⚠️ [ConfirmarEmail] Error enviando correo de bienvenida:', welcomeError)
+            // No fallar si el email falla
+          }
 
-          // Redirigir al dashboard después de 2 segundos
+          // Redirigir al dashboard después de 1.5 segundos
           setTimeout(() => {
             router.push('/dashboard/gastos')
-          }, 2000)
+          }, 1500)
         } else {
           setStatus('error')
           setMessage('Acción no válida.')
         }
       } catch (error: any) {
         console.error('Error verificando email:', error)
-        setStatus('error')
         
-        if (error.code === 'auth/expired-action-code') {
-          setMessage('El enlace de verificación ha expirado. Por favor solicitá uno nuevo.')
-        } else if (error.code === 'auth/invalid-action-code') {
-          setMessage('El enlace de verificación no es válido o ya fue usado.')
+        // Solo mostrar error si realmente es un error, no si el código ya fue usado exitosamente
+        // Si el código ya fue usado pero el correo está verificado, considerar éxito
+        if (error.code === 'auth/invalid-action-code' && user?.emailVerified) {
+          // El código ya fue usado pero el correo está verificado, redirigir al dashboard
+          setHasVerified(true)
+          setStatus('success')
+          setMessage('¡Email ya verificado! Redirigiendo...')
+          setTimeout(() => {
+            router.push('/dashboard/gastos')
+          }, 1000)
         } else {
-          setMessage('Error al verificar el email. Por favor intentá nuevamente.')
+          setStatus('error')
+          if (error.code === 'auth/expired-action-code') {
+            setMessage('El enlace de verificación ha expirado. Por favor solicitá uno nuevo.')
+          } else if (error.code === 'auth/invalid-action-code') {
+            setMessage('El enlace de verificación no es válido o ya fue usado.')
+          } else {
+            setMessage('Error al verificar el email. Por favor intentá nuevamente.')
+          }
         }
       }
     }
 
     verifyEmail()
-  }, [searchParams, router, user])
+  }, [searchParams, router, user, hasVerified])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">

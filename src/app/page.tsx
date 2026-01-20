@@ -21,10 +21,16 @@ export default function LoginPage() {
   const { signIn, signUp, user, loading: authLoading, sendPasswordReset } = useAuth()
   const router = useRouter()
 
-  // Redirect to dashboard when user is authenticated
+  // Redirect to dashboard when user is authenticated AND email is verified
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/dashboard/gastos')
+      // Si el correo no está verificado, redirigir a la página de verificación
+      if (!user.emailVerified) {
+        router.push('/verificar-email')
+      } else {
+        // Solo redirigir al dashboard si el correo está verificado
+        router.push('/dashboard/gastos')
+      }
     }
   }, [user, authLoading, router])
 
@@ -66,10 +72,8 @@ export default function LoginPage() {
         setError(message)
       } else {
         setSuccess('¡Cuenta creada! Revisá tu email para confirmar tu cuenta.')
-        // Redirigir a la página de verificación después del registro
-        setTimeout(() => {
-          router.push('/verificar-email')
-        }, 2000)
+        // Redirigir inmediatamente a la página de verificación después del registro
+        router.push('/verificar-email')
       }
       setLoading(false)
     }
