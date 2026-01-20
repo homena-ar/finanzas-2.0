@@ -168,6 +168,8 @@ export async function GET(request: NextRequest) {
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
       request.nextUrl.origin
 
+    console.log('🔔 [Cron] baseUrl resuelto:', baseUrl)
+
     if (!baseUrl) {
       console.error('❌ [Cron] No se pudo resolver el baseUrl para las llamadas internas')
       return NextResponse.json(
@@ -214,22 +216,27 @@ export async function GET(request: NextRequest) {
         // Llamar a la API de envío de correo
         // Enviar correo solo si tenemos email
         if (profileEmail) {
-          const response = await fetch(`${baseUrl}/api/send-notification-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tipo: notif.tipo,
-              userName: profileName || profileEmail.split('@')[0],
-              userEmail: profileEmail,
-              tarjetaNombre: notif.tarjetaNombre,
-              dia: notif.dia,
-              fecha: notif.fecha
+          const emailUrl = `${baseUrl}/api/send-notification-email`
+          try {
+            const response = await fetch(emailUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tipo: notif.tipo,
+                userName: profileName || profileEmail.split('@')[0],
+                userEmail: profileEmail,
+                tarjetaNombre: notif.tarjetaNombre,
+                dia: notif.dia,
+                fecha: notif.fecha
+              })
             })
-          })
 
-          if (!response.ok) {
-            const error = await response.json()
-            console.error('❌ [Cron] Error enviando notificación (email):', error)
+            if (!response.ok) {
+              const errorText = await response.text()
+              console.error('❌ [Cron] Error enviando notificación (email):', response.status, errorText)
+            }
+          } catch (emailError: any) {
+            console.error('❌ [Cron] Fetch falló al enviar email:', emailUrl, emailError?.message)
           }
         }
 
@@ -258,7 +265,8 @@ export async function GET(request: NextRequest) {
 
         // Enviar notificación push
         try {
-          const pushResponse = await fetch(`${baseUrl}/api/send-push-notification`, {
+          const pushUrl = `${baseUrl}/api/send-push-notification`
+          const pushResponse = await fetch(pushUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -279,10 +287,10 @@ export async function GET(request: NextRequest) {
             const pushResult = await pushResponse.json()
             console.log(`✅ [Cron] Push notification enviada: ${pushResult.sent}/${pushResult.total}`)
           } else {
-            console.warn('⚠️ [Cron] Error enviando push notification:', await pushResponse.text())
+            console.warn('⚠️ [Cron] Error enviando push notification:', pushResponse.status, await pushResponse.text())
           }
         } catch (pushError: any) {
-          console.warn('⚠️ [Cron] Excepción enviando push notification:', pushError.message)
+          console.warn('⚠️ [Cron] Excepción enviando push notification:', pushError?.message)
           // No fallar si el push falla (el correo y la campanita ya se enviaron)
         }
 
