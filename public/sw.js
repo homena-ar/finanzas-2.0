@@ -9,29 +9,42 @@ const urlsToCache = [
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
+  // Activar inmediatamente sin esperar a que se cierren otras pestañas
+  self.skipWaiting()
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('📦 [SW] Cache abierto')
-        return cache.addAll(urlsToCache)
+        return cache.addAll(urlsToCache).catch((err) => {
+          console.warn('⚠️ [SW] Error cacheando algunas URLs:', err)
+          // Continuar aunque falle alguna URL
+        })
       })
   )
 })
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
+  // Tomar control inmediatamente de todas las páginas
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('🗑️ [SW] Eliminando cache antiguo:', cacheName)
-            return caches.delete(cacheName)
-          }
-        })
-      )
-    })
+    Promise.all([
+      // Limpiar caches antiguos
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              console.log('🗑️ [SW] Eliminando cache antiguo:', cacheName)
+              return caches.delete(cacheName)
+            }
+          })
+        )
+      }),
+      // Tomar control de todas las páginas abiertas
+      self.clients.claim()
+    ])
   )
+  console.log('✅ [SW] Service Worker activado')
 })
 
 // Estrategia: Network First, luego Cache
