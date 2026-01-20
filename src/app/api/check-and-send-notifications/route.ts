@@ -1,11 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { Tarjeta, Profile } from '@/types'
+import * as admin from 'firebase-admin'
+import type { Tarjeta, Profile } from '@/types'
+
+// Inicializar Firebase Admin SDK si no está inicializado
+let adminInitialized = false
+
+function initializeAdmin() {
+  if (adminInitialized || admin.apps.length > 0) return true
+
+  try {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+    if (!serviceAccount) {
+      console.error('❌ [Cron] FIREBASE_SERVICE_ACCOUNT_KEY no está configurado')
+      return false
+    }
+
+    let serviceAccountJson: any
+    try {
+      serviceAccountJson = JSON.parse(serviceAccount)
+    } catch (parseError: any) {
+      console.error('❌ [Cron] Error parseando FIREBASE_SERVICE_ACCOUNT_KEY:', parseError.message)
+      return false
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccountJson),
+    })
+
+    adminInitialized = true
+    console.log('✅ [Cron] Firebase Admin SDK inicializado correctamente')
+    return true
+  } catch (error: any) {
+    console.error('❌ [Cron] Error inicializando Firebase Admin SDK:', error.message)
+    return false
+  }
+}
 
 // Esta función se puede llamar desde un cron job o manualmente
 export async function GET(request: NextRequest) {
   try {
+    // Admin SDK (necesario para cron sin auth)
+    if (!initializeAdmin()) {
+      return NextResponse.json(
+        { error: 'Firebase Admin SDK no está configurado. Falta FIREBASE_SERVICE_ACCOUNT_KEY.' },
+        { status: 500 }
+      )
+    }
+
     const authHeader = request.headers.get('authorization')
     // Aceptar tanto CRON_SECRET como CRON_SECRET_KEY para compatibilidad
     const cronSecret = process.env.CRON_SECRET || process.env.CRON_SECRET_KEY
@@ -53,8 +94,8 @@ export async function GET(request: NextRequest) {
     console.log('🔔 [Cron] Verificando notificaciones para día:', targetDay)
 
     // Obtener todas las tarjetas
-    const tarjetasRef = collection(db, 'tarjetas')
-    const tarjetasSnap = await getDocs(tarjetasRef)
+    const firestore = admin.firestore()
+    const tarjetasSnap = await firestore.collection('tarjetas').get()
     
     const notificationsToSend: Array<{
       tipo: 'cierre' | 'vencimiento'
@@ -98,8 +139,7 @@ export async function GET(request: NextRequest) {
     console.log('🔔 [Cron] Notificaciones a enviar:', notificationsToSend.length)
 
     // Obtener perfiles de usuarios para enviar correos
-    const profilesRef = collection(db, 'profiles')
-    const profilesSnap = await getDocs(profilesRef)
+    const profilesSnap = await firestore.collection('profiles').get()
     const profilesMap = new Map<string, Profile>()
     
     profilesSnap.docs.forEach(doc => {
@@ -153,9 +193,7 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
           // Crear notificación en Firestore
-          const notificacionesRef = collection(db, 'notificaciones')
-          const { addDoc } = await import('firebase/firestore')
-          await addDoc(notificacionesRef, {
+          await firestore.collection('notificaciones').add({
             user_id: notif.userId,
             tipo: notif.tipo,
             titulo: notif.tipo === 'cierre' 
@@ -167,9 +205,9 @@ export async function GET(request: NextRequest) {
             icono: notif.tipo === 'cierre' ? '📅' : '💳',
             leida: false,
             tarjeta_id: notif.tarjetaId,
-            fecha_evento: Timestamp.fromDate(targetDate),
+            fecha_evento: admin.firestore.Timestamp.fromDate(targetDate),
             link: '/dashboard',
-            created_at: Timestamp.now()
+            created_at: admin.firestore.Timestamp.now()
           })
 
           results.push({ success: true, notif })
