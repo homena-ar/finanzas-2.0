@@ -385,7 +385,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       })) as Categoria[]
 
       // Crear categorías por defecto si no existen (y tengo permiso de admin o es personal o soy dueño)
-      const isOwner = isWorkspaceMode && currentWorkspace.owner_id === user.uid
+      const isOwner = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
       const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwner
       
       if (categoriasData.length === 0 && canCreateCategories) {
@@ -407,7 +407,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             user_id: user.uid,
             created_at: serverTimestamp()
           }
-          if (isWorkspaceMode) {
+          if (isWorkspaceMode && currentWorkspace?.id) {
             docData.workspace_id = currentWorkspace.id
             docData.created_by = user.uid
           }
@@ -515,7 +515,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const catIngRef = collection(db, 'categorias_ingresos')
         for (const categoria of defaultCategoriasIngresos) {
           const docData: any = { ...categoria, user_id: user.uid, created_at: serverTimestamp() }
-          if (isWorkspaceMode) { docData.workspace_id = currentWorkspace.id; docData.created_by = user.uid }
+          if (isWorkspaceMode && currentWorkspace?.id) { 
+            docData.workspace_id = currentWorkspace.id
+            docData.created_by = user.uid 
+          }
           await addDoc(catIngRef, docData)
         }
         const newSnap = await getDocs(categoriasIngresosQuery)
@@ -558,17 +561,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [user, currentWorkspace])
   // --- FIN FETCHALL ---
 
-useEffect(() => {
+  useEffect(() => {
     console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL')
+
+    // Flag para verificar si el componente sigue montado
+    let isMounted = true
 
     if (!authLoading && user) {
       console.log('📊 [Firebase useData] User exists - Calling fetchAll')
-      fetchAll()
+      fetchAll().catch((error) => {
+        if (isMounted) {
+          console.error('📊 [Firebase useData] Error en fetchAll:', error)
+        }
+      })
     } else if (!authLoading && !user) {
       console.log('📊 [Firebase useData] No user and auth done loading - Setting loading to FALSE')
-      setLoading(false)
+      if (isMounted) {
+        setLoading(false)
+      }
     } else {
       console.log('📊 [Firebase useData] Auth still loading - waiting...')
+    }
+
+    // Cleanup function
+    return () => {
+      isMounted = false
     }
   }, [user, authLoading, fetchAll])
 
@@ -586,7 +603,7 @@ useEffect(() => {
       created_at: new Date().toISOString()
     }
     if (descripcion) insertData.descripcion = descripcion
-    if (currentWorkspace) {
+    if (currentWorkspace?.id) {
       insertData.workspace_id = currentWorkspace.id
       insertData.created_by = user.uid
     }
@@ -654,7 +671,7 @@ useEffect(() => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, completada: false, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'metas'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -673,7 +690,7 @@ useEffect(() => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'tags'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -687,7 +704,7 @@ useEffect(() => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'categorias'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -706,7 +723,7 @@ useEffect(() => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       const docRef = await addDoc(collection(db, 'gastos'), insertData); await fetchAll(); return { error: null, data: { id: docRef.id, ...data } }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -725,7 +742,7 @@ const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'tarjetas'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -744,7 +761,7 @@ const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'impuestos'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -763,7 +780,7 @@ const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'medios_pago'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -777,7 +794,7 @@ const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       const docRef = await addDoc(collection(db, 'ingresos'), insertData); await fetchAll(); return { error: null, data: { id: docRef.id, ...data } }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -796,7 +813,7 @@ const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'tags_ingresos'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
@@ -810,7 +827,7 @@ const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'categorias_ingresos'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])

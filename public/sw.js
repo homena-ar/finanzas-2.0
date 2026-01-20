@@ -54,14 +54,33 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Ignorar requests de extensiones de Chrome y otros esquemas no soportados
+  const url = new URL(event.request.url)
+  if (url.protocol === 'chrome-extension:' || 
+      url.protocol === 'chrome:' || 
+      url.protocol === 'moz-extension:' ||
+      url.protocol === 'edge:') {
+    return // No procesar estos requests
+  }
+
+  // Solo cachear requests del mismo origen
+  if (url.origin !== self.location.origin) {
+    return
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         // Si la respuesta es válida, clonarla y guardarla en cache
-        if (response && response.status === 200) {
+        if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone()
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache)
+            try {
+              cache.put(event.request, responseToCache)
+            } catch (error) {
+              // Ignorar errores de cache (puede ser por esquemas no soportados)
+              console.warn('⚠️ [SW] Error cacheando:', error)
+            }
           })
         }
         return response

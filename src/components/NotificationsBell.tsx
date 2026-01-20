@@ -21,12 +21,14 @@ export function NotificationsBell() {
     // Validar que tenemos los datos necesarios antes de construir la query
     if (!user || !user.uid) return
 
-    const isWorkspaceMode = currentWorkspace !== null && currentWorkspace.id
+    // Validar que currentWorkspace tenga id válido antes de usarlo
+    const isWorkspaceMode = currentWorkspace !== null && 
+                            currentWorkspace.id !== undefined && 
+                            currentWorkspace.id !== null
+    
     let workspaceFilter
     
-    if (isWorkspaceMode) {
-      // Validar que currentWorkspace.id no sea undefined
-      if (!currentWorkspace.id) return
+    if (isWorkspaceMode && currentWorkspace?.id) {
       workspaceFilter = where('workspace_id', '==', currentWorkspace.id)
     } else {
       // Validar que user.uid no sea undefined
