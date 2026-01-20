@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 import { useAuth } from './useAuth'
 import { db } from '@/lib/firebase'
 import { getInvitationEmailTemplate } from '@/lib/email-templates'
@@ -234,6 +234,46 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     }
   }, [user, fetchAll]) // Agregamos fetchAll a las dependencias
+
+  // Reparar workspaces viejos: asegurar membership con ID compuesto
+  const fixedMembershipRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const wsId = currentWorkspace?.id
+    if (!user || !wsId) return
+    if (fixedMembershipRef.current.has(wsId)) return
+
+    fixedMembershipRef.current.add(wsId)
+
+    ;(async () => {
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch('/api/fix-workspace-membership', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ workspaceId: wsId }),
+        })
+
+        const text = await res.text()
+        let data: any = null
+        try { data = JSON.parse(text) } catch { /* ignore */ }
+
+        if (!res.ok) {
+          console.warn('⚠️ [useWorkspace] fix-workspace-membership failed:', res.status, data || text)
+          return
+        }
+
+        console.log('✅ [useWorkspace] fix-workspace-membership:', data)
+        // Refrescar datos una vez reparado
+        await fetchAll()
+      } catch (e) {
+        console.warn('⚠️ [useWorkspace] Error calling fix-workspace-membership:', e)
+      }
+    })()
+  }, [user?.uid, currentWorkspace?.id, fetchAll])
 
   // Recargar miembros cuando cambia el workspace actual (solo si es colaborador)
   useEffect(() => {
@@ -540,20 +580,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const acceptInvitation = useCallback(async (invitationId: string) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const invitation = invitations.find(i => i.id === invitationId)
-      if (!invitation) return { error: new Error('Invitation not found') }
-
-      // CRÍTICO: Usar ID compuesto para cumplir con las reglas de seguridad
-      const memberId = `${invitation.workspace_id}_${user.uid}`
-      await setDoc(doc(db, 'workspace_members', memberId), {
-        workspace_id: invitation.workspace_id,
-        user_id: user.uid,
-        user_email: user.email,
-        permissions: invitation.permissions,
-        created_at: serverTimestamp()
+      // IMPORTANTE: las reglas actuales no permiten que el invitado cree membership directamente.
+      // Lo hacemos vía API (Admin SDK) verificando el token.
+      const token = await user.getIdToken()
+      const resp = await fetch('/api/accept-workspace-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ invitationId }),
       })
 
-      await updateDoc(doc(db, 'workspace_invitations', invitationId), { status: 'accepted' })
+      const text = await resp.text()
+      if (!resp.ok) {
+        let msg = text
+        try {
+          const parsed = JSON.parse(text)
+          msg = parsed.error || parsed.details || msg
+        } catch { /* ignore */ }
+        return { error: new Error(msg) }
+      }
+
+      console.log('✅ [useWorkspace] Invitación aceptada vía API:', text)
       await fetchAll()
       return { error: null }
     } catch (error) { return { error } }

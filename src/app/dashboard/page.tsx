@@ -17,7 +17,7 @@ ChartJS.register(ArcElement, Tooltip, Legend)
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const { currentWorkspace } = useWorkspace()
   const {
     tarjetas, categorias, gastos, loading, currentMonth, monthKey, changeMonth,
@@ -179,34 +179,42 @@ export default function DashboardPage() {
 
   // Generar notificaciones para alertas importantes
   useEffect(() => {
-    if (!profile || loading) return
+    if (!profile || !user?.uid || loading) return
 
     const generateNotifications = async () => {
-      const today = new Date()
-      const day = today.getDate()
-      // Validar que currentWorkspace tenga id válido antes de usarlo
-      const isWorkspaceMode = currentWorkspace !== null && currentWorkspace.id !== undefined && currentWorkspace.id !== null
-      const workspaceFilter = isWorkspaceMode && currentWorkspace?.id
-        ? where('workspace_id', '==', currentWorkspace.id)
-        : where('user_id', '==', profile.id)
+      try {
+        const today = new Date()
+        const day = today.getDate()
 
-      // Verificar notificaciones existentes para evitar duplicados
-      const notificacionesRef = collection(db, 'notificaciones')
-      const existingQuery = query(notificacionesRef, workspaceFilter)
-      const existingSnap = await getDocs(existingQuery)
-      const existingIds = new Set(existingSnap.docs.map(d => d.data().tarjeta_id).filter(Boolean))
+        // Solo consideramos "workspace mode" si hay un id string no vacío
+        const workspaceId =
+          typeof currentWorkspace?.id === 'string' && currentWorkspace.id.length > 0
+            ? currentWorkspace.id
+            : null
+        const isWorkspaceMode = !!workspaceId
 
-      const notificationsToCreate: Array<{
-        tipo: 'cierre' | 'vencimiento' | 'presupuesto'
-        titulo: string
-        mensaje: string
-        icono: string
-        tarjeta_id?: string
-        fecha_evento?: Date
-      }> = []
+        // IMPORTANTE: usamos user.uid (no profile.id) para evitar undefined
+        const workspaceFilter = isWorkspaceMode
+          ? where('workspace_id', '==', workspaceId)
+          : where('user_id', '==', user.uid)
 
-      // Notificaciones de tarjetas
-      tarjetas.forEach(t => {
+        // Verificar notificaciones existentes para evitar duplicados
+        const notificacionesRef = collection(db, 'notificaciones')
+        const existingQuery = query(notificacionesRef, workspaceFilter)
+        const existingSnap = await getDocs(existingQuery)
+        const existingIds = new Set(existingSnap.docs.map(d => d.data().tarjeta_id).filter(Boolean))
+
+        const notificationsToCreate: Array<{
+          tipo: 'cierre' | 'vencimiento' | 'presupuesto'
+          titulo: string
+          mensaje: string
+          icono: string
+          tarjeta_id?: string
+          fecha_evento?: Date
+        }> = []
+
+        // Notificaciones de tarjetas
+        tarjetas.forEach(t => {
         // Alertas de cierre (hoy o mañana)
         if (t.cierre) {
           const diff = t.cierre - day
@@ -280,32 +288,41 @@ export default function DashboardPage() {
         }
       }
 
-      // Crear notificaciones
-      for (const notif of notificationsToCreate) {
-        const notifData: any = {
-          user_id: profile.id,
-          tipo: notif.tipo,
-          titulo: notif.titulo,
-          mensaje: notif.mensaje,
-          icono: notif.icono,
-          leida: false,
-          link: '/dashboard',
-          created_at: Timestamp.now()
-        }
-        if (notif.tarjeta_id) notifData.tarjeta_id = notif.tarjeta_id
-        if (notif.fecha_evento) notifData.fecha_evento = Timestamp.fromDate(notif.fecha_evento)
-        if (isWorkspaceMode) notifData.workspace_id = currentWorkspace.id
+        // Crear notificaciones
+        for (const notif of notificationsToCreate) {
+          const notifData: any = {
+            user_id: user.uid,
+            tipo: notif.tipo,
+            titulo: notif.titulo,
+            mensaje: notif.mensaje,
+            icono: notif.icono,
+            leida: false,
+            link: '/dashboard',
+            created_at: Timestamp.now()
+          }
+          if (notif.tarjeta_id) notifData.tarjeta_id = notif.tarjeta_id
+          if (notif.fecha_evento) notifData.fecha_evento = Timestamp.fromDate(notif.fecha_evento)
+          if (isWorkspaceMode) notifData.workspace_id = workspaceId
 
-        try {
-          await addDoc(notificacionesRef, notifData)
-        } catch (error) {
-          console.error('Error creando notificación:', error)
+          try {
+            await addDoc(notificacionesRef, notifData)
+          } catch (error) {
+            console.error('Error creando notificación:', error)
+          }
         }
+      } catch (error: any) {
+        // Evitar "Uncaught (in promise)" que rompe la navegación
+        console.error('❌ [ResumenPage] Error en generateNotifications:', {
+          error: error?.message || String(error),
+          code: error?.code,
+          workspaceId: currentWorkspace?.id,
+          userId: user?.uid
+        })
       }
     }
 
     generateNotifications()
-  }, [tarjetas, profile, hasBudget, budgetPct, totalPagar, budgetARS, currentWorkspace, loading])
+  }, [tarjetas, profile, user?.uid, hasBudget, budgetPct, totalPagar, budgetARS, currentWorkspace?.id, loading])
 
   // Chart data por categoría
   const catTotals: Record<string, number> = {}

@@ -1,5 +1,5 @@
 // Service Worker para FinControl PWA
-const CACHE_NAME = 'fincontrol-v1'
+const CACHE_NAME = 'fincontrol-v2'
 const urlsToCache = [
   '/',
   '/dashboard',

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import {
   User,
   signInWithEmailAndPassword,
@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const welcomeAttemptedRef = useRef<Set<string>>(new Set())
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -146,12 +147,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const profileData = await fetchProfile(firebaseUser.uid)
           setProfile(profileData)
           
-          // Enviar correo de bienvenida si el email se acaba de verificar
-          // Solo si cambió de false a true (no en la primera carga)
-          if (emailJustVerified && firebaseUser.email && firebaseUser.uid) {
+          const welcomeAlreadySent = !!profileData?.welcome_email_sent
+          const shouldAttemptWelcome =
+            !!firebaseUser.email &&
+            !!firebaseUser.uid &&
+            // Caso A: se acaba de verificar en esta sesión
+            (emailJustVerified ||
+              // Caso B: ya está verificado, pero nunca enviamos welcome (ej: verificó en otro browser/deslogueado)
+              !welcomeAlreadySent)
+
+          // Evitar spamear en re-renders: 1 intento por uid por sesión
+          if (shouldAttemptWelcome && !welcomeAttemptedRef.current.has(firebaseUser.uid)) {
+            welcomeAttemptedRef.current.add(firebaseUser.uid)
             try {
               const userName = firebaseUser.email.split('@')[0]
-              console.log('🎉 [Firebase useAuth] Email verificado por primera vez, enviando correo de bienvenida...')
+              console.log('🎉 [Firebase useAuth] Enviando correo de bienvenida (post-verificación o faltante)...', {
+                emailJustVerified,
+                welcomeAlreadySent,
+                uid: firebaseUser.uid
+              })
               const welcomeResponse = await fetch('/api/send-welcome-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -168,6 +182,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   console.log('ℹ️ [Firebase useAuth] Correo de bienvenida ya fue enviado anteriormente')
                 } else {
                   console.log('✅ [Firebase useAuth] Correo de bienvenida enviado después de verificación')
+                }
+
+                // Fallback: marcar en el perfil desde el cliente (por si Admin SDK no pudo actualizar)
+                try {
+                  await updateDoc(doc(db, 'profiles', firebaseUser.uid), {
+                    welcome_email_sent: true,
+                    welcome_email_sent_at: new Date().toISOString(),
+                  } as any)
+                  setProfile(prev => (prev ? { ...prev, welcome_email_sent: true, welcome_email_sent_at: new Date().toISOString() } : prev))
+                } catch (e) {
+                  // No bloquear si no se puede actualizar el perfil
+                  console.warn('⚠️ [Firebase useAuth] No se pudo marcar welcome_email_sent en perfil (no crítico):', e)
                 }
               } else {
                 console.error('⚠️ [Firebase useAuth] Error enviando correo de bienvenida:', await welcomeResponse.text())

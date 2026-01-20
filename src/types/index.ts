@@ -10,6 +10,9 @@ export interface Profile {
   personal_workspace_name?: string
   personal_workspace_icono?: string | null
   personal_workspace_logo?: string | null // data URL (PNG/JPG/WebP)
+  // Emails
+  welcome_email_sent?: boolean
+  welcome_email_sent_at?: string
   created_at: string
 }
 
