@@ -105,6 +105,21 @@ export default function GastosPage() {
     digitos: ''
   })
   const [aiExpandedTransaction, setAiExpandedTransaction] = useState<number | null>(null)
+  
+  // Modal de edición de transacción individual del preview
+  const [editingAiTransaction, setEditingAiTransaction] = useState<number | null>(null)
+  const [aiTransactionForm, setAiTransactionForm] = useState({
+    descripcion: '',
+    categoria_id: '',
+    monto: '',
+    moneda: 'ARS' as 'ARS' | 'USD',
+    fecha: new Date().toISOString().split('T')[0],
+    tag_ids: [] as string[],
+    tarjeta_id: '',
+    cuotas: '1',
+    cuotas_custom: '',
+    es_fijo: false
+  })
 
   const findCategoriaIdFromLabel = (label?: string) => {
     const normalized = (label || '').trim().toLowerCase()
@@ -516,6 +531,7 @@ export default function GastosPage() {
       icono: aiNewCategoria.icono,
       color: '#6366f1'
     })
+    // La categoría se agregará a la lista y se podrá seleccionar después de que se actualice el estado
     setAiNewCategoria({ nombre: '', icono: '💰' })
     setAiShowNewCategoriaInput(false)
   }
@@ -2710,215 +2726,171 @@ export default function GastosPage() {
                     )}
                   </div>
 
-                  {/* Lista de Transacciones - Compacta */}
-                  {extractedData.total?.tipo_documento === 'resumen_tarjeta' && (
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-slate-900 text-xs">
+                  {/* Lista de Transacciones - Tabla como en gastos normales */}
+                  <div className="card overflow-hidden">
+                    <div className="p-3 bg-slate-50 border-b border-slate-200">
+                      <h4 className="font-semibold text-sm">
                         Transacciones ({extractedData.transacciones.length})
                       </h4>
                     </div>
-                  )}
-
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {extractedData.transacciones.map((trans: any, index: number) => {
-                      const descripcion = getTransactionValue(index, 'descripcion', trans.descripcion)
-                      const monto = getTransactionValue(index, 'monto', trans.monto)
-                      const fecha = getTransactionValue(index, 'fecha', trans.fecha)
-                      const moneda = getTransactionValue(index, 'moneda', trans.moneda || 'ARS')
-                      const cuotas = getTransactionValue(index, 'cuotas', trans.cuotas)
-                      
-                      return (
-                        <div 
-                          key={index}
-                          className={`border rounded-lg p-2 transition-all ${
-                            selectedTransactions.has(index) 
-                              ? 'border-indigo-500 bg-indigo-50' 
-                              : 'border-slate-200 hover:border-indigo-300 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedTransactions.has(index)}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                const newSelected = new Set(selectedTransactions)
-                                if (newSelected.has(index)) {
-                                  newSelected.delete(index)
-                                } else {
-                                  newSelected.add(index)
-                                  if (useGlobalDate && globalDocumentDate) {
-                                    const current = editedTransactions.get(index) || {}
-                                    updateEditedTransaction(index, 'fecha', globalDocumentDate)
-                                  }
-                                }
-                                setSelectedTransactions(newSelected)
-                              }}
-                              className="mt-0.5 w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
-                            />
-                            <div className="flex-1 space-y-1.5 min-w-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase w-12">
                               <input
-                                type="text"
-                                value={descripcion || ''}
+                                type="checkbox"
+                                checked={selectedTransactions.size === extractedData.transacciones.length && extractedData.transacciones.length > 0}
                                 onChange={(e) => {
-                                  e.stopPropagation()
-                                  updateEditedTransaction(index, 'descripcion', e.target.value)
-                                }}
-                                className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
-                                placeholder="Descripción"
-                              />
-                              <div className="grid grid-cols-2 gap-2">
-                                <input
-                                  type="date"
-                                  value={fecha || ''}
-                                  onChange={(e) => {
-                                    e.stopPropagation()
-                                    updateEditedTransaction(index, 'fecha', e.target.value)
-                                  }}
-                                  className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
-                                />
-                                <div className="flex gap-1">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={monto || ''}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)
-                                    }}
-                                    className="input w-full text-xs h-7 border-slate-300 focus:border-indigo-500"
-                                    placeholder="0.00"
-                                  />
-                                  <div className="relative">
-                                    <select
-                                      value={moneda || 'ARS'}
-                                      onChange={(e) => {
-                                        e.stopPropagation()
-                                        console.log('🔵 [GastosPage] Moneda cambiada para transacción', index, ':', e.target.value)
-                                        updateEditedTransaction(index, 'moneda', e.target.value)
-                                      }}
-                                      className="w-16 h-7 text-xs font-bold text-center rounded-lg border-2 cursor-pointer pr-6"
-                                      style={{ 
-                                        color: 'rgb(15, 23, 42) !important',
-                                        backgroundColor: 'rgb(255, 237, 213) !important',
-                                        borderColor: 'rgb(251, 146, 60) !important',
-                                        WebkitAppearance: 'none',
-                                        MozAppearance: 'none',
-                                        appearance: 'none',
-                                        fontWeight: '700'
-                                      }}
-                                    >
-                                      <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
-                                      <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
-                                    </select>
-                                    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-orange-600">▼</div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <label className="text-xs text-slate-600">Cuotas:</label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={cuotas || 1}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      const numCuotas = parseInt(e.target.value) || 1
-                                      updateEditedTransaction(index, 'cuotas', numCuotas)
-                                    }}
-                                    className="input w-16 text-xs h-6 border-slate-300 focus:border-indigo-500"
-                                    placeholder="1"
-                                  />
-                                </div>
-                                {(() => {
-                                  const cuotaActual = getTransactionValue(index, 'cuota_actual', trans.cuota_actual)
-                                  const totalCuotas = getTransactionValue(index, 'cuotas', trans.cuotas)
-                                  const cuotasRestantes = cuotaActual && totalCuotas && totalCuotas > cuotaActual
-                                    ? totalCuotas - cuotaActual + 1
-                                    : cuotas
-                                  
-                                  if (cuotas && cuotas > 1) {
-                                    if (cuotaActual && totalCuotas && totalCuotas > cuotaActual) {
-                                      return (
-                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                          {cuotasRestantes} cuotas restantes (cuotas {cuotaActual} a {totalCuotas})
-                                        </span>
-                                      )
-                                    } else {
-                                      return (
-                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                          {cuotas} cuotas (se distribuirá en {cuotas} meses)
-                                        </span>
-                                      )
-                                    }
+                                  if (e.target.checked) {
+                                    const all = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
+                                    setSelectedTransactions(all)
+                                  } else {
+                                    setSelectedTransactions(new Set())
                                   }
-                                  return null
-                                })()}
-                              </div>
-                              <div className="flex items-center gap-2 text-xs flex-wrap">
-                                {trans.comercio && <span className="text-blue-600">📍 {trans.comercio}</span>}
-                                {trans.categoria && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Sugerida: {trans.categoria}</span>}
-                              </div>
-
-                              {/* Categoría + Tags por transacción */}
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Categoría</label>
-                                  <select
-                                    value={editedTransactions.get(index)?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''}
-                                    onChange={(e) => updateEditedTransaction(index, 'categoria_id', e.target.value)}
-                                    className="input w-full text-xs h-7"
-                                  >
-                                    <option value="">Sin categoría</option>
-                                    {categorias.map(c => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.icono} {c.nombre}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div className="flex items-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => setAiExpandedTransaction(prev => (prev === index ? null : index))}
-                                    className="w-full px-3 h-7 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
-                                  >
-                                    {aiExpandedTransaction === index ? 'Ocultar tags' : 'Editar tags'}
-                                  </button>
-                                </div>
-                              </div>
-                              {aiExpandedTransaction === index && (
-                                <div className="flex flex-wrap gap-1.5 p-2 bg-white border border-slate-200 rounded-lg">
-                                  {tags.length === 0 ? (
-                                    <span className="text-xs text-slate-500">No hay etiquetas creadas.</span>
-                                  ) : tags.map(t => {
-                                    const selected = getTransactionTagIds(index).includes(t.id)
-                                    return (
-                                      <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => toggleTransactionTag(index, t.id)}
-                                        className={`px-2 py-1 rounded-full text-[11px] font-bold transition ${
-                                          selected
-                                            ? 'bg-orange-500 text-white'
-                                            : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
-                                        }`}
-                                      >
-                                        {t.nombre}
-                                      </button>
+                                }}
+                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                              />
+                            </th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Categoría</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Monto</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Cuotas</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {extractedData.transacciones.map((trans: any, index: number) => {
+                            const edited = editedTransactions.get(index)
+                            const descripcion = edited?.descripcion ?? trans.descripcion ?? ''
+                            const monto = edited?.monto ?? trans.monto ?? 0
+                            const fecha = edited?.fecha ?? trans.fecha ?? ''
+                            const moneda = edited?.moneda ?? trans.moneda ?? 'ARS'
+                            const cuotas = edited?.cuotas ?? trans.cuotas ?? null
+                            const categoriaId = edited?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''
+                            const tagIds = edited?.tag_ids ?? getTransactionTagIds(index)
+                            const tarjetaId = edited?.tarjeta_id ?? selectedTarjetaId ?? ''
+                            const esFijo = edited?.es_fijo ?? false
+                            
+                            const categoria = categorias.find(c => c.id === categoriaId)
+                            
+                            return (
+                              <tr 
+                                key={index}
+                                className={`border-b border-slate-100 hover:bg-slate-50 transition ${
+                                  selectedTransactions.has(index) ? 'bg-indigo-50' : ''
+                                }`}
+                              >
+                                <td className="p-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedTransactions.has(index)}
+                                    onChange={(e) => {
+                                      const newSelected = new Set(selectedTransactions)
+                                      if (e.target.checked) {
+                                        newSelected.add(index)
+                                        if (useGlobalDate && globalDocumentDate) {
+                                          updateEditedTransaction(index, 'fecha', globalDocumentDate)
+                                        }
+                                      } else {
+                                        newSelected.delete(index)
+                                      }
+                                      setSelectedTransactions(newSelected)
+                                    }}
+                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="p-3">
+                                  <div className="font-medium">{descripcion || 'Sin descripción'}</div>
+                                  {trans.comercio && (
+                                    <div className="text-xs text-blue-600 mt-1">📍 {trans.comercio}</div>
+                                  )}
+                                  {tagIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {tagIds.map((tagId: string) => {
+                                        const tag = tags.find(t => t.id === tagId)
+                                        return tag ? (
+                                          <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
+                                            {tag.nombre}
+                                          </span>
+                                        ) : null
+                                      })}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  {categoria ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span>{categoria.icono}</span>
+                                      <span>{categoria.nombre}</span>
+                                    </span>
+                                  ) : trans.categoria ? (
+                                    <span className="text-xs text-slate-500">Sugerida: {trans.categoria}</span>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">Sin categoría</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  {tarjetaId ? (
+                                    tarjetaMap[tarjetaId] ? (
+                                      <span className={`tag ${getTagClass(tarjetaMap[tarjetaId].tipo)}`}>
+                                        {tarjetaMap[tarjetaId].nombre}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-slate-400">ID: {tarjetaId.slice(0, 8)}...</span>
                                     )
-                                  })}
-                                  <div className="w-full text-[11px] text-slate-500 pt-1">
-                                    Tip: si no tocás los tags acá, se aplican los tags del gasto (modal principal).
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                                  ) : (
+                                    <span className="tag bg-emerald-100 text-emerald-700">💵 Efectivo</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <span className={`font-bold ${moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                                    {formatMoney(monto, moneda)}
+                                  </span>
+                                </td>
+                                <td className="p-3">
+                                  {cuotas && cuotas > 1 ? (
+                                    <span className="tag bg-indigo-100 text-indigo-700">
+                                      {cuotas} cuotas
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">-</span>
+                                  )}
+                                  {esFijo && (
+                                    <div className="text-xs text-purple-600 mt-1">📌 Fijo</div>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <button
+                                    onClick={() => {
+                                      const edited = editedTransactions.get(index) || {}
+                                      setAiTransactionForm({
+                                        descripcion: edited.descripcion ?? trans.descripcion ?? '',
+                                        categoria_id: edited.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? '',
+                                        monto: edited.monto !== undefined ? String(edited.monto) : String(trans.monto ?? ''),
+                                        moneda: edited.moneda ?? trans.moneda ?? 'ARS',
+                                        fecha: edited.fecha ?? trans.fecha ?? new Date().toISOString().split('T')[0],
+                                        tag_ids: edited.tag_ids ?? getTransactionTagIds(index),
+                                        tarjeta_id: edited.tarjeta_id ?? selectedTarjetaId ?? '',
+                                        cuotas: edited.cuotas ? String(edited.cuotas) : (trans.cuotas ? String(trans.cuotas) : '1'),
+                                        cuotas_custom: '',
+                                        es_fijo: edited.es_fijo ?? false
+                                      })
+                                      setEditingAiTransaction(index)
+                                    }}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition"
+                                    title="Editar"
+                                  >
+                                    <Edit2 className="w-4 h-4 text-slate-600" />
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   {/* Impuestos detectados */}
@@ -3281,6 +3253,297 @@ export default function GastosPage() {
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Modal Editar Transacción del Preview IA */}
+      {editingAiTransaction !== null && extractedData?.transacciones && (
+        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], tarjeta_id: '', cuotas: '1', cuotas_custom: '', es_fijo: false }) }}>
+          <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-lg">Editar Transacción</h3>
+              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], tarjeta_id: '', cuotas: '1', cuotas_custom: '', es_fijo: false }) }} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+              <div>
+                <label className="label">Descripción <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  className="input"
+                  value={aiTransactionForm.descripcion}
+                  onChange={e => setAiTransactionForm(f => ({ ...f, descripcion: e.target.value }))}
+                  placeholder="Ej: Compra en supermercado"
+                />
+              </div>
+
+              <div>
+                <label className="label">Categoría</label>
+                {!aiShowNewCategoriaInput ? (
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={aiTransactionForm.categoria_id}
+                      onChange={e => setAiTransactionForm(f => ({ ...f, categoria_id: e.target.value }))}
+                    >
+                      <option value="">Seleccionar</option>
+                      {categorias.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setAiShowNewCategoriaInput(true)}
+                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                    >
+                      + Crear nueva categoría
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
+                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                    <div>
+                      <input
+                        type="text"
+                        className="input w-full text-base"
+                        placeholder="Ej: Comidas, Transporte, Servicios..."
+                        value={aiNewCategoria.nombre}
+                        onChange={e => setAiNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <EmojiPickerField
+                        value={aiNewCategoria.icono}
+                        onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
+                        placeholder="💰"
+                        size="sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddNewCategoriaAI}
+                        className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-sm"
+                      >
+                        ✓ Crear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAiShowNewCategoriaInput(false); setAiNewCategoria({ nombre: '', icono: '💰' }) }}
+                        className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Monto <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    value={aiTransactionForm.monto}
+                    onChange={e => setAiTransactionForm(f => ({ ...f, monto: e.target.value }))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="label">Moneda</label>
+                  <select
+                    className="input"
+                    value={aiTransactionForm.moneda}
+                    onChange={e => setAiTransactionForm(f => ({ ...f, moneda: e.target.value as 'ARS' | 'USD' }))}
+                  >
+                    <option value="ARS">Pesos</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Fecha</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={aiTransactionForm.fecha}
+                    onChange={e => setAiTransactionForm(f => ({ ...f, fecha: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Cuotas</label>
+                  <div className="flex gap-2">
+                    <select
+                      className="input flex-1"
+                      value={aiTransactionForm.cuotas}
+                      onChange={e => setAiTransactionForm(f => ({ ...f, cuotas: e.target.value }))}
+                    >
+                      <option value="1">1 (Sin cuotas)</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="6">6</option>
+                      <option value="9">9</option>
+                      <option value="12">12</option>
+                      <option value="18">18</option>
+                      <option value="24">24</option>
+                      <option value="36">36</option>
+                      <option value="48">48</option>
+                      <option value="custom">Otra cantidad...</option>
+                    </select>
+                    {aiTransactionForm.cuotas === 'custom' && (
+                      <input
+                        type="number"
+                        min="1"
+                        max="999"
+                        className="input w-24"
+                        placeholder="Cantidad"
+                        value={aiTransactionForm.cuotas_custom}
+                        onChange={e => {
+                          const val = e.target.value
+                          if (val === '' || (parseInt(val) > 0 && parseInt(val) <= 999)) {
+                            setAiTransactionForm(f => ({ ...f, cuotas_custom: val }))
+                          }
+                        }}
+                        onBlur={() => {
+                          if (aiTransactionForm.cuotas_custom && parseInt(aiTransactionForm.cuotas_custom) > 0) {
+                            setAiTransactionForm(f => ({ ...f, cuotas: aiTransactionForm.cuotas_custom }))
+                          }
+                        }}
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Cuenta/Tarjeta</label>
+                <select
+                  className="input w-full"
+                  value={aiTransactionForm.tarjeta_id}
+                  onChange={e => setAiTransactionForm(f => ({ ...f, tarjeta_id: e.target.value }))}
+                >
+                  <option value="">💵 Efectivo</option>
+                  {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Etiquetas</label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border-2 border-slate-200 min-h-[3rem]">
+                  {tags.map(t => {
+                    const isSelected = aiTransactionForm.tag_ids.includes(t.id)
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setAiTransactionForm(f => ({ ...f, tag_ids: f.tag_ids.filter(id => id !== t.id) }))
+                          } else {
+                            setAiTransactionForm(f => ({ ...f, tag_ids: [...f.tag_ids, t.id] }))
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
+                          isSelected
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-white text-orange-700 border border-orange-200 hover:bg-orange-50'
+                        }`}
+                      >
+                        {t.nombre}
+                      </button>
+                    )
+                  })}
+                  {!aiShowNewTagInput && (
+                    <button
+                      type="button"
+                      onClick={() => setAiShowNewTagInput(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 transition"
+                    >
+                      + Nueva etiqueta
+                    </button>
+                  )}
+                  {aiShowNewTagInput && (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="text"
+                        className="input py-1 px-2 text-xs w-32"
+                        placeholder="Nombre"
+                        value={aiNewTagName}
+                        onChange={e => setAiNewTagName(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleAddNewTagAI()}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewTagAI}
+                        className="px-2 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
+                        className="px-2 py-1 bg-slate-300 text-slate-700 rounded text-xs font-bold hover:bg-slate-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={aiTransactionForm.es_fijo}
+                  onChange={e => setAiTransactionForm(f => ({ ...f, es_fijo: e.target.checked }))}
+                  className="w-5 h-5 accent-indigo-500"
+                />
+                <span className="font-semibold">Gasto fijo mensual</span>
+              </label>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-200">
+                <button
+                  onClick={() => {
+                    const index = editingAiTransaction
+                    if (index === null) return
+                    
+                    const updated = new Map(editedTransactions)
+                    updated.set(index, {
+                      descripcion: aiTransactionForm.descripcion,
+                      categoria_id: aiTransactionForm.categoria_id || undefined,
+                      monto: parseFloat(aiTransactionForm.monto) || 0,
+                      moneda: aiTransactionForm.moneda,
+                      fecha: aiTransactionForm.fecha,
+                      tag_ids: aiTransactionForm.tag_ids,
+                      tarjeta_id: aiTransactionForm.tarjeta_id || undefined,
+                      cuotas: aiTransactionForm.cuotas === 'custom' ? parseInt(aiTransactionForm.cuotas_custom) || 1 : parseInt(aiTransactionForm.cuotas) || 1,
+                      es_fijo: aiTransactionForm.es_fijo
+                    })
+                    setEditedTransactions(updated)
+                    setEditingAiTransaction(null)
+                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], tarjeta_id: '', cuotas: '1', cuotas_custom: '', es_fijo: false })
+                  }}
+                  className="btn btn-primary flex-1"
+                >
+                  Guardar Cambios
+                </button>
+                <button
+                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], tarjeta_id: '', cuotas: '1', cuotas_custom: '', es_fijo: false }) }}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Pago Masivo */}
       {showPagoMasivoModal && selectedGastos.size > 0 && (

@@ -61,6 +61,17 @@ export default function IngresosPage() {
   const [aiShowNewCategoriaInput, setAiShowNewCategoriaInput] = useState(false)
   const [aiNewCategoria, setAiNewCategoria] = useState({ nombre: '', icono: '💵', color: '#3b82f6' })
   const [aiExpandedTransaction, setAiExpandedTransaction] = useState<number | null>(null)
+  
+  // Modal de edición de transacción individual del preview
+  const [editingAiTransaction, setEditingAiTransaction] = useState<number | null>(null)
+  const [aiTransactionForm, setAiTransactionForm] = useState({
+    descripcion: '',
+    categoria_id: '',
+    monto: '',
+    moneda: 'ARS' as 'ARS' | 'USD',
+    fecha: new Date().toISOString().split('T')[0],
+    tag_ids: [] as string[]
+  })
 
   const findCategoriaIdFromLabel = (label?: string) => {
     const normalized = (label || '').trim().toLowerCase()
@@ -1139,136 +1150,137 @@ export default function IngresosPage() {
                     )}
                   </div>
 
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {extractedData.transacciones.map((trans: any, index: number) => {
-                      const descripcion = editedTransactions.get(index)?.descripcion ?? trans.descripcion ?? ''
-                      const monto = editedTransactions.get(index)?.monto ?? trans.monto ?? ''
-                      const moneda = editedTransactions.get(index)?.moneda ?? trans.moneda ?? 'ARS'
-                      const fecha = editedTransactions.get(index)?.fecha ?? trans.fecha ?? ''
-                      const categoriaIdValue = editedTransactions.get(index)?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''
-
-                      return (
-                        <div
-                          key={index}
-                          className={`border rounded-lg p-3 transition-colors ${
-                            selectedTransactions.has(index)
-                              ? 'border-purple-500 bg-purple-50'
-                              : 'border-slate-200 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedTransactions.has(index)}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                const newSelected = new Set(selectedTransactions)
-                                if (newSelected.has(index)) newSelected.delete(index)
-                                else newSelected.add(index)
-                                setSelectedTransactions(newSelected)
-                              }}
-                              className="mt-1 w-4 h-4 text-purple-600 rounded border-slate-300"
-                            />
-                            <div className="flex-1 space-y-2">
+                  {/* Lista de Transacciones - Tabla como en ingresos normales */}
+                  <div className="card overflow-hidden">
+                    <div className="p-3 bg-slate-50 border-b border-slate-200">
+                      <h4 className="font-semibold text-sm">
+                        Transacciones ({extractedData.transacciones.length})
+                      </h4>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase w-12">
                               <input
-                                type="text"
-                                className="input w-full text-sm"
-                                value={descripcion}
-                                onChange={(e) => updateEditedTransaction(index, 'descripcion', e.target.value)}
-                                placeholder="Descripción"
+                                type="checkbox"
+                                checked={selectedTransactions.size === extractedData.transacciones.length && extractedData.transacciones.length > 0}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const all = new Set<number>(extractedData.transacciones.map((_: any, i: number) => i))
+                                    setSelectedTransactions(all)
+                                  } else {
+                                    setSelectedTransactions(new Set())
+                                  }
+                                }}
+                                className="w-4 h-4 text-purple-600 rounded border-slate-300 cursor-pointer"
                               />
-                              <div className="grid grid-cols-2 gap-2">
-                                <input
-                                  type="date"
-                                  className="input text-sm"
-                                  value={fecha}
-                                  onChange={(e) => updateEditedTransaction(index, 'fecha', e.target.value)}
-                                />
-                                <div className="flex gap-2">
+                            </th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Categoría</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Monto</th>
+                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {extractedData.transacciones.map((trans: any, index: number) => {
+                            const edited = editedTransactions.get(index)
+                            const descripcion = edited?.descripcion ?? trans.descripcion ?? ''
+                            const monto = edited?.monto ?? trans.monto ?? 0
+                            const fecha = edited?.fecha ?? trans.fecha ?? ''
+                            const moneda = edited?.moneda ?? trans.moneda ?? 'ARS'
+                            const categoriaId = edited?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''
+                            const tagIds = edited?.tag_ids ?? getTransactionTagIds(index)
+                            
+                            const categoria = categoriasIngresos.find(c => c.id === categoriaId)
+                            
+                            return (
+                              <tr 
+                                key={index}
+                                className={`border-b border-slate-100 hover:bg-slate-50 transition ${
+                                  selectedTransactions.has(index) ? 'bg-purple-50' : ''
+                                }`}
+                              >
+                                <td className="p-3">
                                   <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input text-sm flex-1"
-                                    value={monto}
-                                    onChange={(e) => updateEditedTransaction(index, 'monto', parseFloat(e.target.value) || 0)}
-                                    placeholder="0.00"
+                                    type="checkbox"
+                                    checked={selectedTransactions.has(index)}
+                                    onChange={(e) => {
+                                      const newSelected = new Set(selectedTransactions)
+                                      if (e.target.checked) {
+                                        newSelected.add(index)
+                                      } else {
+                                        newSelected.delete(index)
+                                      }
+                                      setSelectedTransactions(newSelected)
+                                    }}
+                                    className="w-4 h-4 text-purple-600 rounded border-slate-300 cursor-pointer"
                                   />
-                                  <select
-                                    className="input text-sm w-24"
-                                    value={moneda}
-                                    onChange={(e) => updateEditedTransaction(index, 'moneda', e.target.value)}
-                                  >
-                                    <option value="ARS">ARS</option>
-                                    <option value="USD">USD</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Categoría</label>
-                                  <select
-                                    className="input text-sm"
-                                    value={categoriaIdValue}
-                                    onChange={(e) => updateEditedTransaction(index, 'categoria_id', e.target.value)}
-                                  >
-                                    <option value="">Sin categoría</option>
-                                    {categoriasIngresos.map(c => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.icono} {c.nombre}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  {trans.categoria && (
-                                    <div className="text-[11px] text-slate-500 mt-1">
-                                      Sugerida: <span className="font-semibold">{trans.categoria}</span>
+                                </td>
+                                <td className="p-3">
+                                  <div className="font-medium">{descripcion || 'Sin descripción'}</div>
+                                  {trans.origen && (
+                                    <div className="text-xs text-blue-600 mt-1">📍 {trans.origen}</div>
+                                  )}
+                                  {tagIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {tagIds.map((tagId: string) => {
+                                        const tag = tagsIngresos.find(t => t.id === tagId)
+                                        return tag ? (
+                                          <span key={tagId} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs">
+                                            {tag.nombre}
+                                          </span>
+                                        ) : null
+                                      })}
                                     </div>
                                   )}
-                                </div>
-                                <div className="flex items-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => setAiExpandedTransaction(prev => (prev === index ? null : index))}
-                                    className="w-full px-3 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
-                                  >
-                                    {aiExpandedTransaction === index ? 'Ocultar tags' : 'Editar tags'}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {aiExpandedTransaction === index && (
-                                <div className="flex flex-wrap gap-2 p-3 bg-white rounded-lg border border-slate-200">
-                                  {tagsIngresos.length === 0 ? (
-                                    <span className="text-xs text-slate-500">No hay etiquetas creadas.</span>
-                                  ) : tagsIngresos.map(t => {
-                                    const selected = getTransactionTagIds(index).includes(t.id)
-                                    return (
-                                      <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => toggleTransactionTag(index, t.id)}
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                                          selected
-                                            ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-500'
-                                            : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-slate-300'
-                                        }`}
-                                      >
-                                        {t.nombre}
-                                      </button>
-                                    )
-                                  })}
-                                  <div className="w-full text-[11px] text-slate-500">
-                                    Tip: si no tocás los tags acá, se aplican los tags del ingreso (modal principal).
+                                </td>
+                                <td className="p-3">
+                                  {categoria ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span>{categoria.icono}</span>
+                                      <span>{categoria.nombre}</span>
+                                    </span>
+                                  ) : trans.categoria ? (
+                                    <span className="text-xs text-slate-500">Sugerida: {trans.categoria}</span>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">Sin categoría</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <span className={`font-bold ${moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                                    {formatMoney(monto, moneda)}
+                                  </span>
+                                  <div className="text-xs text-slate-500 mt-1">
+                                    {fecha ? new Date(fecha).toLocaleDateString('es-AR') : '-'}
                                   </div>
-                                </div>
-                              )}
-
-                              {trans.origen && <div className="text-xs text-blue-700">📍 {trans.origen}</div>}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                                </td>
+                                <td className="p-3">
+                                  <button
+                                    onClick={() => {
+                                      const edited = editedTransactions.get(index) || {}
+                                      setAiTransactionForm({
+                                        descripcion: edited.descripcion ?? trans.descripcion ?? '',
+                                        categoria_id: edited.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? '',
+                                        monto: edited.monto !== undefined ? String(edited.monto) : String(trans.monto ?? ''),
+                                        moneda: edited.moneda ?? trans.moneda ?? 'ARS',
+                                        fecha: edited.fecha ?? trans.fecha ?? new Date().toISOString().split('T')[0],
+                                        tag_ids: edited.tag_ids ?? getTransactionTagIds(index)
+                                      })
+                                      setEditingAiTransaction(index)
+                                    }}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition"
+                                    title="Editar"
+                                  >
+                                    <Edit2 className="w-4 h-4 text-slate-600" />
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   {/* Opción para agregar total */}
@@ -1407,6 +1419,236 @@ export default function IngresosPage() {
                 </button>
                 <button
                   onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Transacción del Preview IA */}
+      {editingAiTransaction !== null && extractedData?.transacciones && (
+        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] }) }}>
+          <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-lg">Editar Transacción</h3>
+              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] }) }} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+              <div>
+                <label className="label">Descripción <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  className="input"
+                  value={aiTransactionForm.descripcion}
+                  onChange={e => setAiTransactionForm(f => ({ ...f, descripcion: e.target.value }))}
+                  placeholder="Ej: Salario, Freelance, Venta..."
+                />
+              </div>
+
+              <div>
+                <label className="label">Categoría</label>
+                {!aiShowNewCategoriaInput ? (
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={aiTransactionForm.categoria_id}
+                      onChange={e => setAiTransactionForm(f => ({ ...f, categoria_id: e.target.value }))}
+                    >
+                      <option value="">Sin categoría</option>
+                      {categoriasIngresos.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setAiShowNewCategoriaInput(true)}
+                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                    >
+                      + Crear nueva categoría
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
+                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                    <div>
+                      <input
+                        type="text"
+                        className="input w-full text-base"
+                        placeholder="Ej: Salario, Freelance, Venta..."
+                        value={aiNewCategoria.nombre}
+                        onChange={e => setAiNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <EmojiPickerField
+                        value={aiNewCategoria.icono}
+                        onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
+                        placeholder="💵"
+                        size="sm"
+                      />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <div>
+                        <div className="text-xs font-bold text-indigo-900 mb-1">Color</div>
+                        <input
+                          type="color"
+                          className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
+                          value={aiNewCategoria.color}
+                          onChange={e => setAiNewCategoria(c => ({ ...c, color: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex-1 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAddNewCategoriaAI}
+                          className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-sm"
+                        >
+                          ✓ Crear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAiShowNewCategoriaInput(false); setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' }) }}
+                          className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Monto <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    value={aiTransactionForm.monto}
+                    onChange={e => setAiTransactionForm(f => ({ ...f, monto: e.target.value }))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="label">Moneda</label>
+                  <select
+                    className="input"
+                    value={aiTransactionForm.moneda}
+                    onChange={e => setAiTransactionForm(f => ({ ...f, moneda: e.target.value as 'ARS' | 'USD' }))}
+                  >
+                    <option value="ARS">💵 Pesos (ARS)</option>
+                    <option value="USD">💵 Dólares (USD)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Fecha</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={aiTransactionForm.fecha}
+                  onChange={e => setAiTransactionForm(f => ({ ...f, fecha: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="label">Etiquetas</label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border-2 border-slate-200 min-h-[3rem]">
+                  {tagsIngresos.map(t => {
+                    const isSelected = aiTransactionForm.tag_ids.includes(t.id)
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setAiTransactionForm(f => ({ ...f, tag_ids: f.tag_ids.filter(id => id !== t.id) }))
+                          } else {
+                            setAiTransactionForm(f => ({ ...f, tag_ids: [...f.tag_ids, t.id] }))
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${
+                          isSelected
+                            ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-500'
+                            : 'bg-white text-slate-600 border-2 border-transparent hover:border-slate-300'
+                        }`}
+                      >
+                        {t.nombre}
+                      </button>
+                    )
+                  })}
+                  {!aiShowNewTagInput && (
+                    <button
+                      type="button"
+                      onClick={() => setAiShowNewTagInput(true)}
+                      className="px-3 py-1.5 rounded-lg text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                    >
+                      + Nueva etiqueta
+                    </button>
+                  )}
+                  {aiShowNewTagInput && (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="text"
+                        className="input py-1 px-2 text-xs w-32"
+                        placeholder="Nombre"
+                        value={aiNewTagName}
+                        onChange={e => setAiNewTagName(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleAddNewTagAI()}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewTagAI}
+                        className="px-2 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
+                        className="px-2 py-1 bg-slate-300 text-slate-700 rounded text-xs font-bold hover:bg-slate-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-200">
+                <button
+                  onClick={() => {
+                    const index = editingAiTransaction
+                    if (index === null) return
+                    
+                    const updated = new Map(editedTransactions)
+                    updated.set(index, {
+                      descripcion: aiTransactionForm.descripcion,
+                      categoria_id: aiTransactionForm.categoria_id || undefined,
+                      monto: parseFloat(aiTransactionForm.monto) || 0,
+                      moneda: aiTransactionForm.moneda,
+                      fecha: aiTransactionForm.fecha,
+                      tag_ids: aiTransactionForm.tag_ids
+                    })
+                    setEditedTransactions(updated)
+                    setEditingAiTransaction(null)
+                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] })
+                  }}
+                  className="btn btn-primary flex-1"
+                >
+                  Guardar Cambios
+                </button>
+                <button
+                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] }) }}
                   className="btn btn-secondary"
                 >
                   Cancelar
