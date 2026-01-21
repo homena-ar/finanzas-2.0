@@ -1,6 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initializeAdmin } from '@/lib/firebase-admin'
-import admin from 'firebase-admin'
+import * as admin from 'firebase-admin'
+
+// Inicializar Firebase Admin SDK si no está inicializado
+let adminInitialized = false
+
+function initializeAdmin() {
+  if (adminInitialized || admin.apps.length > 0) return true
+
+  try {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+    if (!serviceAccount) {
+      console.error('❌ [Ingresos Pendientes] FIREBASE_SERVICE_ACCOUNT_KEY no está configurado')
+      return false
+    }
+
+    let serviceAccountJson: any
+    try {
+      serviceAccountJson = JSON.parse(serviceAccount)
+    } catch (parseError: any) {
+      console.error('❌ [Ingresos Pendientes] Error parseando FIREBASE_SERVICE_ACCOUNT_KEY:', parseError.message)
+      return false
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccountJson),
+    })
+
+    adminInitialized = true
+    console.log('✅ [Ingresos Pendientes] Firebase Admin SDK inicializado correctamente')
+    return true
+  } catch (error: any) {
+    console.error('❌ [Ingresos Pendientes] Error inicializando Firebase Admin SDK:', error.message)
+    return false
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
