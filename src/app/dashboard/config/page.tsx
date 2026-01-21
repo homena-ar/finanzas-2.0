@@ -1621,7 +1621,6 @@ export default function ConfigPage() {
             </div>
           </div>
         )}
-        </div>
       </div>
 
       {/* Configuración financiera mensual */}
