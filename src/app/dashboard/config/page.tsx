@@ -40,8 +40,8 @@ export default function ConfigPage() {
   } = useWorkspace()
 
   const [budgetEnabled, setBudgetEnabled] = useState(false)
-  const [budgetArs, setBudgetArs] = useState('')
-  const [budgetUsd, setBudgetUsd] = useState('')
+  const [budgetAmount, setBudgetAmount] = useState('')
+  const [budgetCurrency, setBudgetCurrency] = useState<'ARS' | 'USD'>('ARS')
   const [ingresosEnabled, setIngresosEnabled] = useState(false)
   const [newTag, setNewTag] = useState('')
   const [newTagIngreso, setNewTagIngreso] = useState('')
@@ -74,8 +74,9 @@ export default function ConfigPage() {
   const [categoriaIngresoForm, setCategoriaIngresoForm] = useState({ nombre: '', icono: '', color: '#10b981' })
   
   // Estados para secciones colapsables
-  const [expandedGastos, setExpandedGastos] = useState(true)
-  const [expandedIngresos, setExpandedIngresos] = useState(true)
+  const [expandedCategoriasEtiquetas, setExpandedCategoriasEtiquetas] = useState(true)
+  const [expandedGastos, setExpandedGastos] = useState(false)
+  const [expandedIngresos, setExpandedIngresos] = useState(false)
   
   // Estados para selección masiva
   const [selectedCategoriasGastos, setSelectedCategoriasGastos] = useState<Set<string>>(new Set())
@@ -147,8 +148,17 @@ export default function ConfigPage() {
       const hasArs = (profile.budget_ars || 0) > 0
       const hasUsd = (profile.budget_usd || 0) > 0
       setBudgetEnabled(hasArs || hasUsd)
-      setBudgetArs(profile.budget_ars ? String(profile.budget_ars) : '')
-      setBudgetUsd(profile.budget_usd ? String(profile.budget_usd) : '')
+      // Si hay presupuesto, usar el que tenga valor, priorizando ARS
+      if (hasArs) {
+        setBudgetAmount(String(profile.budget_ars || ''))
+        setBudgetCurrency('ARS')
+      } else if (hasUsd) {
+        setBudgetAmount(String(profile.budget_usd || ''))
+        setBudgetCurrency('USD')
+      } else {
+        setBudgetAmount('')
+        setBudgetCurrency('ARS')
+      }
       setIngresosEnabled(profile.ingresos_habilitado || false)
       setPersonalName(profile.personal_workspace_name || '')
       setPersonalIcono(profile.personal_workspace_icono || '')
@@ -164,18 +174,32 @@ export default function ConfigPage() {
       reader.readAsDataURL(file)
     })
 
-  const handleSaveIngresos = async () => {
-    setSavingIngresos(true)
+  const handleSaveFinancialConfig = async () => {
+    setSaving(true)
+    
+    // Guardar ingresos
     await updateProfile({
       ingresos_habilitado: ingresosEnabled
     })
-    setSavingIngresos(false)
-
+    
+    // Guardar presupuesto
+    if (budgetEnabled) {
+      await updateProfile({
+        budget_ars: budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0,
+        budget_usd: budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
+      })
+    } else {
+      await updateProfile({
+        budget_ars: 0,
+        budget_usd: 0
+      })
+    }
+    
+    setSaving(false)
+    
     setAlertData({
-      title: ingresosEnabled ? '¡Ingresos activados!' : 'Ingresos desactivados',
-      message: ingresosEnabled
-        ? 'Ahora podés registrar tus ingresos en la sección correspondiente'
-        : 'La sección de ingresos se ocultó del menú',
+      title: '¡Configuración guardada!',
+      message: 'Tu configuración financiera mensual fue actualizada correctamente',
       variant: 'success'
     })
     setShowAlert(true)
@@ -198,23 +222,6 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
-  const handleSaveBudget = async () => {
-    setSaving(true)
-
-    if (budgetEnabled) {
-      await updateProfile({
-        budget_ars: parseFloat(budgetArs) || 0,
-        budget_usd: parseFloat(budgetUsd) || 0
-      })
-    } else {
-      await updateProfile({
-        budget_ars: 0,
-        budget_usd: 0
-      })
-    }
-
-    setSaving(false)
-  }
 
   const handleAddTag = async () => {
     if (!newTag.trim()) return
@@ -938,20 +945,24 @@ export default function ConfigPage() {
         <p className="text-slate-500">Personalizá tu experiencia</p>
       </div>
 
-      {/* Sección Nombre de Espacio Personal - Mejorada */}
+      {/* Espacios de trabajo - Unificado */}
       <div className="card p-5 order-1">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold">🏠 Espacio Personal</h3>
-            <p className="text-slate-500 text-sm mt-1">Personalizá tu espacio y compartilo con familiares</p>
-          </div>
-          <button
-            onClick={() => setShowPersonalInviteModal(true)}
-            className="btn btn-primary btn-sm"
-          >
-            <Users className="w-4 h-4" /> Invitar
-          </button>
+        <div className="mb-6">
+          <h3 className="font-bold mb-2">🏠 Espacios de trabajo</h3>
+          <p className="text-slate-500 text-sm">Gestioná tus finanzas personales y compartidas</p>
         </div>
+
+        {/* Espacio Personal */}
+        <div className="mb-6 pb-6 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-base">🏠 Espacio Personal</h4>
+            <button
+              onClick={() => setShowPersonalInviteModal(true)}
+              className="btn btn-primary btn-sm"
+            >
+              <Users className="w-4 h-4" /> Invitar
+            </button>
+          </div>
 
         <div className="space-y-4">
           {/* Vista Previa Mejorada */}
@@ -1056,25 +1067,19 @@ export default function ConfigPage() {
             <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
-      </div>
 
-      {/* Sección de Workspaces */}
-      <div className="card p-5 order-7">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold">🏢 Workspaces Colaborativos</h3>
-            <p className="text-slate-500 text-sm mt-1">
-              Compartí tus finanzas con otras personas
-            </p>
+        {/* Workspaces Colaborativos */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-base">🏢 Workspaces Colaborativos</h4>
+            <button
+              onClick={() => setShowWorkspaceModal(true)}
+              disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 2}
+              className="btn btn-primary btn-sm"
+            >
+              <Plus className="w-4 h-4" /> Nuevo Workspace
+            </button>
           </div>
-          <button
-            onClick={() => setShowWorkspaceModal(true)}
-            disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 2}
-            className="btn btn-primary"
-          >
-            <Plus className="w-4 h-4" /> Nuevo Workspace
-          </button>
-        </div>
 
         {/* Lista de Workspaces */}
         <div className="space-y-3">
@@ -1574,388 +1579,393 @@ export default function ConfigPage() {
         )}
       </div>
 
-      {/* Sección de Ingresos */}
+      {/* Configuración financiera mensual */}
       <div className="card p-5 order-2">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold">💵 Registro de Ingresos</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={ingresosEnabled}
-              onChange={e => setIngresosEnabled(e.target.checked)}
-              className="w-5 h-5 accent-indigo-500"
-            />
-            <span className="text-sm font-medium">Activar</span>
-          </label>
+        <h3 className="font-bold mb-6">🧩 Configuración financiera mensual</h3>
+        
+        {/* Gestión de Ingresos */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-base">💰 Gestión de Ingresos</h4>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ingresosEnabled}
+                onChange={e => setIngresosEnabled(e.target.checked)}
+                className="w-5 h-5 accent-indigo-500"
+              />
+              <span className="text-sm font-medium">Activar registro de ingresos</span>
+            </label>
+          </div>
+          <p className="text-slate-600 text-sm">
+            Podés registrar tus ingresos mensuales con categorías y etiquetas personalizadas.
+          </p>
         </div>
 
-        {ingresosEnabled ? (
-          <div className="bg-emerald-50 rounded-xl p-4">
-            <p className="text-emerald-700 font-medium mb-1">✓ Sección de ingresos activada</p>
-            <p className="text-emerald-600 text-sm">
-              Podés registrar tus ingresos mensuales con categorías y tags personalizados
-            </p>
+        {/* Presupuesto Mensual */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-base">📊 Presupuesto Mensual</h4>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={budgetEnabled}
+                onChange={e => setBudgetEnabled(e.target.checked)}
+                className="w-5 h-5 accent-indigo-500"
+              />
+              <span className="text-sm font-medium">Activar presupuesto</span>
+            </label>
           </div>
-        ) : (
-          <div className="bg-slate-50 rounded-xl p-4 text-center text-slate-500">
-            <p>Sección de ingresos desactivada</p>
-            <p className="text-sm">Activá el checkbox para habilitar el registro de ingresos</p>
-          </div>
-        )}
+          
+          {budgetEnabled ? (
+            <>
+              <div className="grid sm:grid-cols-2 gap-4 mb-3">
+                <div>
+                  <label className="label">Monto máximo mensual</label>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="500000"
+                    value={budgetAmount}
+                    onChange={e => setBudgetAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Moneda</label>
+                  <select
+                    className="input"
+                    value={budgetCurrency}
+                    onChange={e => setBudgetCurrency(e.target.value as 'ARS' | 'USD')}
+                  >
+                    <option value="ARS">ARS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-slate-50 rounded-xl p-4 text-center text-slate-500">
+              <p>No tenés un presupuesto configurado.</p>
+            </div>
+          )}
+          <p className="text-slate-600 text-sm">
+            Establecé un límite para controlar tus gastos mensuales.
+          </p>
+        </div>
 
-        <button onClick={handleSaveIngresos} disabled={savingIngresos} className="btn btn-primary mt-4">
+        {/* Botón único de guardar */}
+        <button onClick={handleSaveFinancialConfig} disabled={saving} className="btn btn-primary w-full">
           <Save className="w-4 h-4" />
-          {savingIngresos ? 'Guardando...' : 'Guardar'}
+          {saving ? 'Guardando...' : 'Guardar configuración'}
         </button>
       </div>
 
-      {/* Presupuesto */}
+      {/* Categorías y Etiquetas - Unificadas */}
       <div className="card p-5 order-3">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold">💰 Presupuesto Mensual</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={budgetEnabled}
-              onChange={e => setBudgetEnabled(e.target.checked)}
-              className="w-5 h-5 accent-indigo-500"
-            />
-            <span className="text-sm font-medium">Activar</span>
-          </label>
-        </div>
-        
-        {budgetEnabled ? (
-          <>
-            <p className="text-slate-500 text-sm mb-4">Establecé un límite mensual para controlar tus gastos</p>
-            <div className="grid sm:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Presupuesto ARS</label>
-                <input
-                  type="number"
-                  className="input"
-                  placeholder="500000"
-                  value={budgetArs}
-                  onChange={e => setBudgetArs(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label">Presupuesto USD</label>
-                <input
-                  type="number"
-                  className="input"
-                  placeholder="500"
-                  value={budgetUsd}
-                  onChange={e => setBudgetUsd(e.target.value)}
-                />
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="bg-slate-50 rounded-xl p-4 text-center text-slate-500">
-            <p>Sin presupuesto configurado</p>
-            <p className="text-sm">Activá el checkbox para establecer un límite mensual</p>
-          </div>
-        )}
-        
-        <button onClick={handleSaveBudget} disabled={saving} className="btn btn-primary mt-4">
-          <Save className="w-4 h-4" />
-          {saving ? 'Guardando...' : 'Guardar'}
-        </button>
-      </div>
-
-      {/* Categorías y Tags de Gastos - Colapsable */}
-      <div className="card p-5 order-4">
-        <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => setExpandedGastos(!expandedGastos)}
+            onClick={() => setExpandedCategoriasEtiquetas(!expandedCategoriasEtiquetas)}
             className="flex items-center gap-2 text-left flex-1 group"
           >
-            <h3 className="font-bold">📂 Gastos</h3>
-            <p className="text-slate-500 text-sm">Categorías y etiquetas</p>
-            {expandedGastos ? (
+            <h3 className="font-bold">📂 Categorías y Etiquetas</h3>
+            {expandedCategoriasEtiquetas ? (
               <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
             ) : (
               <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
             )}
           </button>
-          {expandedGastos && (
-            <div className="flex gap-2">
-              {selectedCategoriasGastos.size > 0 && (
-                <button
-                  onClick={() => {
-                    setWorkspaceToDeleteAll('categorias_gastos')
-                    setShowDeleteAllConfirm(true)
-                  }}
-                  className="btn btn-secondary btn-sm"
-                >
-                  <Trash2 className="w-4 h-4" /> Eliminar ({selectedCategoriasGastos.size})
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setEditingCategoria(null)
-                  setCategoriaForm({ nombre: '', icono: '', color: '#6366f1' })
-                  setShowCategoriaModal(true)
-                }}
-                className="btn btn-primary btn-sm"
-              >
-                <Plus className="w-4 h-4" /> Nueva Categoría
-              </button>
-            </div>
-          )}
         </div>
 
-        {expandedGastos && (
+        {expandedCategoriasEtiquetas && (
           <div className="space-y-6">
-            {/* Categorías de Gastos */}
+            {/* Gastos - Colapsable */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-sm text-slate-700">Categorías ({categorias.length})</h4>
-                {categorias.length > 0 && (
-                  <button
-                    onClick={() => {
-                      if (selectedCategoriasGastos.size === categorias.length) {
-                        setSelectedCategoriasGastos(new Set())
-                      } else {
-                        setSelectedCategoriasGastos(new Set(categorias.map(c => c.id)))
-                      }
-                    }}
-                    className="text-xs text-slate-600 hover:text-slate-900"
-                  >
-                    {selectedCategoriasGastos.size === categorias.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
-                  </button>
-                )}
-              </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {categorias.map(c => (
-                  <div
-                    key={c.id}
-                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategoriasGastos.has(c.id)}
-                      onChange={(e) => {
-                        const newSelected = new Set(selectedCategoriasGastos)
-                        if (e.target.checked) {
-                          newSelected.add(c.id)
-                        } else {
-                          newSelected.delete(c.id)
-                        }
-                        setSelectedCategoriasGastos(newSelected)
-                      }}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                      style={{ backgroundColor: c.color + '20' }}
-                    >
-                      {c.icono}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold">{c.nombre}</div>
-                      <div className="text-xs text-slate-500">Color: {c.color}</div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleEditCategoria(c)}
-                        className="p-2 hover:bg-slate-200 rounded-lg transition"
-                      >
-                        <Edit2 className="w-4 h-4 text-slate-600" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCategoria(c.id, c.nombre)}
-                        className="p-2 hover:bg-red-100 rounded-lg transition"
-                      >
-                        <X className="w-4 h-4 text-red-600" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tags de Gastos */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-sm text-slate-700">Etiquetas ({tags.length})</h4>
-              </div>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {tags.map(t => (
-                  <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
-                    <span className="font-semibold text-sm">{t.nombre}</span>
-                    <button onClick={() => deleteTag(t.id)} className="hover:text-orange-900">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                {tags.length === 0 && (
-                  <span className="text-slate-400">Sin etiquetas</span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="input flex-1"
-                  placeholder="Nueva etiqueta..."
-                  value={newTag}
-                  onChange={e => setNewTag(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleAddTag()}
-                />
-                <button onClick={handleAddTag} className="btn btn-primary">
-                  <Plus className="w-4 h-4" /> Agregar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Categorías y Tags de Ingresos - Colapsable */}
-      <div className="card p-5 order-4.5">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => setExpandedIngresos(!expandedIngresos)}
-            className="flex items-center gap-2 text-left flex-1 group"
-          >
-            <h3 className="font-bold">💰 Ingresos</h3>
-            <p className="text-slate-500 text-sm">Categorías y etiquetas</p>
-            {expandedIngresos ? (
-              <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
-            )}
-          </button>
-          {expandedIngresos && (
-            <div className="flex gap-2">
-              {selectedCategoriasIngresos.size > 0 && (
-                <button
-                  onClick={() => {
-                    setShowDeleteAllConfirm(true)
-                    setWorkspaceToDeleteAll('categorias_ingresos')
-                  }}
-                  className="btn btn-secondary btn-sm"
-                >
-                  <Trash2 className="w-4 h-4" /> Eliminar ({selectedCategoriasIngresos.size})
-                </button>
-              )}
               <button
-                onClick={() => {
-                  setEditingCategoriaIngreso(null)
-                  setCategoriaIngresoForm({ nombre: '', icono: '', color: '#10b981' })
-                  setShowCategoriaIngresoModal(true)
-                }}
-                className="btn btn-primary btn-sm"
+                onClick={() => setExpandedGastos(!expandedGastos)}
+                className="flex items-center justify-between w-full mb-3 group"
               >
-                <Plus className="w-4 h-4" /> Nueva Categoría
-              </button>
-            </div>
-          )}
-        </div>
-
-        {expandedIngresos && (
-          <div className="space-y-6">
-            {/* Categorías de Ingresos */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-sm text-slate-700">Categorías ({categoriasIngresos.length})</h4>
-                {categoriasIngresos.length > 0 && (
-                  <button
-                    onClick={() => {
-                      if (selectedCategoriasIngresos.size === categoriasIngresos.length) {
-                        setSelectedCategoriasIngresos(new Set())
-                      } else {
-                        setSelectedCategoriasIngresos(new Set(categoriasIngresos.map(c => c.id)))
-                      }
-                    }}
-                    className="text-xs text-slate-600 hover:text-slate-900"
-                  >
-                    {selectedCategoriasIngresos.size === categoriasIngresos.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
-                  </button>
+                <h4 className="font-semibold text-base text-slate-700">📂 Gastos</h4>
+                {expandedGastos ? (
+                  <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
                 )}
-              </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {categoriasIngresos.map(c => (
-                  <div
-                    key={c.id}
-                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategoriasIngresos.has(c.id)}
-                      onChange={(e) => {
-                        const newSelected = new Set(selectedCategoriasIngresos)
-                        if (e.target.checked) {
-                          newSelected.add(c.id)
-                        } else {
-                          newSelected.delete(c.id)
-                        }
-                        setSelectedCategoriasIngresos(newSelected)
+              </button>
+              
+              {expandedGastos && (
+                <div className="space-y-6 pl-4 border-l-2 border-slate-200">
+                  <div className="flex gap-2 mb-4">
+                    {selectedCategoriasGastos.size > 0 && (
+                      <button
+                        onClick={() => {
+                          setWorkspaceToDeleteAll('categorias_gastos')
+                          setShowDeleteAllConfirm(true)
+                        }}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        <Trash2 className="w-4 h-4" /> Eliminar ({selectedCategoriasGastos.size})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setEditingCategoria(null)
+                        setCategoriaForm({ nombre: '', icono: '', color: '#6366f1' })
+                        setShowCategoriaModal(true)
                       }}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                      style={{ backgroundColor: c.color + '20' }}
+                      className="btn btn-primary btn-sm"
                     >
-                      {c.icono}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold">{c.nombre}</div>
-                      <div className="text-xs text-slate-500">Color: {c.color}</div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleEditCategoriaIngreso(c)}
-                        className="p-2 hover:bg-slate-200 rounded-lg transition"
-                      >
-                        <Edit2 className="w-4 h-4 text-slate-600" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCategoriaIngreso(c.id, c.nombre)}
-                        className="p-2 hover:bg-red-100 rounded-lg transition"
-                      >
-                        <X className="w-4 h-4 text-red-600" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tags de Ingresos */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-sm text-slate-700">Etiquetas ({tagsIngresos.length})</h4>
-              </div>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {tagsIngresos.map(t => (
-                  <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
-                    <span className="font-semibold text-sm">{t.nombre}</span>
-                    <button onClick={() => deleteTagIngreso(t.id)} className="hover:text-orange-900">
-                      <X className="w-4 h-4" />
+                      <Plus className="w-4 h-4" /> Nueva Categoría
                     </button>
                   </div>
-                ))}
-                {tagsIngresos.length === 0 && (
-                  <span className="text-slate-400">Sin etiquetas</span>
+
+                  {/* Categorías de Gastos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="font-semibold text-sm text-slate-700">Categorías ({categorias.length})</h5>
+                      {categorias.length > 0 && (
+                        <button
+                          onClick={() => {
+                            if (selectedCategoriasGastos.size === categorias.length) {
+                              setSelectedCategoriasGastos(new Set())
+                            } else {
+                              setSelectedCategoriasGastos(new Set(categorias.map(c => c.id)))
+                            }
+                          }}
+                          className="text-xs text-slate-600 hover:text-slate-900"
+                        >
+                          {selectedCategoriasGastos.size === categorias.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {categorias.map(c => (
+                        <div
+                          key={c.id}
+                          className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedCategoriasGastos.has(c.id)}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedCategoriasGastos)
+                              if (e.target.checked) {
+                                newSelected.add(c.id)
+                              } else {
+                                newSelected.delete(c.id)
+                              }
+                              setSelectedCategoriasGastos(newSelected)
+                            }}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div
+                            className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                            style={{ backgroundColor: c.color + '20' }}
+                          >
+                            {c.icono}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold">{c.nombre}</div>
+                            <div className="text-xs text-slate-500">Color: {c.color}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleEditCategoria(c)}
+                              className="p-2 hover:bg-slate-200 rounded-lg transition"
+                            >
+                              <Edit2 className="w-4 h-4 text-slate-600" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategoria(c.id, c.nombre)}
+                              className="p-2 hover:bg-red-100 rounded-lg transition"
+                            >
+                              <X className="w-4 h-4 text-red-600" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tags de Gastos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="font-semibold text-sm text-slate-700">Etiquetas ({tags.length})</h5>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {tags.map(t => (
+                        <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
+                          <span className="font-semibold text-sm">{t.nombre}</span>
+                          <button onClick={() => deleteTag(t.id)} className="hover:text-orange-900">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {tags.length === 0 && (
+                        <span className="text-slate-400">Sin etiquetas</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="input flex-1"
+                        placeholder="Nueva etiqueta..."
+                        value={newTag}
+                        onChange={e => setNewTag(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleAddTag()}
+                      />
+                      <button onClick={handleAddTag} className="btn btn-primary">
+                        <Plus className="w-4 h-4" /> Agregar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Ingresos - Colapsable */}
+            <div>
+              <button
+                onClick={() => setExpandedIngresos(!expandedIngresos)}
+                className="flex items-center justify-between w-full mb-3 group"
+              >
+                <h4 className="font-semibold text-base text-slate-700">💰 Ingresos</h4>
+                {expandedIngresos ? (
+                  <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
                 )}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="input flex-1"
-                  placeholder="Nueva etiqueta..."
-                  value={newTagIngreso}
-                  onChange={e => setNewTagIngreso(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleAddTagIngreso()}
-                />
-                <button onClick={handleAddTagIngreso} className="btn btn-primary">
-                  <Plus className="w-4 h-4" /> Agregar
-                </button>
-              </div>
+              </button>
+              
+              {expandedIngresos && (
+                <div className="space-y-6 pl-4 border-l-2 border-slate-200">
+                  <div className="flex gap-2 mb-4">
+                    {selectedCategoriasIngresos.size > 0 && (
+                      <button
+                        onClick={() => {
+                          setShowDeleteAllConfirm(true)
+                          setWorkspaceToDeleteAll('categorias_ingresos')
+                        }}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        <Trash2 className="w-4 h-4" /> Eliminar ({selectedCategoriasIngresos.size})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setEditingCategoriaIngreso(null)
+                        setCategoriaIngresoForm({ nombre: '', icono: '', color: '#10b981' })
+                        setShowCategoriaIngresoModal(true)
+                      }}
+                      className="btn btn-primary btn-sm"
+                    >
+                      <Plus className="w-4 h-4" /> Nueva Categoría
+                    </button>
+                  </div>
+
+                  {/* Categorías de Ingresos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="font-semibold text-sm text-slate-700">Categorías ({categoriasIngresos.length})</h5>
+                      {categoriasIngresos.length > 0 && (
+                        <button
+                          onClick={() => {
+                            if (selectedCategoriasIngresos.size === categoriasIngresos.length) {
+                              setSelectedCategoriasIngresos(new Set())
+                            } else {
+                              setSelectedCategoriasIngresos(new Set(categoriasIngresos.map(c => c.id)))
+                            }
+                          }}
+                          className="text-xs text-slate-600 hover:text-slate-900"
+                        >
+                          {selectedCategoriasIngresos.size === categoriasIngresos.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {categoriasIngresos.map(c => (
+                        <div
+                          key={c.id}
+                          className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedCategoriasIngresos.has(c.id)}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedCategoriasIngresos)
+                              if (e.target.checked) {
+                                newSelected.add(c.id)
+                              } else {
+                                newSelected.delete(c.id)
+                              }
+                              setSelectedCategoriasIngresos(newSelected)
+                            }}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div
+                            className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                            style={{ backgroundColor: c.color + '20' }}
+                          >
+                            {c.icono}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold">{c.nombre}</div>
+                            <div className="text-xs text-slate-500">Color: {c.color}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleEditCategoriaIngreso(c)}
+                              className="p-2 hover:bg-slate-200 rounded-lg transition"
+                            >
+                              <Edit2 className="w-4 h-4 text-slate-600" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategoriaIngreso(c.id, c.nombre)}
+                              className="p-2 hover:bg-red-100 rounded-lg transition"
+                            >
+                              <X className="w-4 h-4 text-red-600" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tags de Ingresos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="font-semibold text-sm text-slate-700">Etiquetas ({tagsIngresos.length})</h5>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {tagsIngresos.map(t => (
+                        <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
+                          <span className="font-semibold text-sm">{t.nombre}</span>
+                          <button onClick={() => deleteTagIngreso(t.id)} className="hover:text-orange-900">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {tagsIngresos.length === 0 && (
+                        <span className="text-slate-400">Sin etiquetas</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="input flex-1"
+                        placeholder="Nueva etiqueta..."
+                        value={newTagIngreso}
+                        onChange={e => setNewTagIngreso(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleAddTagIngreso()}
+                      />
+                      <button onClick={handleAddTagIngreso} className="btn btn-primary">
+                        <Plus className="w-4 h-4" /> Agregar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2066,8 +2076,11 @@ export default function ConfigPage() {
         )}
       </div>
 
+        </div>
+      </div>
+
       {/* Info */}
-      <div className="card p-5 bg-slate-50 order-8">
+      <div className="card p-5 bg-slate-50 order-4">
         <h3 className="font-bold mb-2">ℹ️ Información</h3>
         <div className="text-sm text-slate-600 space-y-1">
           <p><strong>Email:</strong> {profile?.email}</p>
