@@ -382,7 +382,7 @@ export default function IngresosPage() {
       fecha_cobro_confirmada: (ingreso as any).fecha_cobro_confirmada
     })
     
-    const pendienteCobroValue = (ingreso as any).pendiente_cobro === true || (ingreso as any).pendiente_cobro === 'true' || (ingreso as any).pendiente_cobro === 1
+    const pendienteCobroValue = (ingreso as any).pendiente_cobro === true || (typeof (ingreso as any).pendiente_cobro === 'string' && (ingreso as any).pendiente_cobro === 'true') || (typeof (ingreso as any).pendiente_cobro === 'number' && (ingreso as any).pendiente_cobro === 1)
     
     console.log('🔵 [Ingresos] Valor procesado de pendiente_cobro:', pendienteCobroValue)
     
@@ -432,7 +432,7 @@ export default function IngresosPage() {
       })
     }
 
-    const pendienteCobroBoolean = form.pendiente_cobro === true || form.pendiente_cobro === 'true' || form.pendiente_cobro === 1
+    const pendienteCobroBoolean = form.pendiente_cobro === true
     
     console.log('🔵 [Ingresos] Preparando datos para guardar:', {
       form_pendiente_cobro: form.pendiente_cobro,
@@ -837,7 +837,7 @@ export default function IngresosPage() {
         
         // Determinar si está pendiente de cobro (desde ediciones o por defecto false)
         // Asegurar que sea boolean explícitamente
-        const pendienteCobro = edited.pendiente_cobro === true || edited.pendiente_cobro === 'true' || edited.pendiente_cobro === 1
+        const pendienteCobro = edited.pendiente_cobro === true || (typeof edited.pendiente_cobro === 'string' && edited.pendiente_cobro === 'true') || (typeof edited.pendiente_cobro === 'number' && edited.pendiente_cobro === 1)
         console.log('🔵 [Ingresos] Verificando pendiente_cobro desde IA:', {
           edited_pendiente_cobro: edited.pendiente_cobro,
           edited_pendiente_cobro_type: typeof edited.pendiente_cobro,
