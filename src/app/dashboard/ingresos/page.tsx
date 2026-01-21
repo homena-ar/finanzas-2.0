@@ -155,7 +155,7 @@ export default function IngresosPage() {
   }
 
   // Función para crear automáticamente categoría si no existe y la IA la sugiere
-  const ensureCategoriaExists = async (categoriaLabel: string): Promise<string | null> => {
+  const ensureCategoriaExists = async (categoriaLabel: string, categoriaIcono?: string): Promise<string | null> => {
     if (!categoriaLabel) return null
     
     // Buscar si ya existe
@@ -165,12 +165,44 @@ export default function IngresosPage() {
       return existingId
     }
     
+    // Mapeo de iconos por tipo de categoría (si no viene de la IA)
+    const iconoMap: Record<string, string> = {
+      'salario': '💰',
+      'trabajo freelance': '💼',
+      'freelance': '💼',
+      'inversiones': '📈',
+      'alquiler': '🏠',
+      'venta': '💵',
+      'reembolso': '🔄',
+      'intereses bancarios': '🏦',
+      'intereses': '🏦',
+      'transferencia personal': '👤',
+      'transferencia': '👤',
+      'pago recibido': '✅',
+      'pago': '✅',
+      'beneficio bancario': '🎁',
+      'beneficio': '🎁'
+    }
+    
+    // Determinar el icono a usar
+    let iconoFinal = categoriaIcono || '💵' // Usar el icono de la IA si está disponible
+    if (!categoriaIcono) {
+      // Si no hay icono de la IA, buscar en el mapa
+      const categoriaLower = categoriaLabel.toLowerCase()
+      for (const [key, icono] of Object.entries(iconoMap)) {
+        if (categoriaLower.includes(key)) {
+          iconoFinal = icono
+          break
+        }
+      }
+    }
+    
     // Crear automáticamente
-    console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel)
+    console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', iconoFinal)
     const { error, id } = await addCategoriaIngreso({
       nombre: categoriaLabel.trim(),
-      icono: '💵',
-      color: '#3b82f6'
+      icono: iconoFinal,
+      color: '#10b981' // Color verde por defecto para ingresos
     })
     
     if (error) {
@@ -342,6 +374,18 @@ export default function IngresosPage() {
   }
 
   const openEdit = (ingreso: Ingreso) => {
+    console.log('🔵 [Ingresos] Abriendo edición de ingreso:', {
+      id: ingreso.id,
+      pendiente_cobro_raw: (ingreso as any).pendiente_cobro,
+      pendiente_cobro_type: typeof (ingreso as any).pendiente_cobro,
+      fecha_cobro_esperada: (ingreso as any).fecha_cobro_esperada,
+      fecha_cobro_confirmada: (ingreso as any).fecha_cobro_confirmada
+    })
+    
+    const pendienteCobroValue = (ingreso as any).pendiente_cobro === true || (ingreso as any).pendiente_cobro === 'true' || (ingreso as any).pendiente_cobro === 1
+    
+    console.log('🔵 [Ingresos] Valor procesado de pendiente_cobro:', pendienteCobroValue)
+    
     setEditing(ingreso)
     setForm({
       descripcion: ingreso.descripcion,
@@ -350,7 +394,7 @@ export default function IngresosPage() {
       moneda: ingreso.moneda,
       fecha: ingreso.fecha,
       tag_ids: ingreso.tag_ids || [],
-      pendiente_cobro: (ingreso as any).pendiente_cobro || false,
+      pendiente_cobro: pendienteCobroValue,
       fecha_cobro_esperada: (ingreso as any).fecha_cobro_esperada || null,
       cuenta_bancaria_id: (ingreso as any).cuenta_bancaria_id || null,
       comprobante: null, // No pre-cargar archivo
@@ -388,6 +432,15 @@ export default function IngresosPage() {
       })
     }
 
+    const pendienteCobroBoolean = form.pendiente_cobro === true || form.pendiente_cobro === 'true' || form.pendiente_cobro === 1
+    
+    console.log('🔵 [Ingresos] Preparando datos para guardar:', {
+      form_pendiente_cobro: form.pendiente_cobro,
+      form_pendiente_cobro_type: typeof form.pendiente_cobro,
+      pendienteCobroBoolean: pendienteCobroBoolean,
+      fecha_cobro_esperada: form.fecha_cobro_esperada
+    })
+    
     const data: any = {
       descripcion: form.descripcion,
       categoria_id: form.categoria_id || null,
@@ -396,29 +449,31 @@ export default function IngresosPage() {
       fecha: form.fecha,
       mes: mes,
       tag_ids: form.tag_ids,
-      pendiente_cobro: form.pendiente_cobro === true, // Asegurar que sea boolean
+      pendiente_cobro: pendienteCobroBoolean, // Asegurar que sea boolean
       fecha_cobro_esperada: form.fecha_cobro_esperada || null,
       cuenta_bancaria_id: form.cuenta_bancaria_id || null,
       comprobante_url: comprobanteUrl,
       comprobante_nombre: comprobanteNombre,
-      notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : (form.pendiente_cobro ? true : false),
-      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : (form.pendiente_cobro ? true : false)
+      notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : (pendienteCobroBoolean ? true : false),
+      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : (pendienteCobroBoolean ? true : false)
     }
 
     // Manejar fecha_cobro_confirmada según el estado de pendiente_cobro
-    if (form.pendiente_cobro) {
+    if (pendienteCobroBoolean) {
       // Si está marcado como pendiente, fecha_cobro_confirmada debe ser null
       data.fecha_cobro_confirmada = null
+      console.log('🔵 [Ingresos] Ingreso marcado como PENDIENTE - fecha_cobro_confirmada será null')
     } else {
       // Si NO está pendiente, confirmar automáticamente con la fecha del ingreso
       data.fecha_cobro_confirmada = form.fecha
+      console.log('🔵 [Ingresos] Ingreso NO pendiente - fecha_cobro_confirmada será:', form.fecha)
     }
     
-    console.log('🔵 [Ingresos] Guardando ingreso desde formulario:', {
+    console.log('🔵 [Ingresos] Datos finales a guardar:', {
       ...data,
       pendiente_cobro_type: typeof data.pendiente_cobro,
       pendiente_cobro_value: data.pendiente_cobro,
-      form_pendiente_cobro: form.pendiente_cobro
+      fecha_cobro_confirmada: data.fecha_cobro_confirmada
     })
 
     try {
@@ -736,6 +791,7 @@ export default function IngresosPage() {
           categoriaId = String(trans.categoria_id)
         } else if (trans.categoria) {
           const categoriaLabel = trans.categoria.trim()
+          const categoriaIcono = (trans as any).categoria_icono || undefined
           
           // Verificar si ya creamos esta categoría en este proceso
           if (categoriasCreadas.has(categoriaLabel)) {
@@ -744,10 +800,10 @@ export default function IngresosPage() {
           } else {
             // Intentar encontrar primero en las existentes
             categoriaId = findCategoriaIdFromLabel(categoriaLabel)
-            // Si no existe, crearla automáticamente
+            // Si no existe, crearla automáticamente con el icono de la IA
             if (!categoriaId) {
-              console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel)
-              categoriaId = (await ensureCategoriaExists(categoriaLabel)) || ''
+              console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', categoriaIcono || 'por defecto')
+              categoriaId = (await ensureCategoriaExists(categoriaLabel, categoriaIcono)) || ''
               if (categoriaId) {
                 // Guardar en el mapa para reutilizar
                 categoriasCreadas.set(categoriaLabel, categoriaId)
@@ -782,10 +838,13 @@ export default function IngresosPage() {
         // Determinar si está pendiente de cobro (desde ediciones o por defecto false)
         // Asegurar que sea boolean explícitamente
         const pendienteCobro = edited.pendiente_cobro === true || edited.pendiente_cobro === 'true' || edited.pendiente_cobro === 1
-        console.log('🔵 [Ingresos] Verificando pendiente_cobro:', {
+        console.log('🔵 [Ingresos] Verificando pendiente_cobro desde IA:', {
           edited_pendiente_cobro: edited.pendiente_cobro,
           edited_pendiente_cobro_type: typeof edited.pendiente_cobro,
-          pendienteCobro_result: pendienteCobro
+          pendienteCobro_result: pendienteCobro,
+          fecha_cobro_esperada: edited.fecha_cobro_esperada,
+          notificar_celular: edited.notificar_celular,
+          notificar_correo: edited.notificar_correo
         })
         const fechaCobroEsperada = edited.fecha_cobro_esperada || null
         
@@ -1734,15 +1793,20 @@ export default function IngresosPage() {
                           }
                         }}
                       />
-                      {globalDocumentDate && (
-                        <div className="text-xs text-slate-600">
-                          Se cargarán en: <strong>{new Date(globalDocumentDate).toLocaleDateString('es-AR', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })}</strong>
-                        </div>
-                      )}
+                      {globalDocumentDate && (() => {
+                        // Parsear la fecha de forma segura para evitar problemas de zona horaria
+                        const [year, month] = globalDocumentDate.split('-').map(Number)
+                        const fechaDisplay = new Date(year, month - 1, 1) // month - 1 porque Date usa 0-11
+                        return (
+                          <div className="text-xs text-slate-600">
+                            Se cargarán en: <strong>{fechaDisplay.toLocaleDateString('es-AR', { 
+                              day: 'numeric', 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}</strong>
+                          </div>
+                        )
+                      })()}
                       <button
                         onClick={() => setUseGlobalDate(!useGlobalDate)}
                         className={`text-xs px-2 py-1 rounded ${
@@ -1754,11 +1818,16 @@ export default function IngresosPage() {
                         {useGlobalDate ? '✓ Usar fecha global' : 'Usar fechas individuales'}
                       </button>
                     </div>
-                    {useGlobalDate && globalDocumentDate && (
-                      <p className="text-xs text-slate-500 mt-2">
-                        Todos los ingresos seleccionados se cargarán en <strong>{new Date(globalDocumentDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</strong>.
-                      </p>
-                    )}
+                    {useGlobalDate && globalDocumentDate && (() => {
+                      // Parsear la fecha de forma segura para evitar problemas de zona horaria
+                      const [year, month] = globalDocumentDate.split('-').map(Number)
+                      const fechaDisplay = new Date(year, month - 1, 1) // month - 1 porque Date usa 0-11
+                      return (
+                        <p className="text-xs text-slate-500 mt-2">
+                          Todos los ingresos seleccionados se cargarán en <strong>{fechaDisplay.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</strong>.
+                        </p>
+                      )
+                    })()}
                   </div>
 
                   {/* Selección de cuenta/tarjeta si fue detectada */}

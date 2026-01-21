@@ -407,6 +407,7 @@ Responde en formato JSON con un array "transacciones" que contenga cada ingreso 
       "moneda": "ARS" o "USD",
       "fecha": "YYYY-MM-DD" (fecha del ingreso individual del período actual),
       "categoria": "categoría sugerida en ESPAÑOL según la descripción (ej: Salario, Trabajo Freelance, Inversiones, Alquiler, Venta, Reembolso, Intereses Bancarios, Transferencia Personal, etc.) - IMPORTANTE: SIEMPRE en español, NUNCA en inglés",
+      "categoria_icono": "emoji o icono apropiado para la categoría sugerida (ej: 💰 para Salario, 💼 para Trabajo Freelance, 📈 para Inversiones, 🏠 para Alquiler, 💵 para Venta, 🔄 para Reembolso, 🏦 para Intereses Bancarios, 👤 para Transferencia Personal, etc.) - DEBE ser diferente según el tipo de ingreso, NO uses siempre el mismo icono",
       "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
     }
   ],
@@ -448,6 +449,7 @@ Si encuentras múltiples ingresos del período actual, inclúyelos todos en el a
   "moneda": "ARS" o "USD",
   "fecha": "YYYY-MM-DD" (fecha del ingreso, si no está visible usa la fecha actual),
   "categoria": "categoría sugerida en ESPAÑOL (ej: Salario, Trabajo Freelance, Inversiones, Alquiler, Venta, Reembolso, Intereses Bancarios, Transferencia Personal, etc.) - IMPORTANTE: SIEMPRE en español, NUNCA en inglés",
+  "categoria_icono": "emoji o icono apropiado para la categoría sugerida (ej: 💰 para Salario, 💼 para Trabajo Freelance, 📈 para Inversiones, 🏠 para Alquiler, 💵 para Venta, 🔄 para Reembolso, 🏦 para Intereses Bancarios, 👤 para Transferencia Personal, etc.) - DEBE ser diferente según el tipo de ingreso, NO uses siempre el mismo icono",
   "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
 }
 

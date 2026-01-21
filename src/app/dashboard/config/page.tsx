@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2, ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
 import { AlertModal, ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 import type { WorkspacePermissions } from '@/types'
@@ -72,6 +72,26 @@ export default function ConfigPage() {
   const [showCategoriaIngresoModal, setShowCategoriaIngresoModal] = useState(false)
   const [editingCategoriaIngreso, setEditingCategoriaIngreso] = useState<any>(null)
   const [categoriaIngresoForm, setCategoriaIngresoForm] = useState({ nombre: '', icono: '', color: '#10b981' })
+  
+  // Estados para secciones colapsables
+  const [expandedGastos, setExpandedGastos] = useState(true)
+  const [expandedIngresos, setExpandedIngresos] = useState(true)
+  
+  // Estados para selección masiva
+  const [selectedCategoriasGastos, setSelectedCategoriasGastos] = useState<Set<string>>(new Set())
+  const [selectedCategoriasIngresos, setSelectedCategoriasIngresos] = useState<Set<string>>(new Set())
+  const [selectedTagsGastos, setSelectedTagsGastos] = useState<Set<string>>(new Set())
+  const [selectedTagsIngresos, setSelectedTagsIngresos] = useState<Set<string>>(new Set())
+  
+  // Estados para invitaciones del Espacio Personal
+  const [showPersonalInviteModal, setShowPersonalInviteModal] = useState(false)
+  const [personalInviteEmail, setPersonalInviteEmail] = useState('')
+  const [personalInvitePermissions, setPersonalInvitePermissions] = useState<WorkspacePermissions>({
+    gastos: 'solo_lectura',
+    ingresos: 'solo_lectura',
+    ahorros: 'solo_lectura',
+    tarjetas: 'solo_lectura'
+  })
 
   // Workspace modal states
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
@@ -305,6 +325,91 @@ export default function ConfigPage() {
       variant: 'success'
     })
     setShowAlert(true)
+  }
+
+  // Handlers para eliminación masiva
+  const handleDeleteMasivoCategoriasGastos = async () => {
+    if (selectedCategoriasGastos.size === 0) return
+    
+    const promises = Array.from(selectedCategoriasGastos).map(id => deleteCategoria(id))
+    await Promise.all(promises)
+    
+    setAlertData({
+      title: 'Categorías eliminadas',
+      message: `Se eliminaron ${selectedCategoriasGastos.size} categoría(s) de gastos`,
+      variant: 'success'
+    })
+    setShowAlert(true)
+    setSelectedCategoriasGastos(new Set())
+  }
+
+  const handleDeleteMasivoCategoriasIngresos = async () => {
+    if (selectedCategoriasIngresos.size === 0) return
+    
+    const promises = Array.from(selectedCategoriasIngresos).map(id => deleteCategoriaIngreso(id))
+    await Promise.all(promises)
+    
+    setAlertData({
+      title: 'Categorías eliminadas',
+      message: `Se eliminaron ${selectedCategoriasIngresos.size} categoría(s) de ingresos`,
+      variant: 'success'
+    })
+    setShowAlert(true)
+    setSelectedCategoriasIngresos(new Set())
+  }
+
+  const handleDeleteMasivoTagsGastos = async () => {
+    if (selectedTagsGastos.size === 0) return
+    
+    const promises = Array.from(selectedTagsGastos).map(id => deleteTag(id))
+    await Promise.all(promises)
+    
+    setAlertData({
+      title: 'Tags eliminados',
+      message: `Se eliminaron ${selectedTagsGastos.size} tag(s) de gastos`,
+      variant: 'success'
+    })
+    setShowAlert(true)
+    setSelectedTagsGastos(new Set())
+  }
+
+  const handleDeleteMasivoTagsIngresos = async () => {
+    if (selectedTagsIngresos.size === 0) return
+    
+    const promises = Array.from(selectedTagsIngresos).map(id => deleteTagIngreso(id))
+    await Promise.all(promises)
+    
+    setAlertData({
+      title: 'Tags eliminados',
+      message: `Se eliminaron ${selectedTagsIngresos.size} tag(s) de ingresos`,
+      variant: 'success'
+    })
+    setShowAlert(true)
+    setSelectedTagsIngresos(new Set())
+  }
+
+  // Handler para invitar al Espacio Personal
+  const handleInvitePersonal = async () => {
+    if (!personalInviteEmail.trim()) {
+      setAlertData({
+        title: 'Email requerido',
+        message: 'Por favor ingresá un email válido',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    // El Espacio Personal es básicamente un workspace especial
+    // Necesitamos crear un workspace temporal o usar el sistema de invitaciones personal
+    // Por ahora, usaremos el sistema de workspaces pero con un nombre especial
+    setAlertData({
+      title: 'Funcionalidad en desarrollo',
+      message: 'Las invitaciones al Espacio Personal estarán disponibles próximamente',
+      variant: 'info'
+    })
+    setShowAlert(true)
+    setShowPersonalInviteModal(false)
   }
 
   // Workspace handlers
@@ -833,100 +938,123 @@ export default function ConfigPage() {
         <p className="text-slate-500">Personalizá tu experiencia</p>
       </div>
 
-      {/* Sección Nombre de Espacio Personal */}
+      {/* Sección Nombre de Espacio Personal - Mejorada */}
       <div className="card p-5 order-1">
-        <h3 className="font-bold mb-4">🏠 Espacio Personal</h3>
-        <div className="space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="label">Icono (opcional)</label>
-              <EmojiPickerField
-                value={personalIcono}
-                onChange={setPersonalIcono}
-                placeholder="🏠"
-                size="md"
-              />
-              <p className="text-xs text-slate-500 mt-1">Podés usar emoji o subir un logo</p>
-            </div>
-            <div>
-              <label className="label">Logo (opcional)</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="input"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    // límite suave para evitar Firestore muy grande
-                    const maxBytes = 250 * 1024
-                    if (file.size > maxBytes) {
-                      setAlertData({
-                        title: 'Imagen muy grande',
-                        message: 'Usá un logo cuadrado y liviano (recomendado 256x256 y menos de 250KB).',
-                        variant: 'warning'
-                      })
-                      setShowAlert(true)
-                      e.target.value = ''
-                      return
-                    }
-                    try {
-                      const dataUrl = await fileToDataUrl(file)
-                      setPersonalLogo(dataUrl)
-                    } catch {
-                      setAlertData({
-                        title: 'Error',
-                        message: 'No se pudo cargar la imagen',
-                        variant: 'error'
-                      })
-                      setShowAlert(true)
-                    }
-                  }}
-                />
-                {personalLogo && (
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold">🏠 Espacio Personal</h3>
+            <p className="text-slate-500 text-sm mt-1">Personalizá tu espacio y compartilo con familiares</p>
+          </div>
+          <button
+            onClick={() => setShowPersonalInviteModal(true)}
+            className="btn btn-primary btn-sm"
+          >
+            <Users className="w-4 h-4" /> Invitar
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Vista Previa Mejorada */}
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border-2 border-indigo-200">
+            <div className="text-xs font-semibold text-indigo-700 mb-3 uppercase tracking-wide">Vista Previa</div>
+            <div className="flex items-center gap-3">
+              {personalLogo ? (
+                <div className="relative">
+                  <img src={personalLogo} alt="Logo" className="w-16 h-16 rounded-xl object-cover border-2 border-indigo-300 shadow-md" />
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm whitespace-nowrap"
                     onClick={() => setPersonalLogo(null)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
                   >
-                    Quitar
+                    <X className="w-3 h-3" />
                   </button>
-                )}
+                </div>
+              ) : personalIcono ? (
+                <div className="w-16 h-16 rounded-xl bg-white border-2 border-indigo-300 flex items-center justify-center text-4xl shadow-md">
+                  {personalIcono}
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-indigo-200 border-2 border-indigo-300 flex items-center justify-center text-indigo-700 font-bold text-2xl shadow-md">
+                  {(personalName || 'E').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1">
+                <div className="font-bold text-lg text-slate-800">{personalName || 'Espacio Personal'}</div>
+                <div className="text-xs text-slate-600 mt-1">
+                  {personalLogo ? 'Logo personalizado' : personalIcono ? 'Icono emoji' : 'Inicial automática'}
+                </div>
               </div>
-              <p className="text-xs text-slate-500 mt-1">Recomendado: 256x256 (PNG) / fondo transparente</p>
             </div>
           </div>
 
-          {(personalName || personalIcono || personalLogo) && (
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <div className="text-xs text-slate-500 mb-2">Vista previa:</div>
-              <div className="flex items-center gap-2">
-                {personalLogo ? (
-                  <img src={personalLogo} alt="Logo" className="w-9 h-9 rounded-lg object-cover border border-slate-200" />
-                ) : personalIcono ? (
-                  <span className="text-2xl">{personalIcono}</span>
-                ) : (
-                  <div className="w-9 h-9 rounded-lg bg-slate-200 flex items-center justify-center text-slate-700 font-bold">
-                    {(personalName || 'E').charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="font-semibold">{personalName || 'Espacio Personal'}</span>
-              </div>
+          {/* Configuración */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Nombre del Espacio</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Ej: Mis Finanzas, Casa, Familia..."
+                value={personalName}
+                onChange={e => setPersonalName(e.target.value)}
+              />
             </div>
-          )}
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              className="input flex-1"
-              placeholder="Ej: Mis Finanzas, Casa, etc."
-              value={personalName}
-              onChange={e => setPersonalName(e.target.value)}
-            />
-            <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary">
-              <Save className="w-4 h-4" /> Guardar
-            </button>
+            <div>
+              <label className="label">Identificación Visual</label>
+              <div className="text-xs text-slate-600 mb-2">Elegí un icono emoji o subí un logo</div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <EmojiPickerField
+                    value={personalIcono}
+                    onChange={setPersonalIcono}
+                    placeholder="🏠"
+                    size="md"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input text-xs"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const maxBytes = 250 * 1024
+                      if (file.size > maxBytes) {
+                        setAlertData({
+                          title: 'Imagen muy grande',
+                          message: 'Usá un logo cuadrado y liviano (recomendado 256x256 y menos de 250KB).',
+                          variant: 'warning'
+                        })
+                        setShowAlert(true)
+                        e.target.value = ''
+                        return
+                      }
+                      try {
+                        const dataUrl = await fileToDataUrl(file)
+                        setPersonalLogo(dataUrl)
+                        setPersonalIcono('') // Limpiar icono si se sube logo
+                      } catch {
+                        setAlertData({
+                          title: 'Error',
+                          message: 'No se pudo cargar la imagen',
+                          variant: 'error'
+                        })
+                        setShowAlert(true)
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                💡 <strong>Tip:</strong> Si subís un logo, el icono emoji se desactivará. El logo tiene prioridad.
+              </p>
+            </div>
           </div>
+
+          <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary w-full">
+            <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Cambios'}
+          </button>
         </div>
       </div>
 
@@ -1535,180 +1663,302 @@ export default function ConfigPage() {
         </button>
       </div>
 
-      {/* Categorías de Gastos */}
+      {/* Categorías y Tags de Gastos - Colapsable */}
       <div className="card p-5 order-4">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold">📂 Categorías de Gastos</h3>
-            <p className="text-slate-500 text-sm mt-1">Administrá tus categorías de gastos</p>
-          </div>
           <button
-            onClick={() => {
-              setEditingCategoria(null)
-              setCategoriaForm({ nombre: '', icono: '', color: '#6366f1' })
-              setShowCategoriaModal(true)
-            }}
-            className="btn btn-primary"
+            onClick={() => setExpandedGastos(!expandedGastos)}
+            className="flex items-center gap-2 text-left flex-1 group"
           >
-            <Plus className="w-4 h-4" /> Nueva Categoría
+            <h3 className="font-bold">📂 Gastos</h3>
+            <p className="text-slate-500 text-sm">Categorías y etiquetas</p>
+            {expandedGastos ? (
+              <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+            )}
           </button>
+          {expandedGastos && (
+            <div className="flex gap-2">
+              {selectedCategoriasGastos.size > 0 && (
+                <button
+                  onClick={() => {
+                    setWorkspaceToDeleteAll('categorias_gastos')
+                    setShowDeleteAllConfirm(true)
+                  }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  <Trash2 className="w-4 h-4" /> Eliminar ({selectedCategoriasGastos.size})
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setEditingCategoria(null)
+                  setCategoriaForm({ nombre: '', icono: '', color: '#6366f1' })
+                  setShowCategoriaModal(true)
+                }}
+                className="btn btn-primary btn-sm"
+              >
+                <Plus className="w-4 h-4" /> Nueva Categoría
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          {categorias.map(c => (
-            <div
-              key={c.id}
-              className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                style={{ backgroundColor: c.color + '20' }}
-              >
-                {c.icono}
+        {expandedGastos && (
+          <div className="space-y-6">
+            {/* Categorías de Gastos */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-sm text-slate-700">Categorías ({categorias.length})</h4>
+                {categorias.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (selectedCategoriasGastos.size === categorias.length) {
+                        setSelectedCategoriasGastos(new Set())
+                      } else {
+                        setSelectedCategoriasGastos(new Set(categorias.map(c => c.id)))
+                      }
+                    }}
+                    className="text-xs text-slate-600 hover:text-slate-900"
+                  >
+                    {selectedCategoriasGastos.size === categorias.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                  </button>
+                )}
               </div>
-              <div className="flex-1">
-                <div className="font-semibold">{c.nombre}</div>
-                <div className="text-xs text-slate-500">Color: {c.color}</div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {categorias.map(c => (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCategoriasGastos.has(c.id)}
+                      onChange={(e) => {
+                        const newSelected = new Set(selectedCategoriasGastos)
+                        if (e.target.checked) {
+                          newSelected.add(c.id)
+                        } else {
+                          newSelected.delete(c.id)
+                        }
+                        setSelectedCategoriasGastos(newSelected)
+                      }}
+                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                      style={{ backgroundColor: c.color + '20' }}
+                    >
+                      {c.icono}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold">{c.nombre}</div>
+                      <div className="text-xs text-slate-500">Color: {c.color}</div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleEditCategoria(c)}
+                        className="p-2 hover:bg-slate-200 rounded-lg transition"
+                      >
+                        <Edit2 className="w-4 h-4 text-slate-600" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategoria(c.id, c.nombre)}
+                        className="p-2 hover:bg-red-100 rounded-lg transition"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => handleEditCategoria(c)}
-                  className="p-2 hover:bg-slate-200 rounded-lg transition"
-                >
-                  <Edit2 className="w-4 h-4 text-slate-600" />
-                </button>
-                <button
-                  onClick={() => handleDeleteCategoria(c.id, c.nombre)}
-                  className="p-2 hover:bg-red-100 rounded-lg transition"
-                >
-                  <X className="w-4 h-4 text-red-600" />
+            </div>
+
+            {/* Tags de Gastos */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-sm text-slate-700">Etiquetas ({tags.length})</h4>
+              </div>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {tags.map(t => (
+                  <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
+                    <span className="font-semibold text-sm">{t.nombre}</span>
+                    <button onClick={() => deleteTag(t.id)} className="hover:text-orange-900">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {tags.length === 0 && (
+                  <span className="text-slate-400">Sin etiquetas</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="input flex-1"
+                  placeholder="Nueva etiqueta..."
+                  value={newTag}
+                  onChange={e => setNewTag(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleAddTag()}
+                />
+                <button onClick={handleAddTag} className="btn btn-primary">
+                  <Plus className="w-4 h-4" /> Agregar
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Categorías de Ingresos */}
+      {/* Categorías y Tags de Ingresos - Colapsable */}
       <div className="card p-5 order-4.5">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold">💰 Categorías de Ingresos</h3>
-            <p className="text-slate-500 text-sm mt-1">Administrá tus categorías de ingresos</p>
-          </div>
           <button
-            onClick={() => {
-              setEditingCategoriaIngreso(null)
-              setCategoriaIngresoForm({ nombre: '', icono: '', color: '#10b981' })
-              setShowCategoriaIngresoModal(true)
-            }}
-            className="btn btn-primary"
+            onClick={() => setExpandedIngresos(!expandedIngresos)}
+            className="flex items-center gap-2 text-left flex-1 group"
           >
-            <Plus className="w-4 h-4" /> Nueva Categoría
+            <h3 className="font-bold">💰 Ingresos</h3>
+            <p className="text-slate-500 text-sm">Categorías y etiquetas</p>
+            {expandedIngresos ? (
+              <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+            )}
           </button>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          {categoriasIngresos.map(c => (
-            <div
-              key={c.id}
-              className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                style={{ backgroundColor: c.color + '20' }}
+          {expandedIngresos && (
+            <div className="flex gap-2">
+              {selectedCategoriasIngresos.size > 0 && (
+                <button
+                  onClick={() => {
+                    setShowDeleteAllConfirm(true)
+                    setWorkspaceToDeleteAll('categorias_ingresos')
+                  }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  <Trash2 className="w-4 h-4" /> Eliminar ({selectedCategoriasIngresos.size})
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setEditingCategoriaIngreso(null)
+                  setCategoriaIngresoForm({ nombre: '', icono: '', color: '#10b981' })
+                  setShowCategoriaIngresoModal(true)
+                }}
+                className="btn btn-primary btn-sm"
               >
-                {c.icono}
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold">{c.nombre}</div>
-                <div className="text-xs text-slate-500">Color: {c.color}</div>
-              </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => handleEditCategoriaIngreso(c)}
-                  className="p-2 hover:bg-slate-200 rounded-lg transition"
-                >
-                  <Edit2 className="w-4 h-4 text-slate-600" />
-                </button>
-                <button
-                  onClick={() => handleDeleteCategoriaIngreso(c.id, c.nombre)}
-                  className="p-2 hover:bg-red-100 rounded-lg transition"
-                >
-                  <X className="w-4 h-4 text-red-600" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tags Gastos */}
-      <div className="card p-5 order-5">
-        <h3 className="font-bold mb-4">🏷️ Etiquetas para Gastos</h3>
-        <p className="text-slate-500 text-sm mb-4">Para organizar y filtrar gastos por categorías personalizadas</p>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          {tags.map(t => (
-            <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
-              <span className="font-semibold text-sm">{t.nombre}</span>
-              <button onClick={() => deleteTag(t.id)} className="hover:text-orange-900">
-                <X className="w-4 h-4" />
+                <Plus className="w-4 h-4" /> Nueva Categoría
               </button>
             </div>
-          ))}
-          {tags.length === 0 && (
-            <span className="text-slate-400">Sin etiquetas</span>
           )}
         </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            className="input flex-1"
-            placeholder="Nueva etiqueta..."
-            value={newTag}
-            onChange={e => setNewTag(e.target.value)}
-            onKeyPress={e => e.key === 'Enter' && handleAddTag()}
-          />
-          <button onClick={handleAddTag} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> Agregar
-          </button>
-        </div>
-      </div>
-
-      {/* Tags Ingresos */}
-      <div className="card p-5 order-6">
-        <h3 className="font-bold mb-4">🏷️ Etiquetas para Ingresos</h3>
-        <p className="text-slate-500 text-sm mb-4">Para organizar y filtrar ingresos por categorías personalizadas</p>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          {tagsIngresos.map(t => (
-            <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
-              <span className="font-semibold text-sm">{t.nombre}</span>
-              <button onClick={() => deleteTagIngreso(t.id)} className="hover:text-orange-900">
-                <X className="w-4 h-4" />
-              </button>
+        {expandedIngresos && (
+          <div className="space-y-6">
+            {/* Categorías de Ingresos */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-sm text-slate-700">Categorías ({categoriasIngresos.length})</h4>
+                {categoriasIngresos.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (selectedCategoriasIngresos.size === categoriasIngresos.length) {
+                        setSelectedCategoriasIngresos(new Set())
+                      } else {
+                        setSelectedCategoriasIngresos(new Set(categoriasIngresos.map(c => c.id)))
+                      }
+                    }}
+                    className="text-xs text-slate-600 hover:text-slate-900"
+                  >
+                    {selectedCategoriasIngresos.size === categoriasIngresos.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                  </button>
+                )}
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {categoriasIngresos.map(c => (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCategoriasIngresos.has(c.id)}
+                      onChange={(e) => {
+                        const newSelected = new Set(selectedCategoriasIngresos)
+                        if (e.target.checked) {
+                          newSelected.add(c.id)
+                        } else {
+                          newSelected.delete(c.id)
+                        }
+                        setSelectedCategoriasIngresos(newSelected)
+                      }}
+                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                      style={{ backgroundColor: c.color + '20' }}
+                    >
+                      {c.icono}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold">{c.nombre}</div>
+                      <div className="text-xs text-slate-500">Color: {c.color}</div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleEditCategoriaIngreso(c)}
+                        className="p-2 hover:bg-slate-200 rounded-lg transition"
+                      >
+                        <Edit2 className="w-4 h-4 text-slate-600" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategoriaIngreso(c.id, c.nombre)}
+                        className="p-2 hover:bg-red-100 rounded-lg transition"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-          {tagsIngresos.length === 0 && (
-            <span className="text-slate-400">Sin etiquetas</span>
-          )}
-        </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            className="input flex-1"
-            placeholder="Nueva etiqueta..."
-            value={newTagIngreso}
-            onChange={e => setNewTagIngreso(e.target.value)}
-            onKeyPress={e => e.key === 'Enter' && handleAddTagIngreso()}
-          />
-          <button onClick={handleAddTagIngreso} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> Agregar
-          </button>
-        </div>
+            {/* Tags de Ingresos */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-sm text-slate-700">Etiquetas ({tagsIngresos.length})</h4>
+              </div>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {tagsIngresos.map(t => (
+                  <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
+                    <span className="font-semibold text-sm">{t.nombre}</span>
+                    <button onClick={() => deleteTagIngreso(t.id)} className="hover:text-orange-900">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {tagsIngresos.length === 0 && (
+                  <span className="text-slate-400">Sin etiquetas</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="input flex-1"
+                  placeholder="Nueva etiqueta..."
+                  value={newTagIngreso}
+                  onChange={e => setNewTagIngreso(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleAddTagIngreso()}
+                />
+                <button onClick={handleAddTagIngreso} className="btn btn-primary">
+                  <Plus className="w-4 h-4" /> Agregar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sección Cambio de Contraseña */}
@@ -2239,7 +2489,11 @@ export default function ConfigPage() {
           setWorkspaceToDeleteAll(null)
         }}
         onConfirm={async () => {
-          if (workspaceToDeleteAll) {
+          if (workspaceToDeleteAll === 'categorias_gastos') {
+            await handleDeleteMasivoCategoriasGastos()
+          } else if (workspaceToDeleteAll === 'categorias_ingresos') {
+            await handleDeleteMasivoCategoriasIngresos()
+          } else if (workspaceToDeleteAll) {
             const result = await deleteAllInvitations(workspaceToDeleteAll)
             if (result.error) {
               setAlertData({
@@ -2255,16 +2509,97 @@ export default function ConfigPage() {
               })
             }
             setShowAlert(true)
-            setShowDeleteAllConfirm(false)
-            setWorkspaceToDeleteAll(null)
           }
+          setShowDeleteAllConfirm(false)
+          setWorkspaceToDeleteAll(null)
         }}
-        title="Eliminar Todo el Historial"
-        message="¿Estás seguro de que deseas eliminar todo el historial de invitaciones de este workspace?\n\nEsta acción eliminará permanentemente todas las invitaciones (pendientes, aceptadas, rechazadas y canceladas) y no se puede deshacer."
-        confirmText="Eliminar Todo"
+        title={workspaceToDeleteAll === 'categorias_gastos' || workspaceToDeleteAll === 'categorias_ingresos' ? 'Eliminar Categorías' : 'Eliminar Todo el Historial'}
+        message={
+          workspaceToDeleteAll === 'categorias_gastos'
+            ? `¿Estás seguro de que querés eliminar ${selectedCategoriasGastos.size} categoría(s) de gastos? Esta acción no se puede deshacer.`
+            : workspaceToDeleteAll === 'categorias_ingresos'
+            ? `¿Estás seguro de que querés eliminar ${selectedCategoriasIngresos.size} categoría(s) de ingresos? Esta acción no se puede deshacer.`
+            : '¿Estás seguro de que deseas eliminar todo el historial de invitaciones de este workspace?\n\nEsta acción eliminará permanentemente todas las invitaciones (pendientes, aceptadas, rechazadas y canceladas) y no se puede deshacer.'
+        }
+        confirmText={workspaceToDeleteAll === 'categorias_gastos' || workspaceToDeleteAll === 'categorias_ingresos' ? 'Eliminar' : 'Eliminar Todo'}
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Modal de Invitación Espacio Personal */}
+      {showPersonalInviteModal && (
+        <div className="modal-overlay" onClick={() => setShowPersonalInviteModal(false)}>
+          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Invitar al Espacio Personal</h2>
+              <button onClick={() => setShowPersonalInviteModal(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Email del invitado</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="email@ejemplo.com"
+                  value={personalInviteEmail}
+                  onChange={e => setPersonalInviteEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Permisos</label>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={personalInvitePermissions.gastos === 'admin'}
+                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, gastos: e.target.checked ? 'admin' : 'solo_lectura' }))}
+                      className="w-4 h-4"
+                    />
+                    <span>Administrar gastos</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={personalInvitePermissions.ingresos === 'admin'}
+                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, ingresos: e.target.checked ? 'admin' : 'solo_lectura' }))}
+                      className="w-4 h-4"
+                    />
+                    <span>Administrar ingresos</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={personalInvitePermissions.ahorros === 'admin'}
+                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, ahorros: e.target.checked ? 'admin' : 'solo_lectura' }))}
+                      className="w-4 h-4"
+                    />
+                    <span>Administrar ahorros</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={personalInvitePermissions.tarjetas === 'admin'}
+                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, tarjetas: e.target.checked ? 'admin' : 'solo_lectura' }))}
+                      className="w-4 h-4"
+                    />
+                    <span>Administrar tarjetas</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={handleInvitePersonal} className="btn btn-primary flex-1">
+                  <Mail className="w-4 h-4" /> Enviar Invitación
+                </button>
+                <button onClick={() => setShowPersonalInviteModal(false)} className="btn btn-secondary">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
