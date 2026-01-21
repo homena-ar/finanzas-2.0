@@ -58,7 +58,7 @@ export default function DashboardPage() {
   // - En espacio personal: depende de ingresos_habilitado
   // - En workspace: depende de permisos de ingresos (o dueño)
   const showIngresos = currentWorkspace
-    ? hasAccess('ingresos')
+    ? (currentWorkspace.ingresos_habilitado && hasAccess('ingresos'))
     : !!profile?.ingresos_habilitado
 
   // Export to Excel function
@@ -209,9 +209,9 @@ export default function DashboardPage() {
   const totalProximo = proximoARS + proximoImpuestos + (proximoUSD * dolar)
   const diferenciaTotal = totalActual - totalProximo
 
-  // Budget check (solo si está habilitado)
-  const budgetARS = profile?.budget_ars || 0
-  const budgetUSD = profile?.budget_usd || 0
+  // Budget check (solo si está habilitado) - usar workspace o perfil según corresponda
+  const budgetARS = currentWorkspace ? (currentWorkspace.budget_ars || 0) : (profile?.budget_ars || 0)
+  const budgetUSD = currentWorkspace ? (currentWorkspace.budget_usd || 0) : (profile?.budget_usd || 0)
   const hasBudget = budgetARS > 0 || budgetUSD > 0
 
   // Calcular presupuesto total y gastado total en ARS

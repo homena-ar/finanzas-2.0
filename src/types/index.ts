@@ -185,6 +185,9 @@ export interface Workspace {
   owner_id: string
   icono: string | null // Emoji o URL de imagen para identificar el workspace
   logo?: string | null // data URL (PNG/JPG/WebP)
+  ingresos_habilitado?: boolean
+  budget_ars?: number
+  budget_usd?: number
   created_at: string
 }
 

@@ -24,6 +24,7 @@ export default function ConfigPage() {
     currentWorkspace,
     createWorkspace,
     updateWorkspace,
+    updateWorkspaceConfig,
     deleteWorkspace,
     inviteUser,
     members,
@@ -144,13 +145,29 @@ export default function ConfigPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
 
-  // Inicializar valores del perfil
+  // Inicializar valores según workspace actual o perfil
   useEffect(() => {
-    if (profile) {
+    if (currentWorkspace) {
+      // Si hay workspace activo, usar su configuración
+      const hasArs = (currentWorkspace.budget_ars || 0) > 0
+      const hasUsd = (currentWorkspace.budget_usd || 0) > 0
+      setBudgetEnabled(hasArs || hasUsd)
+      if (hasArs) {
+        setBudgetAmount(String(currentWorkspace.budget_ars || ''))
+        setBudgetCurrency('ARS')
+      } else if (hasUsd) {
+        setBudgetAmount(String(currentWorkspace.budget_usd || ''))
+        setBudgetCurrency('USD')
+      } else {
+        setBudgetAmount('')
+        setBudgetCurrency('ARS')
+      }
+      setIngresosEnabled(currentWorkspace.ingresos_habilitado || false)
+    } else if (profile) {
+      // Si es espacio personal, usar configuración del perfil
       const hasArs = (profile.budget_ars || 0) > 0
       const hasUsd = (profile.budget_usd || 0) > 0
       setBudgetEnabled(hasArs || hasUsd)
-      // Si hay presupuesto, usar el que tenga valor, priorizando ARS
       if (hasArs) {
         setBudgetAmount(String(profile.budget_ars || ''))
         setBudgetCurrency('ARS')
@@ -162,11 +179,14 @@ export default function ConfigPage() {
         setBudgetCurrency('ARS')
       }
       setIngresosEnabled(profile.ingresos_habilitado || false)
+    }
+    
+    if (profile) {
       setPersonalName(profile.personal_workspace_name || '')
       setPersonalIcono(profile.personal_workspace_icono || '')
       setPersonalLogo(profile.personal_workspace_logo || null)
     }
-  }, [profile])
+  }, [profile, currentWorkspace])
 
   const fileToDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -179,31 +199,51 @@ export default function ConfigPage() {
   const handleSaveFinancialConfig = async () => {
     setSaving(true)
     
-    // Guardar ingresos
-    await updateProfile({
-      ingresos_habilitado: ingresosEnabled
-    })
-    
-    // Guardar presupuesto
-    if (budgetEnabled) {
-      await updateProfile({
-        budget_ars: budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0,
-        budget_usd: budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
-      })
-    } else {
-      await updateProfile({
-        budget_ars: 0,
-        budget_usd: 0
+    try {
+      if (currentWorkspace) {
+        // Guardar en workspace
+        const result = await updateWorkspaceConfig(currentWorkspace.id, {
+          ingresos_habilitado: ingresosEnabled,
+          budget_ars: budgetEnabled && budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0,
+          budget_usd: budgetEnabled && budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
+        })
+        
+        if (result.error) {
+          setAlertData({
+            title: 'Error',
+            message: 'No se pudo guardar la configuración',
+            variant: 'error'
+          })
+        } else {
+          setAlertData({
+            title: '¡Configuración guardada!',
+            message: 'Tu configuración financiera mensual fue actualizada correctamente',
+            variant: 'success'
+          })
+        }
+      } else {
+        // Guardar en perfil (espacio personal)
+        await updateProfile({
+          ingresos_habilitado: ingresosEnabled,
+          budget_ars: budgetEnabled && budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0,
+          budget_usd: budgetEnabled && budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
+        })
+        
+        setAlertData({
+          title: '¡Configuración guardada!',
+          message: 'Tu configuración financiera mensual fue actualizada correctamente',
+          variant: 'success'
+        })
+      }
+    } catch (error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo guardar la configuración',
+        variant: 'error'
       })
     }
     
     setSaving(false)
-    
-    setAlertData({
-      title: '¡Configuración guardada!',
-      message: 'Tu configuración financiera mensual fue actualizada correctamente',
-      variant: 'success'
-    })
     setShowAlert(true)
   }
 

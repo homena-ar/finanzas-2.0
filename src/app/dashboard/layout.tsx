@@ -73,9 +73,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const personalWorkspaceLogo = profile?.personal_workspace_logo || null
 
   // Build navigation items based on permissions
-  // Para ingresos: en espacio personal requiere ingresos_habilitado, en workspace solo requiere permisos
+  // Para ingresos: verificar configuración del workspace o perfil según corresponda
   const showIngresos = currentWorkspace 
-    ? hasAccess('ingresos') // En workspace: solo verificar permisos
+    ? (currentWorkspace.ingresos_habilitado && hasAccess('ingresos')) // En workspace: verificar configuración y permisos
     : (profile?.ingresos_habilitado && hasAccess('ingresos')) // En espacio personal: verificar configuración y permisos
   
   const navItems = [

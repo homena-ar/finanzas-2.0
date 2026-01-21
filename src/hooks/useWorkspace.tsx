@@ -29,7 +29,8 @@ interface WorkspaceContextType {
 
   setCurrentWorkspace: (workspace: Workspace | null) => void
   createWorkspace: (name: string, icono?: string, logo?: string | null) => Promise<{ error: any } | { error: null, workspace: Workspace }>
-  updateWorkspace: (id: string, name: string, icono?: string | null, logo?: string | null) => Promise<{ error: any }>
+  updateWorkspace: (id: string, name: string, icono?: string | null, logo?: string | null, ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number) => Promise<{ error: any }>
+  updateWorkspaceConfig: (id: string, config: { ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number }) => Promise<{ error: any }>
   deleteWorkspace: (id: string) => Promise<{ error: any }>
 
   inviteUser: (workspaceId: string, email: string, permissions: WorkspacePermissions) => Promise<{ error: any }>
@@ -75,6 +76,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         owner_id: doc.data().owner_id,
         icono: doc.data().icono || null,
         logo: doc.data().logo || null,
+        ingresos_habilitado: doc.data().ingresos_habilitado || false,
+        budget_ars: doc.data().budget_ars || 0,
+        budget_usd: doc.data().budget_usd || 0,
         created_at: doc.data().created_at instanceof Timestamp 
           ? doc.data().created_at.toDate().toISOString() 
           : doc.data().created_at
@@ -102,6 +106,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                     owner_id: d.data().owner_id,
                     icono: d.data().icono || null,
                     logo: d.data().logo || null,
+                    ingresos_habilitado: d.data().ingresos_habilitado || false,
+                    budget_ars: d.data().budget_ars || 0,
+                    budget_usd: d.data().budget_usd || 0,
                     created_at: d.data().created_at instanceof Timestamp 
                       ? d.data().created_at.toDate().toISOString() 
                       : d.data().created_at
@@ -324,6 +331,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         owner_id: user.uid,
         icono: icono || null,
         logo: logo || null,
+        ingresos_habilitado: false,
+        budget_ars: 0,
+        budget_usd: 0,
         created_at: new Date().toISOString() 
       }
       
@@ -528,19 +538,48 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user, workspaces])
 
-  const updateWorkspace = useCallback(async (id: string, name: string, icono?: string | null, logo?: string | null) => {
+  const updateWorkspace = useCallback(async (id: string, name: string, icono?: string | null, logo?: string | null, ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number) => {
     try { 
-      const updateData: { name: string; icono?: string | null; logo?: string | null } = { name }
+      const updateData: any = { name }
       if (icono !== undefined) {
         updateData.icono = icono
       }
       if (logo !== undefined) {
         updateData.logo = logo
       }
+      if (ingresos_habilitado !== undefined) {
+        updateData.ingresos_habilitado = ingresos_habilitado
+      }
+      if (budget_ars !== undefined) {
+        updateData.budget_ars = budget_ars
+      }
+      if (budget_usd !== undefined) {
+        updateData.budget_usd = budget_usd
+      }
       await updateDoc(doc(db, 'workspaces', id), updateData)
       await fetchAll()
       return { error: null } 
     } catch (e) { return { error: e } }
+  }, [fetchAll])
+
+  const updateWorkspaceConfig = useCallback(async (id: string, config: { ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number }) => {
+    try {
+      const updateData: any = {}
+      if (config.ingresos_habilitado !== undefined) {
+        updateData.ingresos_habilitado = config.ingresos_habilitado
+      }
+      if (config.budget_ars !== undefined) {
+        updateData.budget_ars = config.budget_ars
+      }
+      if (config.budget_usd !== undefined) {
+        updateData.budget_usd = config.budget_usd
+      }
+      await updateDoc(doc(db, 'workspaces', id), updateData)
+      await fetchAll()
+      return { error: null }
+    } catch (e) {
+      return { error: e }
+    }
   }, [fetchAll])
 
   const deleteWorkspace = useCallback(async (id: string) => {
@@ -664,7 +703,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const value = {
     workspaces, currentWorkspace, members, invitations, sentInvitations, loading,
-    setCurrentWorkspace, createWorkspace, updateWorkspace, deleteWorkspace,
+    setCurrentWorkspace, createWorkspace, updateWorkspace, updateWorkspaceConfig, deleteWorkspace,
     inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, 
     acceptInvitation, rejectInvitation, cancelInvitation, deleteInvitation, deleteAllInvitations, fetchAll
   }
