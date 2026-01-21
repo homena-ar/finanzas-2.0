@@ -1836,7 +1836,7 @@ export default function IngresosPage() {
                                         tag_ids: edited.tag_ids ?? getTransactionTagIds(index),
                                         pendiente_cobro: edited.pendiente_cobro ?? false,
                                         fecha_cobro_esperada: edited.fecha_cobro_esperada ?? null,
-                                        cuenta_bancaria_id: edited.cuenta_bancaria_id ?? selectedCuentaId || null
+                                        cuenta_bancaria_id: edited.cuenta_bancaria_id ?? (selectedCuentaId || null)
                                       })
                                       setEditingAiTransaction(index)
                                     }}
