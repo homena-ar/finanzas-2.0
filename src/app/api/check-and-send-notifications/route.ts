@@ -311,11 +311,38 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // También verificar ingresos pendientes
+    let ingresosPendientesChecked = 0
+    let ingresosPendientesSent = 0
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'http://localhost:3000'
+      const ingresosUrl = `${baseUrl}/api/check-pending-income-notifications`
+      const ingresosResponse = await fetch(ingresosUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (ingresosResponse.ok) {
+        const ingresosData = await ingresosResponse.json()
+        ingresosPendientesChecked = ingresosData.checked || 0
+        ingresosPendientesSent = ingresosData.sent || 0
+        console.log(`✅ [Cron] Ingresos pendientes procesados: ${ingresosPendientesChecked} verificados, ${ingresosPendientesSent} notificaciones enviadas`)
+      }
+    } catch (ingresosError: any) {
+      console.error('❌ [Cron] Error verificando ingresos pendientes:', ingresosError?.message)
+    }
+
     return NextResponse.json({
       success: true,
       processed: notificationsToSend.length,
       results,
-      message: `Procesadas ${notificationsToSend.length} notificaciones`
+      ingresosPendientes: {
+        checked: ingresosPendientesChecked,
+        sent: ingresosPendientesSent
+      },
+      message: `Procesadas ${notificationsToSend.length} notificaciones de tarjetas y ${ingresosPendientesChecked} ingresos pendientes (${ingresosPendientesSent} notificaciones enviadas)`
     })
   } catch (error: any) {
     console.error('❌ [Cron] Error en check-and-send-notifications:', error)

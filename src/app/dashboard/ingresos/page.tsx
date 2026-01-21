@@ -33,7 +33,9 @@ export default function IngresosPage() {
     pendiente_cobro: false,
     fecha_cobro_esperada: '' as string | null,
     cuenta_bancaria_id: '' as string | null,
-    comprobante: null as File | null
+    comprobante: null as File | null,
+    notificar_celular: true,
+    notificar_correo: true
   })
 
   // Modal states
@@ -78,7 +80,9 @@ export default function IngresosPage() {
     tag_ids: [] as string[],
     pendiente_cobro: false,
     fecha_cobro_esperada: '' as string | null,
-    cuenta_bancaria_id: '' as string | null
+    cuenta_bancaria_id: '' as string | null,
+    notificar_celular: true,
+    notificar_correo: true
   })
 
   const findCategoriaIdFromLabel = (label?: string) => {
@@ -156,21 +160,42 @@ export default function IngresosPage() {
     
     // Buscar si ya existe
     const existingId = findCategoriaIdFromLabel(categoriaLabel)
-    if (existingId) return existingId
+    if (existingId) {
+      console.log('✅ [Ingresos] Categoría ya existe:', categoriaLabel, '→', existingId)
+      return existingId
+    }
     
     // Crear automáticamente
-    const result = await addCategoriaIngreso({
+    console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel)
+    const { error, id } = await addCategoriaIngreso({
       nombre: categoriaLabel.trim(),
       icono: '💵',
       color: '#3b82f6'
     })
     
-    // Esperar un poco para que se actualice el estado
-    await new Promise(resolve => setTimeout(resolve, 300))
+    if (error) {
+      console.error('❌ [Ingresos] Error creando categoría automáticamente:', error)
+      return null
+    }
     
-    // Buscar de nuevo
+    // Si addCategoriaIngreso devuelve el ID, usarlo directamente
+    if (id) {
+      console.log('✅ [Ingresos] Categoría creada con ID:', categoriaLabel, '→', id)
+      return id
+    }
+    
+    // Si no devuelve ID, esperar y buscar
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Buscar de nuevo en las categorías actualizadas
     const newId = findCategoriaIdFromLabel(categoriaLabel)
-    return newId || null
+    if (newId) {
+      console.log('✅ [Ingresos] Categoría creada y encontrada:', categoriaLabel, '→', newId)
+      return newId
+    }
+    
+    console.warn('⚠️ [Ingresos] Categoría creada pero no encontrada después de esperar:', categoriaLabel)
+    return null
   }
 
   // Función para crear automáticamente cuenta/tarjeta si no existe
@@ -310,7 +335,9 @@ export default function IngresosPage() {
       pendiente_cobro: false,
       fecha_cobro_esperada: null,
       cuenta_bancaria_id: null,
-      comprobante: null
+      comprobante: null,
+      notificar_celular: true,
+      notificar_correo: true
     })
   }
 
@@ -326,7 +353,9 @@ export default function IngresosPage() {
       pendiente_cobro: (ingreso as any).pendiente_cobro || false,
       fecha_cobro_esperada: (ingreso as any).fecha_cobro_esperada || null,
       cuenta_bancaria_id: (ingreso as any).cuenta_bancaria_id || null,
-      comprobante: null // No pre-cargar archivo
+      comprobante: null, // No pre-cargar archivo
+      notificar_celular: (ingreso as any).notificar_celular !== undefined ? (ingreso as any).notificar_celular : true,
+      notificar_correo: (ingreso as any).notificar_correo !== undefined ? (ingreso as any).notificar_correo : true
     })
     setShowModal(true)
   }
@@ -371,7 +400,9 @@ export default function IngresosPage() {
       fecha_cobro_esperada: form.fecha_cobro_esperada || null,
       cuenta_bancaria_id: form.cuenta_bancaria_id || null,
       comprobante_url: comprobanteUrl,
-      comprobante_nombre: comprobanteNombre
+      comprobante_nombre: comprobanteNombre,
+      notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : true,
+      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : true
     }
 
     // Si no está marcado como pendiente o ya se confirmó, establecer fecha_cobro_confirmada
@@ -379,6 +410,9 @@ export default function IngresosPage() {
       if (!editing?.fecha_cobro_confirmada && !form.pendiente_cobro) {
         data.fecha_cobro_confirmada = form.fecha
       }
+    } else {
+      // Si está pendiente, asegurar que fecha_cobro_confirmada sea null
+      data.fecha_cobro_confirmada = null
     }
 
     try {
@@ -633,13 +667,17 @@ export default function IngresosPage() {
 
     // Si hay múltiples transacciones (resumen)
     if (extractedData.transacciones && Array.isArray(extractedData.transacciones)) {
-      const transactionsToAdd = extractedData.transacciones
-        .map((trans: any, index: number) => {
-          if (!selectedTransactions.has(index)) return null
+      // Mapear transacciones seleccionadas manteniendo el índice original
+      const transactionsToAdd: Array<{ trans: any; originalIndex: number }> = []
+      extractedData.transacciones.forEach((trans: any, index: number) => {
+        if (selectedTransactions.has(index)) {
           const edited = editedTransactions.get(index)
-          return edited ? { ...trans, ...edited } : { ...trans }
-        })
-        .filter((t: any) => t !== null)
+          transactionsToAdd.push({
+            trans: edited ? { ...trans, ...edited } : { ...trans },
+            originalIndex: index
+          })
+        }
+      })
       
       if (transactionsToAdd.length === 0 && !includeTotal) {
         setAlertData({
@@ -663,40 +701,63 @@ export default function IngresosPage() {
       }
 
       // Agregar cada transacción seleccionada como ingreso individual
-      const addPromises = transactionsToAdd.map(async (trans: any) => {
+      const addPromises = transactionsToAdd.map(async ({ trans, originalIndex }) => {
+        // Obtener ediciones si existen (usando el índice original)
+        const edited = editedTransactions.get(originalIndex) || {}
+        
         // Crear categoría automáticamente si la IA la sugiere y no existe
         let categoriaId = ''
-        if (trans.categoria_id) {
+        if (edited.categoria_id) {
+          categoriaId = String(edited.categoria_id)
+        } else if (trans.categoria_id) {
           categoriaId = String(trans.categoria_id)
         } else if (trans.categoria) {
           // Intentar encontrar primero
           categoriaId = findCategoriaIdFromLabel(trans.categoria)
           // Si no existe, crearla automáticamente
           if (!categoriaId) {
+            console.log('🔵 [Ingresos] Creando categoría automáticamente:', trans.categoria)
             categoriaId = (await ensureCategoriaExists(trans.categoria)) || ''
+            console.log('🔵 [Ingresos] Categoría creada/obtenida:', categoriaId, 'para:', trans.categoria)
+          } else {
+            console.log('✅ [Ingresos] Categoría encontrada:', trans.categoria, '→', categoriaId)
           }
         } else if (form.categoria_id && form.categoria_id !== '__new__') {
           categoriaId = form.categoria_id
         }
 
         // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
-        const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || form.fecha)
+        const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (edited.fecha || trans.fecha || form.fecha)
         const fechaDate = new Date(fecha)
         const mes = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
-        const tagIds = Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || [])
+        const tagIds = Array.isArray(edited.tag_ids) ? edited.tag_ids : (Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || []))
+        
+        // Determinar si está pendiente de cobro (desde ediciones o por defecto false)
+        const pendienteCobro = edited.pendiente_cobro !== undefined ? edited.pendiente_cobro : false
+        const fechaCobroEsperada = edited.fecha_cobro_esperada || null
+        
+        console.log('🔵 [Ingresos] Agregando ingreso:', {
+          descripcion: edited.descripcion || trans.descripcion,
+          categoria_id: categoriaId || null,
+          categoria_sugerida: trans.categoria,
+          pendiente_cobro: pendienteCobro
+        })
         
         const { error } = await addIngreso({
-          descripcion: trans.descripcion,
+          descripcion: edited.descripcion || trans.descripcion,
           categoria_id: categoriaId || null,
-          monto: trans.monto,
-          moneda: trans.moneda || 'ARS',
+          monto: edited.monto !== undefined ? edited.monto : trans.monto,
+          moneda: edited.moneda || trans.moneda || 'ARS',
           fecha: fecha,
           mes: mes,
           tag_ids: tagIds,
           origen: trans.origen || '',
-          cuenta_bancaria_id: cuentaIdToUse,
-          pendiente_cobro: false, // Por defecto no está pendiente
-          fecha_cobro_confirmada: fecha // Se confirma automáticamente al agregar
+          cuenta_bancaria_id: edited.cuenta_bancaria_id || cuentaIdToUse,
+          pendiente_cobro: pendienteCobro,
+          fecha_cobro_esperada: fechaCobroEsperada,
+          fecha_cobro_confirmada: pendienteCobro ? null : fecha, // Solo se confirma si no está pendiente
+          notificar_celular: edited.notificar_celular !== undefined ? edited.notificar_celular : (pendienteCobro ? true : false), // Notificar solo si está pendiente
+          notificar_correo: edited.notificar_correo !== undefined ? edited.notificar_correo : (pendienteCobro ? true : false) // Notificar solo si está pendiente
         })
 
         if (error) {
@@ -1364,6 +1425,32 @@ export default function IngresosPage() {
                     <p className="text-xs text-slate-500">
                       El ingreso no se incluirá en los totales hasta que se confirme el cobro.
                     </p>
+                    <div className="space-y-2 mt-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="notificar_celular"
+                          checked={form.notificar_celular !== undefined ? form.notificar_celular : true}
+                          onChange={e => setForm(f => ({ ...f, notificar_celular: e.target.checked }))}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                        />
+                        <label htmlFor="notificar_celular" className="text-sm text-slate-700 cursor-pointer">
+                          📱 Notificar por celular (push)
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="notificar_correo"
+                          checked={form.notificar_correo !== undefined ? form.notificar_correo : true}
+                          onChange={e => setForm(f => ({ ...f, notificar_correo: e.target.checked }))}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                        />
+                        <label htmlFor="notificar_correo" className="text-sm text-slate-700 cursor-pointer">
+                          📧 Notificar por correo
+                        </label>
+                      </div>
+                    </div>
                     {editing && (editing as any).pendiente_cobro && !(editing as any).fecha_cobro_confirmada && (
                       <button
                         onClick={async () => {
@@ -1374,7 +1461,7 @@ export default function IngresosPage() {
                           setEditing(null)
                           resetForm()
                         }}
-                        className="btn btn-success btn-sm w-full"
+                        className="btn btn-success btn-sm w-full mt-2"
                       >
                         ✓ Confirmar cobro ahora
                       </button>
@@ -1836,7 +1923,9 @@ export default function IngresosPage() {
                                         tag_ids: edited.tag_ids ?? getTransactionTagIds(index),
                                         pendiente_cobro: edited.pendiente_cobro ?? false,
                                         fecha_cobro_esperada: edited.fecha_cobro_esperada ?? null,
-                                        cuenta_bancaria_id: edited.cuenta_bancaria_id ?? (selectedCuentaId || null)
+                                        cuenta_bancaria_id: edited.cuenta_bancaria_id ?? (selectedCuentaId || null),
+                                        notificar_celular: edited.notificar_celular !== undefined ? edited.notificar_celular : true,
+                                        notificar_correo: edited.notificar_correo !== undefined ? edited.notificar_correo : true
                                       })
                                       setEditingAiTransaction(index)
                                     }}
@@ -2021,11 +2110,11 @@ export default function IngresosPage() {
 
       {/* Modal Editar Transacción del Preview IA */}
       {editingAiTransaction !== null && extractedData?.transacciones && (
-        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null }) }}>
+        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true }) }}>
           <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">Editar Transacción</h3>
-              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null }) }} className="p-1 hover:bg-slate-100 rounded">
+              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true }) }} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2214,6 +2303,63 @@ export default function IngresosPage() {
                 </div>
               </div>
 
+              <div className="border-t border-slate-200 pt-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    id="ai_pendiente_cobro"
+                    checked={aiTransactionForm.pendiente_cobro}
+                    onChange={e => setAiTransactionForm(f => ({ ...f, pendiente_cobro: e.target.checked }))}
+                    className="w-5 h-5 text-amber-600 rounded border-slate-300"
+                  />
+                  <label htmlFor="ai_pendiente_cobro" className="font-semibold text-slate-700 cursor-pointer">
+                    ⏳ Pendiente de cobro
+                  </label>
+                </div>
+                {aiTransactionForm.pendiente_cobro && (
+                  <div className="ml-8 space-y-3">
+                    <div>
+                      <label className="label text-sm">Fecha esperada de cobro (opcional)</label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={aiTransactionForm.fecha_cobro_esperada || ''}
+                        onChange={e => setAiTransactionForm(f => ({ ...f, fecha_cobro_esperada: e.target.value || null }))}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      El ingreso no se incluirá en los totales hasta que se confirme el cobro.
+                    </p>
+                    <div className="space-y-2 mt-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="ai_notificar_celular"
+                          checked={aiTransactionForm.notificar_celular}
+                          onChange={e => setAiTransactionForm(f => ({ ...f, notificar_celular: e.target.checked }))}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                        />
+                        <label htmlFor="ai_notificar_celular" className="text-sm text-slate-700 cursor-pointer">
+                          📱 Notificar por celular (push)
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="ai_notificar_correo"
+                          checked={aiTransactionForm.notificar_correo}
+                          onChange={e => setAiTransactionForm(f => ({ ...f, notificar_correo: e.target.checked }))}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                        />
+                        <label htmlFor="ai_notificar_correo" className="text-sm text-slate-700 cursor-pointer">
+                          📧 Notificar por correo
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-2 border-t border-slate-200">
                 <button
                   onClick={() => {
@@ -2227,18 +2373,23 @@ export default function IngresosPage() {
                       monto: parseFloat(aiTransactionForm.monto) || 0,
                       moneda: aiTransactionForm.moneda,
                       fecha: aiTransactionForm.fecha,
-                      tag_ids: aiTransactionForm.tag_ids
+                      tag_ids: aiTransactionForm.tag_ids,
+                      pendiente_cobro: aiTransactionForm.pendiente_cobro,
+                      fecha_cobro_esperada: aiTransactionForm.fecha_cobro_esperada || undefined,
+                      cuenta_bancaria_id: aiTransactionForm.cuenta_bancaria_id || undefined,
+                      notificar_celular: aiTransactionForm.notificar_celular,
+                      notificar_correo: aiTransactionForm.notificar_correo
                     })
                     setEditedTransactions(updated)
                     setEditingAiTransaction(null)
-                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null })
+                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true })
                   }}
                   className="btn btn-primary flex-1"
                 >
                   Guardar Cambios
                 </button>
                 <button
-                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null }) }}
+                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true }) }}
                   className="btn btn-secondary"
                 >
                   Cancelar
