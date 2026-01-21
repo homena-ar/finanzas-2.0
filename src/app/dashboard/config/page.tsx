@@ -131,6 +131,8 @@ export default function ConfigPage() {
   const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [editingWorkspaceName, setEditingWorkspaceName] = useState('')
+  const [editingPersonal, setEditingPersonal] = useState(false)
+  const [editingPersonalName, setEditingPersonalName] = useState('')
 
   // Cambio de contraseña
   const [showPasswordChange, setShowPasswordChange] = useState(false)
@@ -205,14 +207,30 @@ export default function ConfigPage() {
     setShowAlert(true)
   }
 
+  const handleEditPersonal = () => {
+    setEditingPersonal(true)
+    setEditingPersonalName(personalName)
+  }
+
   const handleSavePersonalName = async () => {
-    if (!personalName.trim()) return
+    if (!editingPersonalName.trim()) {
+      setAlertData({
+        title: 'Nombre requerido',
+        message: 'Por favor ingresá un nombre para tu espacio personal',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
     setSaving(true)
     await updateProfile({ 
-      personal_workspace_name: personalName,
+      personal_workspace_name: editingPersonalName,
       personal_workspace_icono: personalIcono || null,
       personal_workspace_logo: personalLogo || null,
     })
+    setPersonalName(editingPersonalName)
+    setEditingPersonal(false)
+    setEditingPersonalName('')
     setSaving(false)
     setAlertData({
       title: 'Nombre actualizado',
@@ -220,6 +238,17 @@ export default function ConfigPage() {
       variant: 'success'
     })
     setShowAlert(true)
+  }
+
+  const handleCancelEditPersonal = () => {
+    setEditingPersonal(false)
+    setEditingPersonalName('')
+    // Restaurar valores originales del perfil
+    if (profile) {
+      setPersonalName(profile.personal_workspace_name || '')
+      setPersonalIcono(profile.personal_workspace_icono || '')
+      setPersonalLogo(profile.personal_workspace_logo || null)
+    }
   }
 
 
@@ -946,7 +975,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Espacios de trabajo - Unificado */}
-      <div className="card p-5 order-1">
+      <div className="card p-5 order-1 mb-8">
         <div className="mb-6">
           <h3 className="font-bold mb-2">🏠 Espacios de trabajo</h3>
           <p className="text-slate-500 text-sm">Gestioná tus finanzas personales y compartidas</p>
@@ -954,118 +983,132 @@ export default function ConfigPage() {
 
         {/* Espacio Personal */}
         <div className="mb-6 pb-6 border-b border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-base">🏠 Espacio Personal</h4>
-            <button
-              onClick={() => setShowPersonalInviteModal(true)}
-              className="btn btn-primary btn-sm"
-            >
-              <Users className="w-4 h-4" /> Invitar
-            </button>
-          </div>
-
-        <div className="space-y-4">
-          {/* Vista Previa Mejorada */}
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border-2 border-indigo-200">
-            <div className="text-xs font-semibold text-indigo-700 mb-3 uppercase tracking-wide">Vista Previa</div>
-            <div className="flex items-center gap-3">
-              {personalLogo ? (
-                <div className="relative">
-                  <img src={personalLogo} alt="Logo" className="w-16 h-16 rounded-xl object-cover border-2 border-indigo-300 shadow-md" />
+          <div className={`rounded-xl p-4 border bg-slate-50 border-slate-200`}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                {editingPersonal ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <EmojiPickerField
+                          value={personalIcono}
+                          onChange={setPersonalIcono}
+                          placeholder="🏠"
+                          size="sm"
+                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="input input-sm text-xs"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              const maxBytes = 250 * 1024
+                              if (file.size > maxBytes) {
+                                setAlertData({
+                                  title: 'Imagen muy grande',
+                                  message: 'Usá un logo cuadrado liviano (recomendado 256x256 y menos de 250KB).',
+                                  variant: 'warning'
+                                })
+                                setShowAlert(true)
+                                e.target.value = ''
+                                return
+                              }
+                              try {
+                                const dataUrl = await fileToDataUrl(file)
+                                setPersonalLogo(dataUrl)
+                              } catch {
+                                setAlertData({
+                                  title: 'Error',
+                                  message: 'No se pudo cargar la imagen',
+                                  variant: 'error'
+                                })
+                                setShowAlert(true)
+                              }
+                            }}
+                          />
+                          {personalLogo && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm whitespace-nowrap"
+                              onClick={() => setPersonalLogo(null)}
+                            >
+                              Quitar
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={editingPersonalName}
+                          onChange={(e) => setEditingPersonalName(e.target.value)}
+                          className="input input-sm flex-1 min-w-0"
+                          autoFocus
+                          onKeyPress={(e) => e.key === 'Enter' && handleSavePersonalName()}
+                          placeholder="Nombre del espacio personal"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary btn-sm flex-1 sm:flex-none">
+                          {saving ? 'Guardando...' : 'Guardar'}
+                        </button>
+                        <button onClick={handleCancelEditPersonal} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      {personalLogo ? (
+                        <>
+                          <span>Logo cargado:</span>
+                          <img src={personalLogo} alt="Logo" className="w-6 h-6 rounded object-cover border border-slate-200" />
+                        </>
+                      ) : (
+                        <span>Podés elegir un emoji o subir un logo (opcional)</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {personalLogo ? (
+                        <img src={personalLogo} alt="Logo" className="w-7 h-7 rounded-lg object-cover border border-slate-200" />
+                      ) : personalIcono ? (
+                        <span className="text-xl">{personalIcono}</span>
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs">
+                          {(personalName || 'E').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <h4 className="font-semibold break-words">{personalName || 'Espacio Personal'}</h4>
+                      <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
+                        <Shield className="w-3 h-3" /> PERSONAL
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={handleEditPersonal}
+                          className="p-1 hover:bg-slate-200 rounded transition"
+                          title="Editar espacio personal"
+                        >
+                          <Edit2 className="w-4 h-4 text-slate-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:shrink-0">
+                {!editingPersonal && (
                   <button
-                    type="button"
-                    onClick={() => setPersonalLogo(null)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                    onClick={() => setShowPersonalInviteModal(true)}
+                    className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
                   >
-                    <X className="w-3 h-3" />
+                    <Mail className="w-4 h-4" /> Invitar
                   </button>
-                </div>
-              ) : personalIcono ? (
-                <div className="w-16 h-16 rounded-xl bg-white border-2 border-indigo-300 flex items-center justify-center text-4xl shadow-md">
-                  {personalIcono}
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-xl bg-indigo-200 border-2 border-indigo-300 flex items-center justify-center text-indigo-700 font-bold text-2xl shadow-md">
-                  {(personalName || 'E').charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="flex-1">
-                <div className="font-bold text-lg text-slate-800">{personalName || 'Espacio Personal'}</div>
-                <div className="text-xs text-slate-600 mt-1">
-                  {personalLogo ? 'Logo personalizado' : personalIcono ? 'Icono emoji' : 'Inicial automática'}
-                </div>
+                )}
               </div>
             </div>
           </div>
-
-          {/* Configuración */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Nombre del Espacio</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Ej: Mis Finanzas, Casa, Familia..."
-                value={personalName}
-                onChange={e => setPersonalName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="label">Identificación Visual</label>
-              <div className="text-xs text-slate-600 mb-2">Elegí un icono emoji o subí un logo</div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <EmojiPickerField
-                    value={personalIcono}
-                    onChange={setPersonalIcono}
-                    placeholder="🏠"
-                    size="md"
-                  />
-                </div>
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="input text-xs"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      const maxBytes = 250 * 1024
-                      if (file.size > maxBytes) {
-                        setAlertData({
-                          title: 'Imagen muy grande',
-                          message: 'Usá un logo cuadrado y liviano (recomendado 256x256 y menos de 250KB).',
-                          variant: 'warning'
-                        })
-                        setShowAlert(true)
-                        e.target.value = ''
-                        return
-                      }
-                      try {
-                        const dataUrl = await fileToDataUrl(file)
-                        setPersonalLogo(dataUrl)
-                        setPersonalIcono('') // Limpiar icono si se sube logo
-                      } catch {
-                        setAlertData({
-                          title: 'Error',
-                          message: 'No se pudo cargar la imagen',
-                          variant: 'error'
-                        })
-                        setShowAlert(true)
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                💡 <strong>Tip:</strong> Si subís un logo, el icono emoji se desactivará. El logo tiene prioridad.
-              </p>
-            </div>
-          </div>
-
-          <button onClick={handleSavePersonalName} disabled={saving} className="btn btn-primary w-full">
-            <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
         </div>
 
         {/* Workspaces Colaborativos */}
@@ -1580,7 +1623,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Configuración financiera mensual */}
-      <div className="card p-5 order-2">
+      <div className="card p-5 order-2 mb-8">
         <h3 className="font-bold mb-6">🧩 Configuración financiera mensual</h3>
         
         {/* Gestión de Ingresos */}
@@ -1661,7 +1704,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Categorías y Etiquetas - Unificadas */}
-      <div className="card p-5 order-3">
+      <div className="card p-5 order-3 mb-8">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => setExpandedCategoriasEtiquetas(!expandedCategoriasEtiquetas)}
@@ -1972,7 +2015,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Sección Cambio de Contraseña */}
-      <div className="card p-5 order-6">
+      <div className="card p-5 order-6 mb-8">
         <h3 className="font-bold mb-4">🔐 Seguridad</h3>
         {!showPasswordChange ? (
           <button
@@ -2076,11 +2119,8 @@ export default function ConfigPage() {
         )}
       </div>
 
-        </div>
-      </div>
-
       {/* Info */}
-      <div className="card p-5 bg-slate-50 order-4">
+      <div className="card p-5 bg-slate-50 order-4 mb-8">
         <h3 className="font-bold mb-2">ℹ️ Información</h3>
         <div className="text-sm text-slate-600 space-y-1">
           <p><strong>Email:</strong> {profile?.email}</p>
