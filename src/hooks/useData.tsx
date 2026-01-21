@@ -585,7 +585,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
             fecha: data.fecha,
             mes: data.mes,
             tag_ids: data.tag_ids || [],
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
+            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
+            // Campos nuevos para pendiente de cobro
+            pendiente_cobro: data.pendiente_cobro === true || data.pendiente_cobro === 'true' || data.pendiente_cobro === 1 || false,
+            fecha_cobro_esperada: data.fecha_cobro_esperada || null,
+            fecha_cobro_confirmada: data.fecha_cobro_confirmada || null,
+            cuenta_bancaria_id: data.cuenta_bancaria_id || null,
+            comprobante_url: data.comprobante_url || null,
+            comprobante_nombre: data.comprobante_nombre || null,
+            notificar_celular: data.notificar_celular !== undefined ? (data.notificar_celular === true || data.notificar_celular === 'true' || data.notificar_celular === 1) : false,
+            notificar_correo: data.notificar_correo !== undefined ? (data.notificar_correo === true || data.notificar_correo === 'true' || data.notificar_correo === 1) : false
           }
         }) as Ingreso[]
 
@@ -961,13 +970,23 @@ const addTarjeta = useCallback(async (data: any) => {
         descripcion: insertData.descripcion,
         pendiente_cobro: insertData.pendiente_cobro,
         pendiente_cobro_type: typeof insertData.pendiente_cobro,
-        fecha_cobro_esperada: insertData.fecha_cobro_esperada
+        fecha_cobro_esperada: insertData.fecha_cobro_esperada,
+        fecha_cobro_confirmada: insertData.fecha_cobro_confirmada,
+        cuenta_bancaria_id: insertData.cuenta_bancaria_id,
+        notificar_celular: insertData.notificar_celular,
+        notificar_correo: insertData.notificar_correo
       })
       
       const docRef = await addDoc(collection(db, 'ingresos'), insertData)
+      
+      console.log('✅ [useData] Ingreso agregado exitosamente a Firestore:', docRef.id, {
+        pendiente_cobro: insertData.pendiente_cobro,
+        fecha_cobro_esperada: insertData.fecha_cobro_esperada
+      })
+      
       await fetchAll()
       
-      console.log('✅ [useData] Ingreso agregado exitosamente:', docRef.id)
+      console.log('✅ [useData] Datos refrescados después de agregar ingreso')
       
       return { error: null, data: { id: docRef.id, ...insertData } }
     } catch (error) { 
@@ -989,13 +1008,23 @@ const addTarjeta = useCallback(async (data: any) => {
         descripcion: updateData.descripcion,
         pendiente_cobro: updateData.pendiente_cobro,
         pendiente_cobro_type: typeof updateData.pendiente_cobro,
-        fecha_cobro_esperada: updateData.fecha_cobro_esperada
+        fecha_cobro_esperada: updateData.fecha_cobro_esperada,
+        fecha_cobro_confirmada: updateData.fecha_cobro_confirmada,
+        cuenta_bancaria_id: updateData.cuenta_bancaria_id,
+        notificar_celular: updateData.notificar_celular,
+        notificar_correo: updateData.notificar_correo
       })
       
       await updateDoc(doc(db, 'ingresos', id), updateData)
+      
+      console.log('✅ [useData] Ingreso actualizado exitosamente en Firestore:', id, {
+        pendiente_cobro: updateData.pendiente_cobro,
+        fecha_cobro_esperada: updateData.fecha_cobro_esperada
+      })
+      
       await fetchAll()
       
-      console.log('✅ [useData] Ingreso actualizado exitosamente:', id)
+      console.log('✅ [useData] Datos refrescados después de actualizar ingreso')
       
       return { error: null }
     } catch (error) { 
