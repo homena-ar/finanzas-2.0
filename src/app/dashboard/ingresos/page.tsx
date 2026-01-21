@@ -584,18 +584,31 @@ export default function IngresosPage() {
         // Detectar fecha general del documento desde el mes del resumen
         if (result.data?.total && result.data.total.mes_resumen) {
           const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
+          // Asegurar que sea el primer día del mes (no el último del mes anterior)
           const fechaResumen = `${mesResumen}-01`
           setGlobalDocumentDate(fechaResumen)
           setUseGlobalDate(true)
         } else if (result.data?.transacciones && result.data.transacciones.length > 0) {
           const firstDate = result.data.transacciones[0]?.fecha
           if (firstDate) {
-            setGlobalDocumentDate(firstDate)
+            // Si hay fecha, usar el primer día de ese mes
+            const fechaDate = new Date(firstDate)
+            const mesResumen = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
+            setGlobalDocumentDate(`${mesResumen}-01`)
             setUseGlobalDate(true)
           } else {
-            setGlobalDocumentDate(new Date().toISOString().split('T')[0])
+            // Si no hay fecha, usar el primer día del mes actual
+            const hoy = new Date()
+            const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+            setGlobalDocumentDate(`${mesActual}-01`)
             setUseGlobalDate(false)
           }
+        } else {
+          // Si no hay transacciones, usar el primer día del mes actual
+          const hoy = new Date()
+          const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+          setGlobalDocumentDate(`${mesActual}-01`)
+          setUseGlobalDate(false)
         }
 
         // Si hay información de cuenta/tarjeta detectada, configurarla
@@ -700,6 +713,9 @@ export default function IngresosPage() {
         }
       }
 
+      // Mapa para evitar crear categorías duplicadas en el mismo proceso
+      const categoriasCreadas = new Map<string, string>() // Map<categoriaLabel, categoriaId>
+
       // Agregar cada transacción seleccionada como ingreso individual
       const addPromises = transactionsToAdd.map(async ({ trans, originalIndex }) => {
         // Obtener ediciones si existen (usando el índice original)
@@ -712,22 +728,46 @@ export default function IngresosPage() {
         } else if (trans.categoria_id) {
           categoriaId = String(trans.categoria_id)
         } else if (trans.categoria) {
-          // Intentar encontrar primero
-          categoriaId = findCategoriaIdFromLabel(trans.categoria)
-          // Si no existe, crearla automáticamente
-          if (!categoriaId) {
-            console.log('🔵 [Ingresos] Creando categoría automáticamente:', trans.categoria)
-            categoriaId = (await ensureCategoriaExists(trans.categoria)) || ''
-            console.log('🔵 [Ingresos] Categoría creada/obtenida:', categoriaId, 'para:', trans.categoria)
+          const categoriaLabel = trans.categoria.trim()
+          
+          // Verificar si ya creamos esta categoría en este proceso
+          if (categoriasCreadas.has(categoriaLabel)) {
+            categoriaId = categoriasCreadas.get(categoriaLabel)!
+            console.log('✅ [Ingresos] Reutilizando categoría ya creada en este proceso:', categoriaLabel, '→', categoriaId)
           } else {
-            console.log('✅ [Ingresos] Categoría encontrada:', trans.categoria, '→', categoriaId)
+            // Intentar encontrar primero en las existentes
+            categoriaId = findCategoriaIdFromLabel(categoriaLabel)
+            // Si no existe, crearla automáticamente
+            if (!categoriaId) {
+              console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel)
+              categoriaId = (await ensureCategoriaExists(categoriaLabel)) || ''
+              if (categoriaId) {
+                // Guardar en el mapa para reutilizar
+                categoriasCreadas.set(categoriaLabel, categoriaId)
+                console.log('✅ [Ingresos] Categoría creada y guardada en mapa:', categoriaLabel, '→', categoriaId)
+              } else {
+                console.warn('⚠️ [Ingresos] No se pudo crear/obtener categoría:', categoriaLabel)
+              }
+            } else {
+              // Guardar en el mapa para reutilizar
+              categoriasCreadas.set(categoriaLabel, categoriaId)
+              console.log('✅ [Ingresos] Categoría encontrada y guardada en mapa:', categoriaLabel, '→', categoriaId)
+            }
           }
         } else if (form.categoria_id && form.categoria_id !== '__new__') {
           categoriaId = form.categoria_id
         }
 
         // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
-        const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (edited.fecha || trans.fecha || form.fecha)
+        let fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (edited.fecha || trans.fecha || form.fecha)
+        
+        // Si se usa fecha global, asegurar que sea el primer día del mes seleccionado
+        if (useGlobalDate && globalDocumentDate) {
+          // globalDocumentDate ya debería ser YYYY-MM-01, pero asegurémonos
+          const [year, month] = globalDocumentDate.split('-')
+          fecha = `${year}-${month}-01`
+        }
+        
         const fechaDate = new Date(fecha)
         const mes = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
         const tagIds = Array.isArray(edited.tag_ids) ? edited.tag_ids : (Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || []))
@@ -736,11 +776,33 @@ export default function IngresosPage() {
         const pendienteCobro = edited.pendiente_cobro !== undefined ? edited.pendiente_cobro : false
         const fechaCobroEsperada = edited.fecha_cobro_esperada || null
         
+        // Calcular cuándo se enviará la notificación
+        let notificacionInfo = ''
+        if (pendienteCobro && fechaCobroEsperada) {
+          const fechaCobro = new Date(fechaCobroEsperada)
+          const hoy = new Date()
+          hoy.setHours(0, 0, 0, 0)
+          fechaCobro.setHours(0, 0, 0, 0)
+          const diasDiferencia = Math.ceil((fechaCobro.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
+          
+          if (diasDiferencia === 0) {
+            notificacionInfo = ' (Notificación: hoy)'
+          } else if (diasDiferencia === 1) {
+            notificacionInfo = ' (Notificación: mañana)'
+          } else if (diasDiferencia > 1) {
+            notificacionInfo = ` (Notificación: en ${diasDiferencia} días)`
+          } else {
+            notificacionInfo = ' (Notificación: ya pasó la fecha)'
+          }
+        }
+        
         console.log('🔵 [Ingresos] Agregando ingreso:', {
           descripcion: edited.descripcion || trans.descripcion,
           categoria_id: categoriaId || null,
           categoria_sugerida: trans.categoria,
-          pendiente_cobro: pendienteCobro
+          pendiente_cobro: pendienteCobro,
+          fecha_cobro_esperada: fechaCobroEsperada,
+          notificacion: notificacionInfo
         })
         
         const { error } = await addIngreso({
@@ -1425,6 +1487,17 @@ export default function IngresosPage() {
                     <p className="text-xs text-slate-500">
                       El ingreso no se incluirá en los totales hasta que se confirme el cobro.
                     </p>
+                    {form.fecha_cobro_esperada && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs text-blue-800">
+                          <strong>📅 Notificación:</strong> Se te avisará el día {new Date(form.fecha_cobro_esperada).toLocaleDateString('es-AR', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })} para recordarte confirmar el cobro.
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-2 mt-3">
                       <div className="flex items-center gap-2">
                         <input
@@ -1600,49 +1673,52 @@ export default function IngresosPage() {
                   </div>
 
                   {/* Selector de Fecha/Mes General */}
-                  {globalDocumentDate && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <label className="text-sm font-semibold text-slate-700">
-                          📅 Mes para cargar los ingresos:
-                        </label>
-                        <input
-                          type="month"
-                          className="input"
-                          value={globalDocumentDate.slice(0, 7)}
-                          onChange={e => {
-                            const monthValue = e.target.value
-                            if (monthValue) {
-                              setGlobalDocumentDate(`${monthValue}-01`)
-                              setUseGlobalDate(true)
-                            }
-                          }}
-                        />
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="text-sm font-semibold text-slate-700">
+                        📅 Mes para cargar los ingresos:
+                      </label>
+                      <input
+                        type="month"
+                        className="input"
+                        value={globalDocumentDate ? globalDocumentDate.slice(0, 7) : new Date().toISOString().slice(0, 7)}
+                        onChange={e => {
+                          const monthValue = e.target.value
+                          if (monthValue) {
+                            // Usar el primer día del mes seleccionado (no el último del mes anterior)
+                            const fechaSeleccionada = `${monthValue}-01`
+                            setGlobalDocumentDate(fechaSeleccionada)
+                            setUseGlobalDate(true)
+                            console.log('🔵 [Ingresos] Mes seleccionado:', monthValue, '→ Fecha:', fechaSeleccionada)
+                          }
+                        }}
+                      />
+                      {globalDocumentDate && (
                         <div className="text-xs text-slate-600">
-                          Detectada: {new Date(globalDocumentDate).toLocaleDateString('es-AR', { 
+                          Se cargarán en: <strong>{new Date(globalDocumentDate).toLocaleDateString('es-AR', { 
                             day: 'numeric', 
-                            month: 'short', 
+                            month: 'long', 
                             year: 'numeric' 
-                          })}
+                          })}</strong>
                         </div>
-                        <button
-                          onClick={() => setUseGlobalDate(!useGlobalDate)}
-                          className={`text-xs px-2 py-1 rounded ${
-                            useGlobalDate 
-                              ? 'bg-indigo-100 text-indigo-700' 
-                              : 'bg-slate-200 text-slate-600'
-                          }`}
-                        >
-                          {useGlobalDate ? '✓ Usar fecha global' : 'Usar fechas individuales'}
-                        </button>
-                      </div>
-                      {useGlobalDate && (
-                        <p className="text-xs text-slate-500 mt-2">
-                          Todos los ingresos seleccionados se cargarán en el mes seleccionado.
-                        </p>
                       )}
+                      <button
+                        onClick={() => setUseGlobalDate(!useGlobalDate)}
+                        className={`text-xs px-2 py-1 rounded ${
+                          useGlobalDate 
+                            ? 'bg-indigo-100 text-indigo-700' 
+                            : 'bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {useGlobalDate ? '✓ Usar fecha global' : 'Usar fechas individuales'}
+                      </button>
                     </div>
-                  )}
+                    {useGlobalDate && globalDocumentDate && (
+                      <p className="text-xs text-slate-500 mt-2">
+                        Todos los ingresos seleccionados se cargarán en <strong>{new Date(globalDocumentDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</strong>.
+                      </p>
+                    )}
+                  </div>
 
                   {/* Selección de cuenta/tarjeta si fue detectada */}
                   {detectedCuenta && (
@@ -2330,6 +2406,17 @@ export default function IngresosPage() {
                     <p className="text-xs text-slate-500">
                       El ingreso no se incluirá en los totales hasta que se confirme el cobro.
                     </p>
+                    {aiTransactionForm.fecha_cobro_esperada && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs text-blue-800">
+                          <strong>📅 Notificación:</strong> Se te avisará el día {new Date(aiTransactionForm.fecha_cobro_esperada).toLocaleDateString('es-AR', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })} para recordarte confirmar el cobro.
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-2 mt-3">
                       <div className="flex items-center gap-2">
                         <input
