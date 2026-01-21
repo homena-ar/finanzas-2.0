@@ -17,6 +17,7 @@ export default function ConfigPage() {
     tags, addTag, deleteTag,
     tagsIngresos, addTagIngreso, deleteTagIngreso,
     categorias, addCategoria, updateCategoria, deleteCategoria,
+    categoriasIngresos, addCategoriaIngreso, updateCategoriaIngreso, deleteCategoriaIngreso,
   } = useData()
   const {
     workspaces,
@@ -62,10 +63,15 @@ export default function ConfigPage() {
   const [invitationToDelete, setInvitationToDelete] = useState<{ id: string; email: string } | null>(null)
   const [workspaceToDeleteAll, setWorkspaceToDeleteAll] = useState<string | null>(null)
 
-  // Categoría modal states
+  // Categoría modal states (gastos)
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [editingCategoria, setEditingCategoria] = useState<any>(null)
   const [categoriaForm, setCategoriaForm] = useState({ nombre: '', icono: '', color: '#6366f1' })
+  
+  // Categoría modal states (ingresos)
+  const [showCategoriaIngresoModal, setShowCategoriaIngresoModal] = useState(false)
+  const [editingCategoriaIngreso, setEditingCategoriaIngreso] = useState<any>(null)
+  const [categoriaIngresoForm, setCategoriaIngresoForm] = useState({ nombre: '', icono: '', color: '#10b981' })
 
   // Workspace modal states
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
@@ -243,6 +249,56 @@ export default function ConfigPage() {
 
   const handleDeleteCategoria = async (id: string, nombre: string) => {
     await deleteCategoria(id)
+    setAlertData({
+      title: 'Categoría eliminada',
+      message: `La categoría "${nombre}" fue eliminada`,
+      variant: 'success'
+    })
+    setShowAlert(true)
+  }
+
+  // Handlers para categorías de ingresos
+  const handleSaveCategoriaIngreso = async () => {
+    if (!categoriaIngresoForm.nombre.trim() || !categoriaIngresoForm.icono.trim()) {
+      setAlertData({
+        title: 'Campos incompletos',
+        message: 'Por favor completá el nombre y seleccioná un icono',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    if (editingCategoriaIngreso) {
+      await updateCategoriaIngreso(editingCategoriaIngreso.id, categoriaIngresoForm)
+      setAlertData({
+        title: '¡Categoría actualizada!',
+        message: `La categoría "${categoriaIngresoForm.nombre}" fue actualizada correctamente`,
+        variant: 'success'
+      })
+    } else {
+      await addCategoriaIngreso(categoriaIngresoForm)
+      setAlertData({
+        title: '¡Categoría creada!',
+        message: `La categoría "${categoriaIngresoForm.nombre}" fue creada correctamente`,
+        variant: 'success'
+      })
+    }
+
+    setShowAlert(true)
+    setShowCategoriaIngresoModal(false)
+    setCategoriaIngresoForm({ nombre: '', icono: '', color: '#10b981' })
+    setEditingCategoriaIngreso(null)
+  }
+
+  const handleEditCategoriaIngreso = (cat: any) => {
+    setEditingCategoriaIngreso(cat)
+    setCategoriaIngresoForm({ nombre: cat.nombre, icono: cat.icono, color: cat.color })
+    setShowCategoriaIngresoModal(true)
+  }
+
+  const handleDeleteCategoriaIngreso = async (id: string, nombre: string) => {
+    await deleteCategoriaIngreso(id)
     setAlertData({
       title: 'Categoría eliminada',
       message: `La categoría "${nombre}" fue eliminada`,
@@ -1479,11 +1535,11 @@ export default function ConfigPage() {
         </button>
       </div>
 
-      {/* Categorías */}
+      {/* Categorías de Gastos */}
       <div className="card p-5 order-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-bold">📂 Categorías</h3>
+            <h3 className="font-bold">📂 Categorías de Gastos</h3>
             <p className="text-slate-500 text-sm mt-1">Administrá tus categorías de gastos</p>
           </div>
           <button
@@ -1523,6 +1579,60 @@ export default function ConfigPage() {
                 </button>
                 <button
                   onClick={() => handleDeleteCategoria(c.id, c.nombre)}
+                  className="p-2 hover:bg-red-100 rounded-lg transition"
+                >
+                  <X className="w-4 h-4 text-red-600" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Categorías de Ingresos */}
+      <div className="card p-5 order-4.5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold">💰 Categorías de Ingresos</h3>
+            <p className="text-slate-500 text-sm mt-1">Administrá tus categorías de ingresos</p>
+          </div>
+          <button
+            onClick={() => {
+              setEditingCategoriaIngreso(null)
+              setCategoriaIngresoForm({ nombre: '', icono: '', color: '#10b981' })
+              setShowCategoriaIngresoModal(true)
+            }}
+            className="btn btn-primary"
+          >
+            <Plus className="w-4 h-4" /> Nueva Categoría
+          </button>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          {categoriasIngresos.map(c => (
+            <div
+              key={c.id}
+              className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                style={{ backgroundColor: c.color + '20' }}
+              >
+                {c.icono}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold">{c.nombre}</div>
+                <div className="text-xs text-slate-500">Color: {c.color}</div>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleEditCategoriaIngreso(c)}
+                  className="p-2 hover:bg-slate-200 rounded-lg transition"
+                >
+                  <Edit2 className="w-4 h-4 text-slate-600" />
+                </button>
+                <button
+                  onClick={() => handleDeleteCategoriaIngreso(c.id, c.nombre)}
                   className="p-2 hover:bg-red-100 rounded-lg transition"
                 >
                   <X className="w-4 h-4 text-red-600" />
@@ -1717,6 +1827,76 @@ export default function ConfigPage() {
       </div>
 
       {/* Modal de Categoría */}
+      {showCategoriaIngresoModal && (
+        <div className="modal-overlay" onClick={() => setShowCategoriaIngresoModal(false)}>
+          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">
+                {editingCategoriaIngreso ? 'Editar Categoría de Ingreso' : 'Nueva Categoría de Ingreso'}
+              </h2>
+              <button onClick={() => setShowCategoriaIngresoModal(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Nombre</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={categoriaIngresoForm.nombre}
+                  onChange={e => setCategoriaIngresoForm(c => ({ ...c, nombre: e.target.value }))}
+                  placeholder="Ej: Salario, Freelance, Inversiones..."
+                />
+              </div>
+              <div>
+                <label className="label">Icono</label>
+                <EmojiPickerField
+                  value={categoriaIngresoForm.icono}
+                  onChange={v => setCategoriaIngresoForm(c => ({ ...c, icono: v }))}
+                  placeholder="💵"
+                />
+              </div>
+              <div>
+                <label className="label">Color</label>
+                <div className="flex gap-3 items-center">
+                  <input
+                    type="color"
+                    className="w-16 h-16 rounded border border-slate-200 cursor-pointer"
+                    value={categoriaIngresoForm.color}
+                    onChange={e => setCategoriaIngresoForm(c => ({ ...c, color: e.target.value }))}
+                  />
+                  <input
+                    type="text"
+                    className="input flex-1"
+                    value={categoriaIngresoForm.color}
+                    onChange={e => setCategoriaIngresoForm(c => ({ ...c, color: e.target.value }))}
+                    placeholder="#10b981"
+                  />
+                </div>
+                <div className="mt-3 p-3 bg-slate-50 rounded-lg flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                    style={{ backgroundColor: categoriaIngresoForm.color + '20' }}
+                  >
+                    {categoriaIngresoForm.icono || '?'}
+                  </div>
+                  <div className="font-semibold">{categoriaIngresoForm.nombre || 'Nombre de categoría'}</div>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={handleSaveCategoriaIngreso} className="btn btn-primary flex-1">
+                  {editingCategoriaIngreso ? 'Actualizar' : 'Crear'}
+                </button>
+                <button onClick={() => setShowCategoriaIngresoModal(false)} className="btn btn-secondary">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCategoriaModal && (
         <div className="modal-overlay" onClick={() => setShowCategoriaModal(false)}>
           <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>

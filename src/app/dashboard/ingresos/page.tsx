@@ -592,6 +592,7 @@ export default function IngresosPage() {
           const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
           // Asegurar que sea el primer día del mes (no el último del mes anterior)
           const fechaResumen = `${mesResumen}-01`
+          console.log('🔵 [Ingresos] Fecha detectada desde mes_resumen:', mesResumen, '→', fechaResumen)
           setGlobalDocumentDate(fechaResumen)
           setUseGlobalDate(true)
         } else if (result.data?.transacciones && result.data.transacciones.length > 0) {
@@ -779,7 +780,13 @@ export default function IngresosPage() {
         const tagIds = Array.isArray(edited.tag_ids) ? edited.tag_ids : (Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || []))
         
         // Determinar si está pendiente de cobro (desde ediciones o por defecto false)
-        const pendienteCobro = edited.pendiente_cobro !== undefined ? edited.pendiente_cobro : false
+        // Asegurar que sea boolean explícitamente
+        const pendienteCobro = edited.pendiente_cobro === true || edited.pendiente_cobro === 'true' || edited.pendiente_cobro === 1
+        console.log('🔵 [Ingresos] Verificando pendiente_cobro:', {
+          edited_pendiente_cobro: edited.pendiente_cobro,
+          edited_pendiente_cobro_type: typeof edited.pendiente_cobro,
+          pendienteCobro_result: pendienteCobro
+        })
         const fechaCobroEsperada = edited.fecha_cobro_esperada || null
         
         // Calcular cuándo se enviará la notificación

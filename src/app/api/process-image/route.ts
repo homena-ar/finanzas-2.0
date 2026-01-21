@@ -406,7 +406,7 @@ Responde en formato JSON con un array "transacciones" que contenga cada ingreso 
       "monto": número decimal usando punto (.) como separador decimal, sin puntos de miles (ej: 15179.99, 1500.50),
       "moneda": "ARS" o "USD",
       "fecha": "YYYY-MM-DD" (fecha del ingreso individual del período actual),
-      "categoria": "categoría sugerida según la descripción (ej: Salario, Freelance, Inversiones, etc.)",
+      "categoria": "categoría sugerida en ESPAÑOL según la descripción (ej: Salario, Trabajo Freelance, Inversiones, Alquiler, Venta, Reembolso, Intereses Bancarios, Transferencia Personal, etc.) - IMPORTANTE: SIEMPRE en español, NUNCA en inglés",
       "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
     }
   ],
@@ -447,7 +447,7 @@ Si encuentras múltiples ingresos del período actual, inclúyelos todos en el a
   "monto": número (solo el número, sin símbolos),
   "moneda": "ARS" o "USD",
   "fecha": "YYYY-MM-DD" (fecha del ingreso, si no está visible usa la fecha actual),
-  "categoria": "categoría sugerida (ej: Salario, Freelance, Inversiones, etc.)",
+  "categoria": "categoría sugerida en ESPAÑOL (ej: Salario, Trabajo Freelance, Inversiones, Alquiler, Venta, Reembolso, Intereses Bancarios, Transferencia Personal, etc.) - IMPORTANTE: SIEMPRE en español, NUNCA en inglés",
   "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
 }
 
