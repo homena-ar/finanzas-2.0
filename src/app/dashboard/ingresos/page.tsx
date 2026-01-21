@@ -5,7 +5,7 @@ import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName } from '@/lib/utils'
-import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2, CheckCircle2, Download } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
@@ -14,10 +14,10 @@ export default function IngresosPage() {
   const { user, profile } = useAuth()
   const { currentWorkspace, members } = useWorkspace()
   const {
-    ingresos, categoriasIngresos, tagsIngresos,
+    ingresos, categoriasIngresos, tagsIngresos, tarjetas,
     currentMonth, monthKey, getIngresosMes,
     addIngreso, updateIngreso, deleteIngreso,
-    addTagIngreso, addCategoriaIngreso
+    addTagIngreso, addCategoriaIngreso, addTarjeta
   } = useData()
 
   const [showModal, setShowModal] = useState(false)
@@ -29,7 +29,11 @@ export default function IngresosPage() {
     monto: '',
     moneda: 'ARS' as 'ARS' | 'USD',
     fecha: new Date().toISOString().split('T')[0],
-    tag_ids: [] as string[]
+    tag_ids: [] as string[],
+    pendiente_cobro: false,
+    fecha_cobro_esperada: '' as string | null,
+    cuenta_bancaria_id: '' as string | null,
+    comprobante: null as File | null
   })
 
   // Modal states
@@ -54,6 +58,7 @@ export default function IngresosPage() {
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set())
   const [includeTotal, setIncludeTotal] = useState(false)
   const [editedTransactions, setEditedTransactions] = useState<Map<number, any>>(new Map())
+  const [savingTransactions, setSavingTransactions] = useState(false)
 
   // IA (preview): creación/edición sin mezclar con el modal principal
   const [aiShowNewTagInput, setAiShowNewTagInput] = useState(false)
@@ -70,7 +75,10 @@ export default function IngresosPage() {
     monto: '',
     moneda: 'ARS' as 'ARS' | 'USD',
     fecha: new Date().toISOString().split('T')[0],
-    tag_ids: [] as string[]
+    tag_ids: [] as string[],
+    pendiente_cobro: false,
+    fecha_cobro_esperada: '' as string | null,
+    cuenta_bancaria_id: '' as string | null
   })
 
   const findCategoriaIdFromLabel = (label?: string) => {
@@ -119,8 +127,105 @@ export default function IngresosPage() {
     setAiShowNewCategoriaInput(false)
   }
 
+  const buildDetectedCuentaName = (t: any) => {
+    const banco = t?.banco ? String(t.banco).trim() : ''
+    const tipo = t?.tipo_tarjeta ? String(t.tipo_tarjeta).trim() : ''
+    const base = [tipo, banco].filter(Boolean).join(' ')
+    return base || 'Nueva cuenta/tarjeta'
+  }
+
+  const handleAddNewCuentaAI = async () => {
+    if (!aiNewCuenta.nombre.trim()) return
+    const result = await addTarjeta({
+      nombre: aiNewCuenta.nombre.trim(),
+      tipo: aiNewCuenta.tipo,
+      banco: aiNewCuenta.banco || null,
+      digitos: aiNewCuenta.digitos || null,
+      cierre: null
+    })
+    if (!result.error && result.id) {
+      setSelectedCuentaId(result.id as string)
+    }
+    setAiNewCuenta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setAiShowNewCuentaInput(false)
+  }
+
+  // Función para crear automáticamente categoría si no existe y la IA la sugiere
+  const ensureCategoriaExists = async (categoriaLabel: string): Promise<string | null> => {
+    if (!categoriaLabel) return null
+    
+    // Buscar si ya existe
+    const existingId = findCategoriaIdFromLabel(categoriaLabel)
+    if (existingId) return existingId
+    
+    // Crear automáticamente
+    const result = await addCategoriaIngreso({
+      nombre: categoriaLabel.trim(),
+      icono: '💵',
+      color: '#3b82f6'
+    })
+    
+    // Esperar un poco para que se actualice el estado
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // Buscar de nuevo
+    const newId = findCategoriaIdFromLabel(categoriaLabel)
+    return newId || null
+  }
+
+  // Función para crear automáticamente cuenta/tarjeta si no existe
+  const ensureCuentaExists = async (cuentaData: any): Promise<string | null> => {
+    if (!cuentaData || (!cuentaData.banco && !cuentaData.tipo_tarjeta)) return null
+    
+    const nombreCuenta = buildDetectedCuentaName(cuentaData)
+    
+    // Buscar si ya existe
+    const existing = tarjetas.find(t => 
+      t.nombre.toLowerCase().includes(nombreCuenta.toLowerCase()) ||
+      nombreCuenta.toLowerCase().includes(t.nombre.toLowerCase())
+    )
+    if (existing) return existing.id
+    
+    // Crear automáticamente
+    const result = await addTarjeta({
+      nombre: nombreCuenta,
+      tipo: cuentaData.tipo_tarjeta?.toLowerCase().includes('master') ? 'mastercard' :
+            cuentaData.tipo_tarjeta?.toLowerCase().includes('amex') ? 'amex' :
+            cuentaData.tipo_tarjeta?.toLowerCase().includes('visa') ? 'visa' : 'other',
+      banco: cuentaData.banco || null,
+      digitos: cuentaData.ultimos_digitos || null,
+      cierre: null
+    })
+    
+    return result.id || null
+  }
+
   // Filters
-  const [filters, setFilters] = useState({ search: '', colaborador: '', moneda: '' })
+  const [filters, setFilters] = useState({ 
+    search: '', 
+    colaborador: '', 
+    moneda: '', 
+    categoria: '', 
+    tag: '', 
+    cuenta: '',
+    pendiente: '',
+    sort: 'monto-desc' 
+  })
+
+  // Estado para fecha/mes general del documento (similar a gastos)
+  const [globalDocumentDate, setGlobalDocumentDate] = useState<string | null>(null)
+  const [useGlobalDate, setUseGlobalDate] = useState(false)
+
+  // Estados para creación automática de tarjetas/cuentas
+  const [detectedCuenta, setDetectedCuenta] = useState<any>(null)
+  const [selectedCuentaId, setSelectedCuentaId] = useState<string>('')
+  const [aiShowNewCuentaInput, setAiShowNewCuentaInput] = useState(false)
+  const [aiNewCuenta, setAiNewCuenta] = useState({
+    nombre: '',
+    tipo: 'visa' as 'visa' | 'mastercard' | 'amex' | 'other',
+    banco: '',
+    digitos: ''
+  })
 
   let ingresosMes = getIngresosMes(monthKey)
 
@@ -132,6 +237,22 @@ export default function IngresosPage() {
   }
   if (filters.moneda) {
     ingresosMes = ingresosMes.filter(i => i.moneda === filters.moneda)
+  }
+  if (filters.categoria) {
+    ingresosMes = ingresosMes.filter(i => i.categoria_id === filters.categoria)
+  }
+  if (filters.tag) {
+    ingresosMes = ingresosMes.filter(i => i.tag_ids?.includes(filters.tag))
+  }
+  if (filters.cuenta) {
+    ingresosMes = ingresosMes.filter(i => (i as any).cuenta_bancaria_id === filters.cuenta)
+  }
+  if (filters.pendiente) {
+    if (filters.pendiente === 'si') {
+      ingresosMes = ingresosMes.filter(i => (i as any).pendiente_cobro === true && !(i as any).fecha_cobro_confirmada)
+    } else if (filters.pendiente === 'no') {
+      ingresosMes = ingresosMes.filter(i => !(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)
+    }
   }
   if (filters.colaborador && currentWorkspace) {
     ingresosMes = ingresosMes.filter(i => {
@@ -146,9 +267,37 @@ export default function IngresosPage() {
     })
   }
 
-  // Calculate totals
-  const totalARS = ingresosMes.filter(i => i.moneda === 'ARS').reduce((sum, i) => sum + i.monto, 0)
-  const totalUSD = ingresosMes.filter(i => i.moneda === 'USD').reduce((sum, i) => sum + i.monto, 0)
+  // Sort
+  const sortParts = filters.sort.split('-')
+  const [sortField, sortDir] = sortParts.length === 2 ? sortParts : ['monto', 'desc']
+  ingresosMes.sort((a, b) => {
+    let vA, vB
+    if (sortField === 'monto') {
+      vA = a.monto
+      vB = b.monto
+    } else if (sortField === 'fecha') {
+      vA = new Date(a.fecha).getTime()
+      vB = new Date(b.fecha).getTime()
+    } else {
+      vA = a.descripcion.toLowerCase()
+      vB = b.descripcion.toLowerCase()
+    }
+    return sortDir === 'asc' ? (vA < vB ? -1 : vA > vB ? 1 : 0) : (vA > vB ? -1 : vA < vB ? 1 : 0)
+  })
+
+  // Calculate totals (solo ingresos confirmados/no pendientes)
+  const totalARS = ingresosMes
+    .filter(i => i.moneda === 'ARS' && (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada))
+    .reduce((sum, i) => sum + i.monto, 0)
+  const totalUSD = ingresosMes
+    .filter(i => i.moneda === 'USD' && (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada))
+    .reduce((sum, i) => sum + i.monto, 0)
+  const totalPendienteARS = ingresosMes
+    .filter(i => i.moneda === 'ARS' && (i as any).pendiente_cobro && !(i as any).fecha_cobro_confirmada)
+    .reduce((sum, i) => sum + i.monto, 0)
+  const totalPendienteUSD = ingresosMes
+    .filter(i => i.moneda === 'USD' && (i as any).pendiente_cobro && !(i as any).fecha_cobro_confirmada)
+    .reduce((sum, i) => sum + i.monto, 0)
 
   const resetForm = () => {
     setForm({
@@ -157,7 +306,11 @@ export default function IngresosPage() {
       monto: '',
       moneda: 'ARS',
       fecha: new Date().toISOString().split('T')[0],
-      tag_ids: []
+      tag_ids: [],
+      pendiente_cobro: false,
+      fecha_cobro_esperada: null,
+      cuenta_bancaria_id: null,
+      comprobante: null
     })
   }
 
@@ -169,7 +322,11 @@ export default function IngresosPage() {
       monto: String(ingreso.monto),
       moneda: ingreso.moneda,
       fecha: ingreso.fecha,
-      tag_ids: ingreso.tag_ids || []
+      tag_ids: ingreso.tag_ids || [],
+      pendiente_cobro: (ingreso as any).pendiente_cobro || false,
+      fecha_cobro_esperada: (ingreso as any).fecha_cobro_esperada || null,
+      cuenta_bancaria_id: (ingreso as any).cuenta_bancaria_id || null,
+      comprobante: null // No pre-cargar archivo
     })
     setShowModal(true)
   }
@@ -190,14 +347,38 @@ export default function IngresosPage() {
     const fecha = new Date(form.fecha)
     const mes = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`
 
-    const data = {
+    // Convertir comprobante a base64 si existe
+    let comprobanteUrl = null
+    let comprobanteNombre = null
+    if (form.comprobante) {
+      comprobanteNombre = form.comprobante.name
+      const reader = new FileReader()
+      comprobanteUrl = await new Promise((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(form.comprobante!)
+      })
+    }
+
+    const data: any = {
       descripcion: form.descripcion,
       categoria_id: form.categoria_id || null,
       monto: parseFloat(form.monto),
       moneda: form.moneda,
       fecha: form.fecha,
       mes: mes,
-      tag_ids: form.tag_ids
+      tag_ids: form.tag_ids,
+      pendiente_cobro: form.pendiente_cobro || false,
+      fecha_cobro_esperada: form.fecha_cobro_esperada || null,
+      cuenta_bancaria_id: form.cuenta_bancaria_id || null,
+      comprobante_url: comprobanteUrl,
+      comprobante_nombre: comprobanteNombre
+    }
+
+    // Si no está marcado como pendiente o ya se confirmó, establecer fecha_cobro_confirmada
+    if (!form.pendiente_cobro || editing?.fecha_cobro_confirmada) {
+      if (!editing?.fecha_cobro_confirmada && !form.pendiente_cobro) {
+        data.fecha_cobro_confirmada = form.fecha
+      }
     }
 
     try {
@@ -331,6 +512,12 @@ export default function IngresosPage() {
     setAiNewTagName('')
     setAiShowNewCategoriaInput(false)
     setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
+    setAiShowNewCuentaInput(false)
+    setAiNewCuenta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setDetectedCuenta(null)
+    setSelectedCuentaId('')
+    setGlobalDocumentDate(null)
+    setUseGlobalDate(false)
 
     try {
       // Convertir a base64
@@ -359,8 +546,44 @@ export default function IngresosPage() {
         }
 
         setExtractedData(result.data)
-        // Preseleccionar categorías (si la IA sugiere una que coincide con las existentes)
+        
+        // Detectar fecha general del documento desde el mes del resumen
+        if (result.data?.total && result.data.total.mes_resumen) {
+          const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
+          const fechaResumen = `${mesResumen}-01`
+          setGlobalDocumentDate(fechaResumen)
+          setUseGlobalDate(true)
+        } else if (result.data?.transacciones && result.data.transacciones.length > 0) {
+          const firstDate = result.data.transacciones[0]?.fecha
+          if (firstDate) {
+            setGlobalDocumentDate(firstDate)
+            setUseGlobalDate(true)
+          } else {
+            setGlobalDocumentDate(new Date().toISOString().split('T')[0])
+            setUseGlobalDate(false)
+          }
+        }
+
+        // Si hay información de cuenta/tarjeta detectada, configurarla
+        if (result.data?.tarjeta) {
+          setDetectedCuenta(result.data.tarjeta)
+          // Intentar encontrar tarjeta existente
+          const nombreDetectado = buildDetectedCuentaName(result.data.tarjeta)
+          const existing = tarjetas.find(t => 
+            t.nombre.toLowerCase().includes(nombreDetectado.toLowerCase()) ||
+            nombreDetectado.toLowerCase().includes(t.nombre.toLowerCase())
+          )
+          if (existing) {
+            setSelectedCuentaId(existing.id)
+          }
+        }
+        
+        // Seleccionar automáticamente todas las transacciones detectadas
         if (result.data?.transacciones && Array.isArray(result.data.transacciones)) {
+          const allTransactions = new Set<number>(result.data.transacciones.map((_: any, i: number) => i))
+          setSelectedTransactions(allTransactions)
+          
+          // Preseleccionar categorías (si la IA sugiere una que coincide con las existentes)
           const initialEdited = new Map<number, any>()
           result.data.transacciones.forEach((trans: any, i: number) => {
             const categoriaId = findCategoriaIdFromLabel(trans?.categoria)
@@ -405,7 +628,7 @@ export default function IngresosPage() {
     }
   }
 
-  const handleConfirmExtractedData = () => {
+  const handleConfirmExtractedData = async () => {
     if (!extractedData) return
 
     // Si hay múltiples transacciones (resumen)
@@ -428,18 +651,36 @@ export default function IngresosPage() {
         return
       }
 
+      setSavingTransactions(true)
+
+      // Crear cuenta/tarjeta automáticamente si fue detectada y no existe
+      let cuentaIdToUse = selectedCuentaId || null
+      if (detectedCuenta && !cuentaIdToUse) {
+        cuentaIdToUse = await ensureCuentaExists(detectedCuenta)
+        if (cuentaIdToUse) {
+          setSelectedCuentaId(cuentaIdToUse)
+        }
+      }
+
       // Agregar cada transacción seleccionada como ingreso individual
       const addPromises = transactionsToAdd.map(async (trans: any) => {
+        // Crear categoría automáticamente si la IA la sugiere y no existe
         let categoriaId = ''
         if (trans.categoria_id) {
           categoriaId = String(trans.categoria_id)
         } else if (trans.categoria) {
+          // Intentar encontrar primero
           categoriaId = findCategoriaIdFromLabel(trans.categoria)
+          // Si no existe, crearla automáticamente
+          if (!categoriaId) {
+            categoriaId = (await ensureCategoriaExists(trans.categoria)) || ''
+          }
         } else if (form.categoria_id && form.categoria_id !== '__new__') {
           categoriaId = form.categoria_id
         }
 
-        const fecha = trans.fecha || form.fecha
+        // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
+        const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || form.fecha)
         const fechaDate = new Date(fecha)
         const mes = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
         const tagIds = Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || [])
@@ -452,7 +693,10 @@ export default function IngresosPage() {
           fecha: fecha,
           mes: mes,
           tag_ids: tagIds,
-          origen: trans.origen || ''
+          origen: trans.origen || '',
+          cuenta_bancaria_id: cuentaIdToUse,
+          pendiente_cobro: false, // Por defecto no está pendiente
+          fecha_cobro_confirmada: fecha // Se confirma automáticamente al agregar
         })
 
         if (error) {
@@ -463,7 +707,7 @@ export default function IngresosPage() {
 
       // Si se solicita, agregar el total también
       if (includeTotal && extractedData.total && extractedData.total.monto) {
-        const totalFecha = form.fecha
+        const totalFecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : form.fecha
         const totalFechaDate = new Date(totalFecha)
         const totalMes = `${totalFechaDate.getFullYear()}-${String(totalFechaDate.getMonth() + 1).padStart(2, '0')}`
         addPromises.push((async () => {
@@ -475,7 +719,10 @@ export default function IngresosPage() {
             fecha: totalFecha,
             mes: totalMes,
             tag_ids: form.tag_ids || [],
-            origen: extractedData.total.periodo || ''
+            origen: extractedData.total.periodo || '',
+            cuenta_bancaria_id: cuentaIdToUse,
+            pendiente_cobro: false,
+            fecha_cobro_confirmada: totalFecha
           })
 
           if (error) {
@@ -485,31 +732,38 @@ export default function IngresosPage() {
         })())
       }
 
-      Promise.all(addPromises)
-        .then(() => {
-          setShowImagePreview(false)
-          setExtractedData(null)
-          setPreviewImage(null)
-          setSelectedTransactions(new Set())
-          setIncludeTotal(false)
-          setEditedTransactions(new Map())
-          setAiExpandedTransaction(null)
-          setAiShowNewTagInput(false)
-          setAiNewTagName('')
-          setAiShowNewCategoriaInput(false)
-          setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
-          setShowModal(false)
-          resetForm()
+      try {
+        await Promise.all(addPromises)
+        setShowImagePreview(false)
+        setExtractedData(null)
+        setPreviewImage(null)
+        setSelectedTransactions(new Set())
+        setIncludeTotal(false)
+        setEditedTransactions(new Map())
+        setAiExpandedTransaction(null)
+        setAiShowNewTagInput(false)
+        setAiNewTagName('')
+        setAiShowNewCategoriaInput(false)
+        setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' })
+        setAiShowNewCuentaInput(false)
+        setAiNewCuenta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+        setDetectedCuenta(null)
+        setSelectedCuentaId('')
+        setGlobalDocumentDate(null)
+        setUseGlobalDate(false)
+        setSavingTransactions(false)
+        setShowModal(false)
+        resetForm()
+      } catch (error) {
+        console.error('Error agregando transacciones:', error)
+        setSavingTransactions(false)
+        setAlertData({
+          title: 'Error',
+          message: 'Error al agregar las transacciones. Por favor, intenta nuevamente.',
+          variant: 'error'
         })
-        .catch((error) => {
-          console.error('Error agregando transacciones:', error)
-          setAlertData({
-            title: 'Error',
-            message: 'Error al agregar las transacciones. Por favor, intenta nuevamente.',
-            variant: 'error'
-          })
-          setShowAlert(true)
-        })
+        setShowAlert(true)
+      }
       
       return
     }
@@ -566,7 +820,7 @@ export default function IngresosPage() {
       </div>
 
       {/* Totals */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card p-6">
           <div className="text-sm text-slate-500 mb-1">Total ARS</div>
           <div className="text-2xl font-bold text-emerald-600">{formatMoney(totalARS, 'ARS')}</div>
@@ -575,58 +829,121 @@ export default function IngresosPage() {
           <div className="text-sm text-slate-500 mb-1">Total USD</div>
           <div className="text-2xl font-bold text-emerald-600">{formatMoney(totalUSD, 'USD')}</div>
         </div>
+        <div className="card p-6">
+          <div className="text-sm text-slate-500 mb-1">Pendiente ARS</div>
+          <div className="text-2xl font-bold text-amber-600">{formatMoney(totalPendienteARS, 'ARS')}</div>
+        </div>
+        <div className="card p-6">
+          <div className="text-sm text-slate-500 mb-1">Pendiente USD</div>
+          <div className="text-2xl font-bold text-amber-600">{formatMoney(totalPendienteUSD, 'USD')}</div>
+        </div>
       </div>
 
       {/* Filters */}
-      {(currentWorkspace && members.length > 0) || filters.search || filters.moneda ? (
-        <div className="card p-4 bg-slate-50 border-b border-slate-200">
-          <div className="flex flex-wrap gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar..."
-                className="input pl-9 w-40"
-                value={filters.search}
-                onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-              />
-            </div>
+      <div className="card p-4 bg-slate-50 border-b border-slate-200">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar..."
+              className="input pl-9 w-40"
+              value={filters.search}
+              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+            />
+          </div>
+          <select
+            className="input w-auto"
+            value={filters.moneda}
+            onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
+          >
+            <option value="">Todas las monedas</option>
+            <option value="ARS">ARS</option>
+            <option value="USD">USD</option>
+          </select>
+          <select
+            className="input w-auto"
+            value={filters.categoria}
+            onChange={e => setFilters(f => ({ ...f, categoria: e.target.value }))}
+          >
+            <option value="">Todas las categorías</option>
+            {categoriasIngresos.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.icono} {c.nombre}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input w-auto"
+            value={filters.tag}
+            onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
+          >
+            <option value="">Todos los tags</option>
+            {tagsIngresos.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.nombre}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input w-auto"
+            value={filters.cuenta}
+            onChange={e => setFilters(f => ({ ...f, cuenta: e.target.value }))}
+          >
+            <option value="">Todas las cuentas</option>
+            {tarjetas.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.nombre}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input w-auto"
+            value={filters.pendiente}
+            onChange={e => setFilters(f => ({ ...f, pendiente: e.target.value }))}
+          >
+            <option value="">Todos</option>
+            <option value="si">Pendientes de cobro</option>
+            <option value="no">Confirmados</option>
+          </select>
+          <select
+            className="input w-auto"
+            value={filters.sort}
+            onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
+          >
+            <option value="monto-desc">Mayor a menor monto</option>
+            <option value="monto-asc">Menor a mayor monto</option>
+            <option value="fecha-desc">Más recientes</option>
+            <option value="fecha-asc">Más antiguos</option>
+            <option value="descripcion-asc">A-Z</option>
+            <option value="descripcion-desc">Z-A</option>
+          </select>
+          {currentWorkspace && members.length > 0 && (
             <select
               className="input w-auto"
-              value={filters.moneda}
-              onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
+              value={filters.colaborador}
+              onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
             >
-              <option value="">Todas las monedas</option>
-              <option value="ARS">ARS</option>
-              <option value="USD">USD</option>
-            </select>
-            {currentWorkspace && members.length > 0 && (
-              <select
-                className="input w-auto"
-                value={filters.colaborador}
-                onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
-              >
-                <option value="">Todos los colaboradores</option>
-                <option value="yo">Tú</option>
-                {currentWorkspace.owner_id !== user?.uid && (
-                  <option value="propietario">
-                    {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
-                     members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
-                     'Propietario'}
+              <option value="">Todos los colaboradores</option>
+              <option value="yo">Tú</option>
+              {currentWorkspace.owner_id !== user?.uid && (
+                <option value="propietario">
+                  {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
+                   members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
+                   'Propietario'}
+                </option>
+              )}
+              {members
+                .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
+                .map(m => (
+                  <option key={m.id} value={m.user_id}>
+                    {m.display_name || m.user_email.split('@')[0]}
                   </option>
-                )}
-                {members
-                  .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
-                  .map(m => (
-                    <option key={m.id} value={m.user_id}>
-                      {m.display_name || m.user_email.split('@')[0]}
-                    </option>
-                  ))}
-              </select>
-            )}
-          </div>
+                ))}
+            </select>
+          )}
         </div>
-      ) : null}
+      </div>
 
       {/* Ingresos List */}
       <div className="card">
@@ -694,13 +1011,14 @@ export default function IngresosPage() {
                 <th className="text-left p-4 font-semibold text-slate-700">Categoría</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Fecha</th>
                 <th className="text-right p-4 font-semibold text-slate-700">Monto</th>
+                <th className="text-left p-4 font-semibold text-slate-700">Estado</th>
                 <th className="text-right p-4 font-semibold text-slate-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {ingresosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center p-12">
+                  <td colSpan={7} className="text-center p-12">
                     <Wallet className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                     <p className="text-slate-500 mb-4">No hay ingresos registrados para este mes</p>
                     <button
@@ -746,6 +1064,11 @@ export default function IngresosPage() {
                           })}
                         </div>
                       )}
+                      {(ingreso as any).comprobante_url && (
+                        <div className="mt-1">
+                          <span className="text-xs text-slate-500">📎 {(ingreso as any).comprobante_nombre || 'Comprobante'}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">
                       {categoria && (
@@ -759,12 +1082,50 @@ export default function IngresosPage() {
                       {new Date(ingreso.fecha).toLocaleDateString('es-AR')}
                     </td>
                     <td className="p-4 text-right">
-                      <span className="font-bold text-emerald-600">
+                      <span className={`font-bold ${(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada ? 'text-amber-600' : 'text-emerald-600'}`}>
                         {formatMoney(ingreso.monto, ingreso.moneda)}
                       </span>
                     </td>
+                    <td className="p-4">
+                      {(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada ? (
+                        <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-semibold">
+                          ⏳ Pendiente
+                        </span>
+                      ) : (ingreso as any).fecha_cobro_confirmada ? (
+                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-full font-semibold">
+                          ✓ Confirmado
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
+                          -
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 text-right">
                       <div className="flex gap-2 justify-end">
+                        {(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada && (
+                          <button
+                            onClick={async () => {
+                              await updateIngreso(ingreso.id, {
+                                fecha_cobro_confirmada: new Date().toISOString().split('T')[0]
+                              })
+                            }}
+                            className="p-2 hover:bg-emerald-50 rounded-lg transition"
+                            title="Confirmar cobro"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          </button>
+                        )}
+                        {(ingreso as any).comprobante_url && (
+                          <a
+                            href={(ingreso as any).comprobante_url}
+                            download={(ingreso as any).comprobante_nombre}
+                            className="p-2 hover:bg-slate-100 rounded-lg transition"
+                            title="Descargar comprobante"
+                          >
+                            <Download className="w-4 h-4 text-slate-600" />
+                          </a>
+                        )}
                         <button
                           onClick={() => openEdit(ingreso)}
                           className="p-2 hover:bg-slate-100 rounded-lg transition"
@@ -960,6 +1321,98 @@ export default function IngresosPage() {
                 )}
               </div>
 
+              <div>
+                <label className="label">Cuenta bancaria / Tarjeta de origen (opcional)</label>
+                <select
+                  className="input"
+                  value={form.cuenta_bancaria_id || ''}
+                  onChange={e => setForm(f => ({ ...f, cuenta_bancaria_id: e.target.value || null }))}
+                >
+                  <option value="">Sin cuenta específica</option>
+                  {tarjetas.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="border-t border-slate-200 pt-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    id="pendiente_cobro"
+                    checked={form.pendiente_cobro}
+                    onChange={e => setForm(f => ({ ...f, pendiente_cobro: e.target.checked }))}
+                    className="w-5 h-5 text-amber-600 rounded border-slate-300"
+                  />
+                  <label htmlFor="pendiente_cobro" className="font-semibold text-slate-700 cursor-pointer">
+                    ⏳ Pendiente de cobro
+                  </label>
+                </div>
+                {form.pendiente_cobro && (
+                  <div className="ml-8 space-y-2">
+                    <div>
+                      <label className="label text-sm">Fecha esperada de cobro (opcional)</label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={form.fecha_cobro_esperada || ''}
+                        onChange={e => setForm(f => ({ ...f, fecha_cobro_esperada: e.target.value || null }))}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      El ingreso no se incluirá en los totales hasta que se confirme el cobro.
+                    </p>
+                    {editing && (editing as any).pendiente_cobro && !(editing as any).fecha_cobro_confirmada && (
+                      <button
+                        onClick={async () => {
+                          await updateIngreso(editing.id, {
+                            fecha_cobro_confirmada: new Date().toISOString().split('T')[0]
+                          })
+                          setShowModal(false)
+                          setEditing(null)
+                          resetForm()
+                        }}
+                        className="btn btn-success btn-sm w-full"
+                      >
+                        ✓ Confirmar cobro ahora
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="label">Comprobante (opcional)</label>
+                {editing && (editing as any).comprobante_url && !form.comprobante && (
+                  <div className="mb-2 p-2 bg-slate-50 rounded-lg flex items-center justify-between">
+                    <span className="text-sm text-slate-600">
+                      📎 {(editing as any).comprobante_nombre || 'Comprobante guardado'}
+                    </span>
+                    <a
+                      href={(editing as any).comprobante_url}
+                      download={(editing as any).comprobante_nombre}
+                      className="text-xs text-indigo-600 hover:underline"
+                    >
+                      Descargar
+                    </a>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="input"
+                  onChange={e => setForm(f => ({ ...f, comprobante: e.target.files?.[0] || null }))}
+                />
+                {form.comprobante && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    ✓ {form.comprobante.name}
+                    {editing && (editing as any).comprobante_url && ' (reemplazará el actual)'}
+                  </p>
+                )}
+              </div>
+
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -1058,6 +1511,119 @@ export default function IngresosPage() {
                       Selecciona los que deseas agregar.
                     </p>
                   </div>
+
+                  {/* Selector de Fecha/Mes General */}
+                  {globalDocumentDate && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <label className="text-sm font-semibold text-slate-700">
+                          📅 Mes para cargar los ingresos:
+                        </label>
+                        <input
+                          type="month"
+                          className="input"
+                          value={globalDocumentDate.slice(0, 7)}
+                          onChange={e => {
+                            const monthValue = e.target.value
+                            if (monthValue) {
+                              setGlobalDocumentDate(`${monthValue}-01`)
+                              setUseGlobalDate(true)
+                            }
+                          }}
+                        />
+                        <div className="text-xs text-slate-600">
+                          Detectada: {new Date(globalDocumentDate).toLocaleDateString('es-AR', { 
+                            day: 'numeric', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setUseGlobalDate(!useGlobalDate)}
+                          className={`text-xs px-2 py-1 rounded ${
+                            useGlobalDate 
+                              ? 'bg-indigo-100 text-indigo-700' 
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {useGlobalDate ? '✓ Usar fecha global' : 'Usar fechas individuales'}
+                        </button>
+                      </div>
+                      {useGlobalDate && (
+                        <p className="text-xs text-slate-500 mt-2">
+                          Todos los ingresos seleccionados se cargarán en el mes seleccionado.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selección de cuenta/tarjeta si fue detectada */}
+                  {detectedCuenta && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                      <div className="text-sm font-semibold text-indigo-900 mb-2">
+                        💳 Cuenta/Tarjeta detectada: {buildDetectedCuentaName(detectedCuenta)}
+                      </div>
+                      <div className="space-y-2">
+                        <select
+                          className="input w-full"
+                          value={selectedCuentaId}
+                          onChange={e => setSelectedCuentaId(e.target.value)}
+                        >
+                          <option value="">No asignar cuenta</option>
+                          {tarjetas.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.nombre}
+                            </option>
+                          ))}
+                          <option value="__new__">➕ Crear nueva cuenta/tarjeta</option>
+                        </select>
+                        {selectedCuentaId === '__new__' && (
+                          <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-2">
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Nombre de la cuenta/tarjeta"
+                              value={aiNewCuenta.nombre}
+                              onChange={e => setAiNewCuenta(c => ({ ...c, nombre: e.target.value }))}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                className="input"
+                                value={aiNewCuenta.tipo}
+                                onChange={e => setAiNewCuenta(c => ({ ...c, tipo: e.target.value as any }))}
+                              >
+                                <option value="visa">Visa</option>
+                                <option value="mastercard">Mastercard</option>
+                                <option value="amex">Amex</option>
+                                <option value="other">Otra</option>
+                              </select>
+                              <input
+                                type="text"
+                                className="input"
+                                placeholder="Banco"
+                                value={aiNewCuenta.banco}
+                                onChange={e => setAiNewCuenta(c => ({ ...c, banco: e.target.value }))}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleAddNewCuentaAI}
+                                className="btn btn-primary btn-sm"
+                              >
+                                Crear
+                              </button>
+                              <button
+                                onClick={() => setSelectedCuentaId('')}
+                                className="btn btn-secondary btn-sm"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Crear categorías / tags desde el preview */}
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
@@ -1248,9 +1814,11 @@ export default function IngresosPage() {
                                   )}
                                 </td>
                                 <td className="p-3">
-                                  <span className={`font-bold ${moneda === 'USD' ? 'text-emerald-600' : ''}`}>
-                                    {formatMoney(monto, moneda)}
-                                  </span>
+                                  <div className="flex items-center gap-1 justify-start">
+                                    <span className={`font-bold text-lg ${moneda === 'USD' ? 'text-emerald-600' : 'text-emerald-600'}`}>
+                                      {formatMoney(monto, moneda)}
+                                    </span>
+                                  </div>
                                   <div className="text-xs text-slate-500 mt-1">
                                     {fecha ? new Date(fecha).toLocaleDateString('es-AR') : '-'}
                                   </div>
@@ -1413,13 +1981,32 @@ export default function IngresosPage() {
                 <button
                   onClick={handleConfirmExtractedData}
                   className="btn btn-primary flex-1"
-                  disabled={extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal}
+                  disabled={(extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal) || savingTransactions}
                 >
-                  ✓ {extractedData.transacciones ? `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}
+                  {savingTransactions ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>✓ {extractedData.transacciones ? `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}</>
+                  )}
                 </button>
                 <button
-                  onClick={() => { setShowImagePreview(false); setExtractedData(null); setPreviewImage(null); setSelectedTransactions(new Set()); setIncludeTotal(false) }}
+                  onClick={() => { 
+                    setShowImagePreview(false)
+                    setExtractedData(null)
+                    setPreviewImage(null)
+                    setSelectedTransactions(new Set())
+                    setIncludeTotal(false)
+                    setEditedTransactions(new Map())
+                    setGlobalDocumentDate(null)
+                    setUseGlobalDate(false)
+                    setDetectedCuenta(null)
+                    setSelectedCuentaId('')
+                  }}
                   className="btn btn-secondary"
+                  disabled={savingTransactions}
                 >
                   Cancelar
                 </button>

@@ -386,28 +386,35 @@ IMPORTANTE CRÍTICO SOBRE FORMATO DE NÚMEROS:
 - Ejemplo: "1.500,50" significa mil quinientos pesos con 50 centavos = 1500.50 (no 150050)
 - Convierte TODOS los montos a formato numérico estándar usando punto (.) para decimales y SIN puntos de miles
 
-IMPORTANTE SOBRE FILTRADO:
+IMPORTANTE SOBRE FILTRADO Y LIMPIEZA DE DATOS:
 - NO incluyas transferencias o depósitos de meses anteriores
 - SOLO extrae ingresos del período actual del resumen
 - Busca la sección de ingresos o transacciones del período vigente
+- ⚠️ IGNORA palabras irrelevantes en la descripción como: "TRANSFERENCIA", "CASH", "PROVEEDOR", "DEPÓSITO", "ABONO", "CRÉDITO", etc.
+- ⚠️ EN INGRESOS LO IMPORTANTE ES QUIÉN PAGÓ, NO EL MÉTODO DE PAGO
+- ⚠️ Si ves "TRANSFERENCIA DE JUAN PÉREZ", usa solo "JUAN PÉREZ" como descripción
+- ⚠️ Si ves "DEPÓSITO CASH - EMPRESA XYZ", usa "EMPRESA XYZ" como descripción
+- ⚠️ Si ves "ABONO PROVEEDOR ABC", usa "PROVEEDOR ABC" o mejor aún, extrae el nombre real si está visible
+- FOCUS en extraer: nombre de la persona/empresa que pagó, concepto del ingreso (ej: "Salario", "Venta", "Alquiler"), NO el método de pago
 
 Responde en formato JSON con un array "transacciones" que contenga cada ingreso individual encontrado:
 
 {
   "transacciones": [
     {
-      "descripcion": "descripción del ingreso individual (ej: Salario, Transferencia, Depósito, etc.)",
+      "descripcion": "descripción limpia del ingreso sin métodos de pago (ej: Salario, Juan Pérez, Empresa XYZ, Venta de Producto, etc.)",
       "monto": número decimal usando punto (.) como separador decimal, sin puntos de miles (ej: 15179.99, 1500.50),
       "moneda": "ARS" o "USD",
       "fecha": "YYYY-MM-DD" (fecha del ingreso individual del período actual),
       "categoria": "categoría sugerida según la descripción (ej: Salario, Freelance, Inversiones, etc.)",
-      "origen": "origen del ingreso (banco, empresa, persona, etc.)"
+      "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
     }
   ],
   "total": {
     "monto": número decimal (total de ingresos del período si está visible, formato estándar con punto decimal),
     "moneda": "ARS" o "USD",
-    "periodo": "fecha de cierre o período del resumen"
+    "periodo": "fecha de cierre o período del resumen",
+    "mes_resumen": "YYYY-MM" (mes del resumen detectado)
   }
 }
 
@@ -416,18 +423,32 @@ EJEMPLOS DE CONVERSIÓN CORRECTA:
 - "1.500,50" → 1500.50
 - "50.000,00" → 50000.00
 
+EJEMPLOS DE LIMPIEZA DE DESCRIPCIONES:
+- "TRANSFERENCIA DE JUAN PÉREZ" → "Juan Pérez"
+- "DEPÓSITO CASH - EMPRESA XYZ" → "Empresa XYZ"
+- "ABONO PROVEEDOR ABC SRL" → "Proveedor ABC SRL"
+- "CRÉDITO SALARIO MES ENERO" → "Salario"
+- "TRANSFERENCIA BANCARIA CLIENTE 123" → "Cliente 123"
+
 Si encuentras múltiples ingresos del período actual, inclúyelos todos en el array. NO incluyas ingresos de períodos anteriores. Las fechas deben estar en formato YYYY-MM-DD.`
       } else {
         // Para comprobantes individuales de ingreso
         prompt = `Analiza este ${documentType} de un comprobante de ingreso individual y extrae la siguiente información en formato JSON:
 
+⚠️ IMPORTANTE SOBRE DESCRIPCIONES:
+- IGNORA palabras irrelevantes como: "TRANSFERENCIA", "CASH", "PROVEEDOR", "DEPÓSITO", "ABONO", "CRÉDITO"
+- EN INGRESOS LO IMPORTANTE ES QUIÉN PAGÓ, NO EL MÉTODO DE PAGO
+- Si ves "TRANSFERENCIA DE JUAN PÉREZ", usa solo "Juan Pérez"
+- Si ves "DEPÓSITO CASH - EMPRESA XYZ", usa "Empresa XYZ"
+- Extrae: nombre de la persona/empresa que pagó, concepto del ingreso
+
 {
-  "descripcion": "descripción del ingreso (ej: Salario, Transferencia, Depósito, etc.)",
+  "descripcion": "descripción limpia del ingreso sin métodos de pago (ej: Salario, Juan Pérez, Empresa XYZ, etc.)",
   "monto": número (solo el número, sin símbolos),
   "moneda": "ARS" o "USD",
   "fecha": "YYYY-MM-DD" (fecha del ingreso, si no está visible usa la fecha actual),
   "categoria": "categoría sugerida (ej: Salario, Freelance, Inversiones, etc.)",
-  "origen": "origen del ingreso (banco, empresa, etc.)"
+  "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
 }
 
 Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea solo el número sin símbolos de moneda ni puntos de miles. La fecha debe estar en formato YYYY-MM-DD.`

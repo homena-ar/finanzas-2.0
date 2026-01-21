@@ -144,6 +144,13 @@ export interface Ingreso {
   created_at: string
   categoria?: CategoriaIngreso
   tags?: TagIngreso[]
+  // Nuevos campos
+  pendiente_cobro?: boolean // Si está pendiente de cobro
+  fecha_cobro_esperada?: string | null // Fecha esperada de cobro (opcional)
+  fecha_cobro_confirmada?: string | null // Fecha en que se confirmó el cobro
+  cuenta_bancaria_id?: string | null // ID de la cuenta bancaria o tarjeta de origen
+  comprobante_url?: string | null // URL del comprobante (base64)
+  comprobante_nombre?: string | null // Nombre del archivo del comprobante
 }
 
 export interface DolarAPI {
