@@ -1833,7 +1833,10 @@ export default function IngresosPage() {
                                         monto: edited.monto !== undefined ? String(edited.monto) : String(trans.monto ?? ''),
                                         moneda: edited.moneda ?? trans.moneda ?? 'ARS',
                                         fecha: edited.fecha ?? trans.fecha ?? new Date().toISOString().split('T')[0],
-                                        tag_ids: edited.tag_ids ?? getTransactionTagIds(index)
+                                        tag_ids: edited.tag_ids ?? getTransactionTagIds(index),
+                                        pendiente_cobro: edited.pendiente_cobro ?? false,
+                                        fecha_cobro_esperada: edited.fecha_cobro_esperada ?? null,
+                                        cuenta_bancaria_id: edited.cuenta_bancaria_id ?? selectedCuentaId || null
                                       })
                                       setEditingAiTransaction(index)
                                     }}
@@ -2018,11 +2021,11 @@ export default function IngresosPage() {
 
       {/* Modal Editar Transacción del Preview IA */}
       {editingAiTransaction !== null && extractedData?.transacciones && (
-        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] }) }}>
+        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null }) }}>
           <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">Editar Transacción</h3>
-              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] }) }} className="p-1 hover:bg-slate-100 rounded">
+              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null }) }} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2228,14 +2231,14 @@ export default function IngresosPage() {
                     })
                     setEditedTransactions(updated)
                     setEditingAiTransaction(null)
-                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] })
+                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null })
                   }}
                   className="btn btn-primary flex-1"
                 >
                   Guardar Cambios
                 </button>
                 <button
-                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [] }) }}
+                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null }) }}
                   className="btn btn-secondary"
                 >
                   Cancelar
