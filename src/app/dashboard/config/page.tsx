@@ -1587,6 +1587,7 @@ export default function ConfigPage() {
             </div>
           )}
         </div>
+        </div>
 
         {/* Invitaciones Pendientes - MEJORADO */}
         {invitations.length > 0 && (
@@ -1620,6 +1621,7 @@ export default function ConfigPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Configuración financiera mensual */}
@@ -2528,7 +2530,7 @@ export default function ConfigPage() {
           }
         }}
         title="Eliminar Invitación"
-        message={invitationToDelete ? `¿Estás seguro de que deseas eliminar esta invitación a ${invitationToDelete.email}?\n\nEsta acción no se puede deshacer y la invitación será eliminada permanentemente del historial.` : ''}
+        message={invitationToDelete ? `¿Estás seguro de que deseas eliminar esta invitación a ${invitationToDelete.email}?\n\nEsta acción no se puede deshacer y la invitación será eliminada permanentemente del historial.` : '¿Estás seguro de que deseas eliminar esta invitación?'}
         confirmText="Eliminar"
         cancelText="Cancelar"
         variant="danger"
