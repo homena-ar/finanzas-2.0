@@ -15,6 +15,7 @@ export default function ConfigPage() {
   const { profile, updateProfile, user } = useAuth()
   const {
     tags, addTag, deleteTag,
+    tagsIngresos, addTagIngreso, deleteTagIngreso,
     categorias, addCategoria, updateCategoria, deleteCategoria,
   } = useData()
   const {
@@ -42,6 +43,7 @@ export default function ConfigPage() {
   const [budgetUsd, setBudgetUsd] = useState('')
   const [ingresosEnabled, setIngresosEnabled] = useState(false)
   const [newTag, setNewTag] = useState('')
+  const [newTagIngreso, setNewTagIngreso] = useState('')
   const [saving, setSaving] = useState(false)
   const [savingIngresos, setSavingIngresos] = useState(false)
 
@@ -192,6 +194,12 @@ export default function ConfigPage() {
     if (!newTag.trim()) return
     await addTag(newTag.trim())
     setNewTag('')
+  }
+
+  const handleAddTagIngreso = async () => {
+    if (!newTagIngreso.trim()) return
+    await addTagIngreso(newTagIngreso.trim())
+    setNewTagIngreso('')
   }
 
   const handleSaveCategoria = async () => {
@@ -1525,10 +1533,10 @@ export default function ConfigPage() {
         </div>
       </div>
 
-      {/* Tags */}
+      {/* Tags Gastos */}
       <div className="card p-5 order-5">
-        <h3 className="font-bold mb-4">🏷️ Tags Personalizados</h3>
-        <p className="text-slate-500 text-sm mb-4">Creá tags para organizar tus gastos</p>
+        <h3 className="font-bold mb-4">🏷️ Etiquetas para Gastos</h3>
+        <p className="text-slate-500 text-sm mb-4">Para organizar y filtrar gastos por categorías personalizadas</p>
 
         <div className="flex flex-wrap gap-2 mb-4">
           {tags.map(t => (
@@ -1540,7 +1548,7 @@ export default function ConfigPage() {
             </div>
           ))}
           {tags.length === 0 && (
-            <span className="text-slate-400">Sin tags</span>
+            <span className="text-slate-400">Sin etiquetas</span>
           )}
         </div>
 
@@ -1548,12 +1556,46 @@ export default function ConfigPage() {
           <input
             type="text"
             className="input flex-1"
-            placeholder="Nuevo tag..."
+            placeholder="Nueva etiqueta..."
             value={newTag}
             onChange={e => setNewTag(e.target.value)}
             onKeyPress={e => e.key === 'Enter' && handleAddTag()}
           />
           <button onClick={handleAddTag} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> Agregar
+          </button>
+        </div>
+      </div>
+
+      {/* Tags Ingresos */}
+      <div className="card p-5 order-6">
+        <h3 className="font-bold mb-4">🏷️ Etiquetas para Ingresos</h3>
+        <p className="text-slate-500 text-sm mb-4">Para organizar y filtrar ingresos por categorías personalizadas</p>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          {tagsIngresos.map(t => (
+            <div key={t.id} className="flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full">
+              <span className="font-semibold text-sm">{t.nombre}</span>
+              <button onClick={() => deleteTagIngreso(t.id)} className="hover:text-orange-900">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          {tagsIngresos.length === 0 && (
+            <span className="text-slate-400">Sin etiquetas</span>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="input flex-1"
+            placeholder="Nueva etiqueta..."
+            value={newTagIngreso}
+            onChange={e => setNewTagIngreso(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && handleAddTagIngreso()}
+          />
+          <button onClick={handleAddTagIngreso} className="btn btn-primary">
             <Plus className="w-4 h-4" /> Agregar
           </button>
         </div>

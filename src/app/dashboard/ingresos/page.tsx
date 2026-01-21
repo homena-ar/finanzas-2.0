@@ -396,24 +396,30 @@ export default function IngresosPage() {
       fecha: form.fecha,
       mes: mes,
       tag_ids: form.tag_ids,
-      pendiente_cobro: form.pendiente_cobro || false,
+      pendiente_cobro: form.pendiente_cobro === true, // Asegurar que sea boolean
       fecha_cobro_esperada: form.fecha_cobro_esperada || null,
       cuenta_bancaria_id: form.cuenta_bancaria_id || null,
       comprobante_url: comprobanteUrl,
       comprobante_nombre: comprobanteNombre,
-      notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : true,
-      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : true
+      notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : (form.pendiente_cobro ? true : false),
+      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : (form.pendiente_cobro ? true : false)
     }
 
-    // Si no está marcado como pendiente o ya se confirmó, establecer fecha_cobro_confirmada
-    if (!form.pendiente_cobro || editing?.fecha_cobro_confirmada) {
-      if (!editing?.fecha_cobro_confirmada && !form.pendiente_cobro) {
-        data.fecha_cobro_confirmada = form.fecha
-      }
-    } else {
-      // Si está pendiente, asegurar que fecha_cobro_confirmada sea null
+    // Manejar fecha_cobro_confirmada según el estado de pendiente_cobro
+    if (form.pendiente_cobro) {
+      // Si está marcado como pendiente, fecha_cobro_confirmada debe ser null
       data.fecha_cobro_confirmada = null
+    } else {
+      // Si NO está pendiente, confirmar automáticamente con la fecha del ingreso
+      data.fecha_cobro_confirmada = form.fecha
     }
+    
+    console.log('🔵 [Ingresos] Guardando ingreso desde formulario:', {
+      ...data,
+      pendiente_cobro_type: typeof data.pendiente_cobro,
+      pendiente_cobro_value: data.pendiente_cobro,
+      form_pendiente_cobro: form.pendiente_cobro
+    })
 
     try {
       if (editing) {
@@ -796,16 +802,7 @@ export default function IngresosPage() {
           }
         }
         
-        console.log('🔵 [Ingresos] Agregando ingreso:', {
-          descripcion: edited.descripcion || trans.descripcion,
-          categoria_id: categoriaId || null,
-          categoria_sugerida: trans.categoria,
-          pendiente_cobro: pendienteCobro,
-          fecha_cobro_esperada: fechaCobroEsperada,
-          notificacion: notificacionInfo
-        })
-        
-        const { error } = await addIngreso({
+        const ingresoData = {
           descripcion: edited.descripcion || trans.descripcion,
           categoria_id: categoriaId || null,
           monto: edited.monto !== undefined ? edited.monto : trans.monto,
@@ -820,12 +817,29 @@ export default function IngresosPage() {
           fecha_cobro_confirmada: pendienteCobro ? null : fecha, // Solo se confirma si no está pendiente
           notificar_celular: edited.notificar_celular !== undefined ? edited.notificar_celular : (pendienteCobro ? true : false), // Notificar solo si está pendiente
           notificar_correo: edited.notificar_correo !== undefined ? edited.notificar_correo : (pendienteCobro ? true : false) // Notificar solo si está pendiente
-        })
-
-        if (error) {
-          console.error('Error al agregar ingreso desde IA:', error)
-          throw error
         }
+        
+        console.log('🔵 [Ingresos] Agregando ingreso con datos:', {
+          ...ingresoData,
+          categoria_sugerida: trans.categoria,
+          notificacion: notificacionInfo,
+          pendiente_cobro_type: typeof pendienteCobro,
+          pendiente_cobro_value: pendienteCobro
+        })
+        
+        const { error } = await addIngreso(ingresoData)
+        
+        if (error) {
+          console.error('❌ [Ingresos] Error al agregar ingreso desde IA:', error)
+          throw error
+        } else {
+          console.log('✅ [Ingresos] Ingreso agregado exitosamente:', {
+            descripcion: ingresoData.descripcion,
+            pendiente_cobro: ingresoData.pendiente_cobro
+          })
+        }
+
+        // Ya se maneja arriba
       })
 
       // Si se solicita, agregar el total también
@@ -1180,7 +1194,7 @@ export default function IngresosPage() {
                           {ingreso.tag_ids.map(tagId => {
                             const tag = tagsIngresos.find(t => t.id === tagId)
                             return tag ? (
-                              <span key={tagId} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">
+                              <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
                                 {tag.nombre}
                               </span>
                             ) : null
@@ -1405,43 +1419,63 @@ export default function IngresosPage() {
               </div>
 
               <div>
-                <label className="label">Tags</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {tagsIngresos.map(tag => (
+                <label className="label">Etiquetas</label>
+                <p className="text-xs text-slate-500 mb-3">Para organizar y filtrar ingresos por categorías personalizadas</p>
+                <div className="flex flex-wrap gap-2 mb-2 p-3 bg-slate-50 rounded-xl border-2 border-slate-200 min-h-[3rem]">
+                  {tagsIngresos.map(tag => {
+                    const isSelected = form.tag_ids.includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                          isSelected
+                            ? 'bg-orange-500 text-white border-2 border-orange-600'
+                            : 'bg-white text-orange-700 border-2 border-orange-300 hover:border-orange-400'
+                        }`}
+                      >
+                        {tag.nombre}
+                      </button>
+                    )
+                  })}
+                  {!showNewTagInput && (
                     <button
-                      key={tag.id}
-                      onClick={() => toggleTag(tag.id)}
-                      className={`px-3 py-1 rounded-lg text-sm transition ${
-                        form.tag_ids.includes(tag.id)
-                          ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-500'
-                          : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-slate-300'
-                      }`}
+                      type="button"
+                      onClick={() => setShowNewTagInput(true)}
+                      className="px-3 py-1.5 rounded-full text-sm bg-blue-50 text-blue-700 border-2 border-blue-300 hover:bg-blue-100 transition font-semibold flex items-center gap-1"
                     >
-                      {tag.nombre}
+                      <Plus className="w-4 h-4" /> Nueva etiqueta
                     </button>
-                  ))}
-                  <button
-                    onClick={() => setShowNewTagInput(!showNewTagInput)}
-                    className="px-3 py-1 rounded-lg text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
-                  >
-                    ➕ Nuevo tag
-                  </button>
+                  )}
+                  {showNewTagInput && (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="text"
+                        className="input py-1 px-2 text-sm w-32 rounded-full"
+                        placeholder="Nombre"
+                        value={newTagName}
+                        onChange={e => setNewTagName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddNewTag()}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewTag}
+                        className="px-2 py-1 bg-emerald-500 text-white rounded-full text-sm font-bold hover:bg-emerald-600"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewTagInput(false); setNewTagName('') }}
+                        className="px-2 py-1 bg-slate-300 text-slate-700 rounded-full text-sm font-bold hover:bg-slate-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {showNewTagInput && (
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="text"
-                      className="input flex-1"
-                      placeholder="Nombre del tag"
-                      value={newTagName}
-                      onChange={e => setNewTagName(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAddNewTag()}
-                    />
-                    <button onClick={handleAddNewTag} className="btn btn-primary">
-                      Agregar
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -1788,96 +1822,6 @@ export default function IngresosPage() {
                     </div>
                   )}
 
-                  {/* Crear categorías / tags desde el preview */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
-                    <div className="text-xs font-semibold text-slate-700">🏷️ Categorías y etiquetas</div>
-                    {!aiShowNewCategoriaInput ? (
-                      <button
-                        type="button"
-                        onClick={() => setAiShowNewCategoriaInput(true)}
-                        className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
-                      >
-                        + Crear nueva categoría
-                      </button>
-                    ) : (
-                      <div className="space-y-2 p-3 bg-white rounded-lg border border-indigo-200">
-                        <input
-                          type="text"
-                          className="input w-full text-xs h-8"
-                          placeholder="Nombre de categoría"
-                          value={aiNewCategoria.nombre}
-                          onChange={e => setAiNewCategoria(c => ({ ...c, nombre: e.target.value }))}
-                        />
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-600 mb-1">Icono</div>
-                          <EmojiPickerField
-                            value={aiNewCategoria.icono}
-                            onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
-                            placeholder="💵"
-                            size="sm"
-                          />
-                        </div>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="color"
-                            className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
-                            value={aiNewCategoria.color}
-                            onChange={e => setAiNewCategoria(c => ({ ...c, color: e.target.value }))}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleAddNewCategoriaAI}
-                            className="btn btn-primary btn-sm"
-                          >
-                            Crear
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setAiShowNewCategoriaInput(false); setAiNewCategoria({ nombre: '', icono: '💵', color: '#3b82f6' }) }}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {!aiShowNewTagInput ? (
-                      <button
-                        type="button"
-                        onClick={() => setAiShowNewTagInput(true)}
-                        className="w-full px-3 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-bold hover:bg-orange-100 transition"
-                      >
-                        + Crear nueva etiqueta
-                      </button>
-                    ) : (
-                      <div className="flex gap-2 p-3 bg-white rounded-lg border border-orange-200">
-                        <input
-                          type="text"
-                          className="input flex-1 text-xs h-8"
-                          placeholder="Nombre de etiqueta"
-                          value={aiNewTagName}
-                          onChange={e => setAiNewTagName(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleAddNewTagAI()}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddNewTagAI}
-                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
-                          className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-                  </div>
 
                   {/* Lista de Transacciones - Tabla como en ingresos normales */}
                   <div className="card overflow-hidden">
@@ -1956,7 +1900,7 @@ export default function IngresosPage() {
                                       {tagIds.map((tagId: string) => {
                                         const tag = tagsIngresos.find(t => t.id === tagId)
                                         return tag ? (
-                                          <span key={tagId} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs">
+                                          <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
                                             {tag.nombre}
                                           </span>
                                         ) : null
@@ -1985,6 +1929,13 @@ export default function IngresosPage() {
                                   <div className="text-xs text-slate-500 mt-1">
                                     {fecha ? new Date(fecha).toLocaleDateString('es-AR') : '-'}
                                   </div>
+                                  {(edited?.pendiente_cobro || false) && (
+                                    <div className="mt-1">
+                                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                                        ⏳ Pendiente
+                                      </span>
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="p-3">
                                   <button
@@ -2316,6 +2267,7 @@ export default function IngresosPage() {
 
               <div>
                 <label className="label">Etiquetas</label>
+                <p className="text-xs text-slate-500 mb-3">Para organizar y filtrar ingresos por categorías personalizadas</p>
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border-2 border-slate-200 min-h-[3rem]">
                   {tagsIngresos.map(t => {
                     const isSelected = aiTransactionForm.tag_ids.includes(t.id)
@@ -2330,52 +2282,16 @@ export default function IngresosPage() {
                             setAiTransactionForm(f => ({ ...f, tag_ids: [...f.tag_ids, t.id] }))
                           }
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${
+                        className={`px-3 py-1.5 rounded-full text-sm font-semibold transition ${
                           isSelected
-                            ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-500'
-                            : 'bg-white text-slate-600 border-2 border-transparent hover:border-slate-300'
+                            ? 'bg-orange-500 text-white border-2 border-orange-600'
+                            : 'bg-white text-orange-700 border-2 border-orange-300 hover:border-orange-400'
                         }`}
                       >
                         {t.nombre}
                       </button>
                     )
                   })}
-                  {!aiShowNewTagInput && (
-                    <button
-                      type="button"
-                      onClick={() => setAiShowNewTagInput(true)}
-                      className="px-3 py-1.5 rounded-lg text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
-                    >
-                      + Nueva etiqueta
-                    </button>
-                  )}
-                  {aiShowNewTagInput && (
-                    <div className="flex gap-1 items-center">
-                      <input
-                        type="text"
-                        className="input py-1 px-2 text-xs w-32"
-                        placeholder="Nombre"
-                        value={aiNewTagName}
-                        onChange={e => setAiNewTagName(e.target.value)}
-                        onKeyPress={e => e.key === 'Enter' && handleAddNewTagAI()}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddNewTagAI}
-                        className="px-2 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
-                        className="px-2 py-1 bg-slate-300 text-slate-700 rounded text-xs font-bold hover:bg-slate-400"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
 

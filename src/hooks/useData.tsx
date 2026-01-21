@@ -945,15 +945,63 @@ const addTarjeta = useCallback(async (data: any) => {
   const addIngreso = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
-      const docRef = await addDoc(collection(db, 'ingresos'), insertData); await fetchAll(); return { error: null, data: { id: docRef.id, ...data } }
-    } catch (error) { return { error } }
+      // Asegurar que pendiente_cobro sea boolean
+      const insertData: any = { 
+        ...data, 
+        pendiente_cobro: data.pendiente_cobro === true,
+        user_id: user.uid, 
+        created_at: serverTimestamp() 
+      }
+      if (currentWorkspace?.id) { 
+        insertData.workspace_id = currentWorkspace.id
+        insertData.created_by = user.uid 
+      }
+      
+      console.log('🔵 [useData] Agregando ingreso con datos:', {
+        descripcion: insertData.descripcion,
+        pendiente_cobro: insertData.pendiente_cobro,
+        pendiente_cobro_type: typeof insertData.pendiente_cobro,
+        fecha_cobro_esperada: insertData.fecha_cobro_esperada
+      })
+      
+      const docRef = await addDoc(collection(db, 'ingresos'), insertData)
+      await fetchAll()
+      
+      console.log('✅ [useData] Ingreso agregado exitosamente:', docRef.id)
+      
+      return { error: null, data: { id: docRef.id, ...insertData } }
+    } catch (error) { 
+      console.error('❌ [useData] Error agregando ingreso:', error)
+      return { error } 
+    }
   }, [user, currentWorkspace, fetchAll])
 
   const updateIngreso = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
-    try { await updateDoc(doc(db, 'ingresos', id), data); await fetchAll(); return { error: null } } catch (error) { return { error } }
+    try {
+      // Asegurar que pendiente_cobro sea boolean si está presente
+      const updateData: any = { ...data }
+      if ('pendiente_cobro' in data) {
+        updateData.pendiente_cobro = data.pendiente_cobro === true
+      }
+      
+      console.log('🔵 [useData] Actualizando ingreso:', id, {
+        descripcion: updateData.descripcion,
+        pendiente_cobro: updateData.pendiente_cobro,
+        pendiente_cobro_type: typeof updateData.pendiente_cobro,
+        fecha_cobro_esperada: updateData.fecha_cobro_esperada
+      })
+      
+      await updateDoc(doc(db, 'ingresos', id), updateData)
+      await fetchAll()
+      
+      console.log('✅ [useData] Ingreso actualizado exitosamente:', id)
+      
+      return { error: null }
+    } catch (error) { 
+      console.error('❌ [useData] Error actualizando ingreso:', error)
+      return { error } 
+    }
   }, [user, fetchAll])
 
   const deleteIngreso = useCallback(async (id: string) => {
