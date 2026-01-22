@@ -261,7 +261,9 @@ REGLAS PARA DETECTAR DECIMALES:
     "banco": "nombre del banco o null si no se encuentra",
     "tipo_tarjeta": "Visa/Mastercard/Amex/CreditCard u otro, o null",
     "ultimos_digitos": "últimos dígitos visibles o null",
-    "nombre_titular": "nombre del titular si está visible o null"
+    "nombre_titular": "nombre del titular si está visible o null",
+    "fecha_cierre": número entero del 1 al 31 o null (día del mes en que cierra el resumen, ej: si cierra el día 15, usar 15. Si no se encuentra, null),
+    "fecha_vencimiento": número entero del 1 al 31 o null (día del mes en que vence el pago, ej: si vence el día 20, usar 20. Si no se encuentra, null)
   },
   "transacciones": [
     {
@@ -280,7 +282,7 @@ REGLAS PARA DETECTAR DECIMALES:
         - Ejemplos de valores: 15179.99, 6647.26, 3600.00, 14999.83),
       "moneda": "ARS" o "USD" según corresponda,
       "fecha": "YYYY-MM-01" (SIEMPRE el primer día del mes del resumen detectado. Si el vencimiento es en enero, el resumen es de diciembre, entonces usar "YYYY-12-01". Si el vencimiento es en febrero, usar "YYYY-01-01", etc. Formato ISO),
-      "categoria": "categoría sugerida según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, etc.)",
+      "categoria": "categoría sugerida en ESPAÑOL según la descripción (ej: Transporte, Telefonía/Internet, Supermercado, Pedidos/Delivery, Ropa, Farmacia, etc.) - IMPORTANTE: SIEMPRE en español, NUNCA en inglés",
       "comercio": "nombre del comercio o establecimiento si está disponible o null",
       "cuotas": número entero o null (⚠️⚠️⚠️ CRÍTICO Y OBLIGATORIO: 
         - PRIMERO: Busca en la columna "CUOTA" de la tabla. Si existe y tiene formato "X/Y":

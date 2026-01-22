@@ -683,6 +683,9 @@ export default function GastosPage() {
       'supermercado': '🛒',
       'comida': '🍔',
       'restaurante': '🍽️',
+      'pedidos': '🍕',
+      'delivery': '🍕',
+      'food delivery': '🍕',
       'transporte': '🚗',
       'taxi': '🚕',
       'uber': '🚕',
@@ -693,12 +696,21 @@ export default function GastosPage() {
       'netflix': '📺',
       'spotify': '🎵',
       'ropa': '👕',
+      'retail': '🛍️',
       'salud': '💊',
       'farmacia': '💊',
       'educacion': '📚',
       'entretenimiento': '🎮',
       'hogar': '🏠',
       'alquiler': '🏠',
+      'e-commerce': '🛒',
+      'comercio electronico': '🛒',
+      'utilities': '⚡',
+      'servicios publicos': '⚡',
+      'health': '💊',
+      'salud': '💊',
+      'insurance': '🛡️',
+      'seguro': '🛡️',
       'otros': '💰'
     }
     
@@ -720,7 +732,7 @@ export default function GastosPage() {
     try {
       // Crear automáticamente
       console.log('🔵 [Gastos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', iconoFinal)
-      const { error } = await addCategoria({
+      const { error, id } = await addCategoria({
         nombre: categoriaLabel.trim(),
         icono: iconoFinal,
         color: '#6366f1' // Color por defecto para gastos
@@ -732,17 +744,20 @@ export default function GastosPage() {
         return null
       }
       
-      // Esperar un momento para que se actualice la lista
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      let finalId = id
       
-      // Buscar de nuevo en las categorías actualizadas
-      const newId = findCategoriaIdFromLabel(categoriaLabel)
-      if (newId) {
-        console.log('✅ [Gastos] Categoría creada y encontrada:', categoriaLabel, '→', newId)
+      // Si no devuelve ID, esperar y buscar
+      if (!finalId) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        finalId = findCategoriaIdFromLabel(categoriaLabel)
+      }
+      
+      if (finalId) {
+        console.log('✅ [Gastos] Categoría creada con ID:', categoriaLabel, '→', finalId)
         // Guardar en el mapa global para futuras referencias
-        categoriasCreadasGlobal.current.set(categoriaLabel, newId)
+        categoriasCreadasGlobal.current.set(categoriaLabel, finalId)
         categoriasEnCreacion.current.delete(normalizedLabel)
-        return newId
+        return finalId
       }
       
       console.warn('⚠️ [Gastos] Categoría creada pero no encontrada después de esperar:', categoriaLabel)
@@ -836,17 +851,18 @@ export default function GastosPage() {
     
     // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
     const accountSuggestion = cuentaData?.accountSuggestion || cuentaData
+    const tarjetaData = cuentaData?.tarjeta || {}
     
     // Validar que tenga información suficiente
-    if (!accountSuggestion.nombre && !accountSuggestion.banco && !accountSuggestion.tipo && !accountSuggestion.tipo_tarjeta) {
+    if (!accountSuggestion.nombre && !accountSuggestion.banco && !accountSuggestion.tipo && !accountSuggestion.tipo_tarjeta && !tarjetaData.banco) {
       return null
     }
     
     const nombreCuenta = buildDetectedTarjetaName(cuentaData)
     
     // Buscar si ya existe (por nombre, banco, o últimos dígitos)
-    const ultimosDigitos = accountSuggestion?.ultimosDigitos || accountSuggestion?.ultimos_digitos
-    const banco = accountSuggestion?.banco
+    const ultimosDigitos = accountSuggestion?.ultimosDigitos || accountSuggestion?.ultimos_digitos || tarjetaData.ultimos_digitos
+    const banco = accountSuggestion?.banco || tarjetaData.banco
     
     const existing = tarjetas.find(t => {
       // Buscar por nombre
@@ -873,7 +889,7 @@ export default function GastosPage() {
     }
     
     // Determinar tipo de tarjeta
-    const tipoStr = (accountSuggestion?.tipo || accountSuggestion?.tipo_tarjeta || '').toLowerCase()
+    const tipoStr = (accountSuggestion?.tipo || accountSuggestion?.tipo_tarjeta || tarjetaData.tipo_tarjeta || '').toLowerCase()
     let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
     if (tipoStr.includes('visa')) {
       tipo = 'visa'
@@ -887,14 +903,19 @@ export default function GastosPage() {
       tipo = 'other' // Cuenta bancaria
     }
     
+    // Extraer fechas de vencimiento y cierre del resumen
+    const fechaCierre = tarjetaData.fecha_cierre || null
+    const fechaVencimiento = tarjetaData.fecha_vencimiento || null
+    
     // Crear automáticamente
-    console.log('🔵 [Gastos] Creando cuenta automáticamente:', nombreCuenta)
+    console.log('🔵 [Gastos] Creando cuenta automáticamente:', nombreCuenta, 'con cierre:', fechaCierre, 'vencimiento:', fechaVencimiento)
     const result = await addTarjeta({
       nombre: nombreCuenta,
       tipo: tipo,
       banco: banco || null,
       digitos: ultimosDigitos || null,
-      cierre: null
+      cierre: fechaCierre ? parseInt(String(fechaCierre)) : null,
+      vencimiento: fechaVencimiento ? parseInt(String(fechaVencimiento)) : null
     })
     
     if (result.error) {
@@ -1143,7 +1164,12 @@ export default function GastosPage() {
           
           // Si hay información de tarjeta detectada, configurarla
           if (result.data.tarjeta) {
-            setDetectedTarjeta(result.data.tarjeta)
+            // Guardar toda la información incluyendo accountSuggestion si existe
+            const tarjetaCompleta = {
+              ...result.data.tarjeta,
+              accountSuggestion: result.data.accountSuggestion || null
+            }
+            setDetectedTarjeta(tarjetaCompleta)
             
             // Intentar encontrar una tarjeta existente que coincida
             const bancoMatch = result.data.tarjeta.banco ? 
@@ -1299,7 +1325,9 @@ export default function GastosPage() {
       
       // Si hay tarjeta detectada pero no se seleccionó ninguna, intentar crear automáticamente
       if (detectedTarjeta && !tarjetaIdToUse) {
-        tarjetaIdToUse = await ensureCuentaExists(detectedTarjeta)
+        // Pasar toda la información de la tarjeta detectada incluyendo fechas
+        // detectedTarjeta ya incluye accountSuggestion si existe
+        tarjetaIdToUse = await ensureCuentaExists({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })
         if (tarjetaIdToUse) {
           setSelectedTarjetaId(tarjetaIdToUse)
         }
@@ -1311,12 +1339,17 @@ export default function GastosPage() {
       const addPromises = transactionsToAdd.map(async (trans: any, index: number) => {
         console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando transacción ${index + 1}:`, trans)
         
+        // Aplicar ediciones si existen
+        const edited = editedTransactions.get(index)
+        let finalTrans = edited ? { ...trans, ...edited } : { ...trans }
+        
+        // Crear categoría automáticamente si la IA la sugiere y no existe
         let categoriaId = ''
-        if (trans.categoria_id) {
-          categoriaId = String(trans.categoria_id)
-        } else if (trans.categoria) {
-          const categoriaLabel = trans.categoria.trim()
-          const categoriaIcono = (trans as any).categoria_icono || undefined
+        if (finalTrans.categoria_id) {
+          categoriaId = String(finalTrans.categoria_id)
+        } else if (finalTrans.categoria) {
+          const categoriaLabel = finalTrans.categoria.trim()
+          const categoriaIcono = (finalTrans as any).categoria_icono || undefined
           
           // ensureCategoriaExists ya maneja el mapa global y evita duplicados
           categoriaId = (await ensureCategoriaExists(categoriaLabel, categoriaIcono)) || ''
@@ -1412,19 +1445,19 @@ export default function GastosPage() {
         })
         
         const gastoData = {
-          descripcion: trans.descripcion,
+          descripcion: finalTrans.descripcion || trans.descripcion,
           categoria_id: categoriaId,
           monto: montoFinal,
-          moneda: trans.moneda || 'ARS',
+          moneda: finalTrans.moneda || trans.moneda || 'ARS',
           fecha: fecha,
           mes_facturacion: mesFacturacion,
           tarjeta_id: tarjetaIdToUse,
           cuotas: cuotasFinal,
           cuota_actual: cuotaActualFinal,
           es_fijo: false, // NO marcar como fijo, las cuotas se distribuyen automáticamente
-          tag_ids: Array.isArray(trans.tag_ids) ? trans.tag_ids : (gastoForm.tag_ids || []),
+          tag_ids: Array.isArray(finalTrans.tag_ids) ? finalTrans.tag_ids : (Array.isArray(trans.tag_ids) ? trans.tag_ids : (gastoForm.tag_ids || [])),
           pagado: gastoForm.pagado,
-          comercio: trans.comercio || ''
+          comercio: finalTrans.comercio || trans.comercio || ''
         }
         
         console.log(`🔵 [GastosPage] handleConfirmExtractedData - Agregando gasto ${index + 1}:`, gastoData)

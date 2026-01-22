@@ -437,14 +437,20 @@ export default function IngresosPage() {
       tipo = 'other' // Cuenta bancaria
     }
     
+    // Extraer fechas de vencimiento y cierre del resumen
+    const tarjetaData = cuentaData?.tarjeta || {}
+    const fechaCierre = tarjetaData.fecha_cierre || null
+    const fechaVencimiento = tarjetaData.fecha_vencimiento || null
+    
     // Crear automáticamente
-    console.log('🔵 [Ingresos] Creando cuenta automáticamente:', nombreCuenta)
+    console.log('🔵 [Ingresos] Creando cuenta automáticamente:', nombreCuenta, 'con cierre:', fechaCierre, 'vencimiento:', fechaVencimiento)
     const result = await addTarjeta({
       nombre: nombreCuenta,
       tipo: tipo,
       banco: banco || null,
       digitos: ultimosDigitos || null,
-      cierre: null
+      cierre: fechaCierre ? parseInt(String(fechaCierre)) : null,
+      vencimiento: fechaVencimiento ? parseInt(String(fechaVencimiento)) : null
     })
     
     if (result.error) {

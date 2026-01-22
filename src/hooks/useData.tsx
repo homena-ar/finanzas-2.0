@@ -45,7 +45,7 @@ type DataContextType = {
   deleteMeta: (id: string) => Promise<{ error: any }>
   addTag: (nombre: string) => Promise<{ error: any }>
   deleteTag: (id: string) => Promise<{ error: any }>
-  addCategoria: (data: any) => Promise<{ error: any }>
+    addCategoria: (data: any) => Promise<{ error: any; id?: string }>
   updateCategoria: (id: string, data: any) => Promise<{ error: any }>
   deleteCategoria: (id: string) => Promise<{ error: any }>
   addGasto: (data: any) => Promise<{ error: any, data?: Gasto }>
@@ -864,7 +864,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
       if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
-      await addDoc(collection(db, 'categorias'), insertData); await fetchAll(); return { error: null }
+      const docRef = await addDoc(collection(db, 'categorias'), insertData)
+      await fetchAll()
+      return { error: null, id: docRef.id }
     } catch (error) { return { error } }
   }, [user, currentWorkspace, fetchAll])
 
