@@ -1146,7 +1146,6 @@ export default function GastosPage() {
           }
           
           // Detectar fecha general del documento desde el mes del resumen
-          if (result.data.total && result.data.total.mes_resumen) {
           // Si la IA detectó el mes del resumen, usar el día 10 de ese mes para evitar problemas de timezone
           if (result.data.total?.mes_resumen) {
             const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
