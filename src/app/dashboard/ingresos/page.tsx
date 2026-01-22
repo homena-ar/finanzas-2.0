@@ -1106,7 +1106,8 @@ export default function IngresosPage() {
           
           // Verificar si ya creamos esta categoría (o una similar) en este proceso
           let foundInMap = false
-          for (const [mapLabel, mapId] of categoriasCreadas.entries()) {
+          for (const mapLabel of categoriasCreadas.keys()) {
+            const mapId = categoriasCreadas.get(mapLabel)!
             const mapNormalized = normalizeCategoriaName(mapLabel)
             // Si son iguales o similares (una contiene a la otra)
             if (mapNormalized === normalizedLabel || 
