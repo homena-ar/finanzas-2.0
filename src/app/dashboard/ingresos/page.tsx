@@ -2469,7 +2469,6 @@ export default function IngresosPage() {
                               />
                             </th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
-                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Categoría</th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Monto</th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase"></th>
                           </tr>
@@ -2510,34 +2509,33 @@ export default function IngresosPage() {
                                   />
                                 </td>
                                 <td className="p-3">
-                                  <div className="font-medium">{descripcion || 'Sin descripción'}</div>
-                                  {trans.origen && (
-                                    <div className="text-xs text-blue-600 mt-1">📍 {trans.origen}</div>
-                                  )}
-                                  {tagIds.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                      {tagIds.map((tagId: string) => {
-                                        const tag = tagsIngresos.find(t => t.id === tagId)
-                                        return tag ? (
-                                          <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                                            {tag.nombre}
-                                          </span>
-                                        ) : null
-                                      })}
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
+                                      {categoria?.icono || '💰'}
                                     </div>
-                                  )}
-                                </td>
-                                <td className="p-3">
-                                  {categoria ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <span>{categoria.icono}</span>
-                                      <span>{categoria.nombre}</span>
-                                    </span>
-                                  ) : trans.categoria ? (
-                                    <span className="text-xs text-slate-500">Sugerida: {trans.categoria}</span>
-                                  ) : (
-                                    <span className="text-xs text-slate-400">Sin categoría</span>
-                                  )}
+                                    <div>
+                                      <div className="font-semibold">{descripcion || 'Sin descripción'}</div>
+                                      {trans.origen && (
+                                        <div className="text-xs text-blue-600 mt-1">📍 {trans.origen}</div>
+                                      )}
+                                      <div className="text-xs text-slate-500">
+                                        {categoria ? categoria.nombre : (trans.categoria ? `Sugerida: ${trans.categoria}` : 'Sin categoría')}
+                                        {(edited?.es_fijo || false) && ' 📌'}
+                                      </div>
+                                      {tagIds.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {tagIds.map((tagId: string) => {
+                                            const tag = tagsIngresos.find(t => t.id === tagId)
+                                            return tag ? (
+                                              <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                                {tag.nombre}
+                                              </span>
+                                            ) : null
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="p-3">
                                   <div className="flex items-center gap-1 justify-start">

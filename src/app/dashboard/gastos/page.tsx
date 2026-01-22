@@ -768,10 +768,142 @@ export default function GastosPage() {
   }
 
   const buildDetectedTarjetaName = (t: any) => {
-    const banco = t?.banco ? String(t.banco).trim() : ''
-    const tipo = t?.tipo_tarjeta ? String(t.tipo_tarjeta).trim() : ''
-    const base = [tipo, banco].filter(Boolean).join(' ')
-    return base || 'Nueva cuenta/tarjeta'
+    // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
+    const accountSuggestion = t?.accountSuggestion || t
+    
+    // Si tiene nombre directo, usarlo
+    if (accountSuggestion?.nombre) {
+      return String(accountSuggestion.nombre).trim()
+    }
+    
+    // Construir nombre desde componentes
+    const banco = accountSuggestion?.banco ? String(accountSuggestion.banco).trim() : ''
+    const tipo = accountSuggestion?.tipo_tarjeta || accountSuggestion?.tipo ? 
+      String(accountSuggestion.tipo_tarjeta || accountSuggestion.tipo).trim() : ''
+    const ultimosDigitos = accountSuggestion?.ultimosDigitos || accountSuggestion?.ultimos_digitos ? 
+      String(accountSuggestion.ultimosDigitos || accountSuggestion.ultimos_digitos).trim() : ''
+    
+    // Construir nombre inteligente
+    const parts: string[] = []
+    if (tipo) {
+      // Capitalizar tipo
+      const tipoCapitalized = tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
+      parts.push(tipoCapitalized)
+    }
+    if (banco) parts.push(banco)
+    if (ultimosDigitos) parts.push(`****${ultimosDigitos}`)
+    
+    return parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
+  }
+
+  const ensureCuentaExists = async (cuentaData: any, aiNewCuentaData?: { nombre: string; tipo: 'visa' | 'mastercard' | 'amex' | 'other'; banco: string; digitos: string }): Promise<string | null> => {
+    // Si se pasan datos modificados por el usuario, usarlos directamente
+    if (aiNewCuentaData && aiNewCuentaData.nombre) {
+      const nombreCuenta = aiNewCuentaData.nombre.trim()
+      if (!nombreCuenta) return null
+      
+      // Buscar si ya existe con ese nombre exacto
+      const existing = tarjetas.find(t => 
+        t.nombre.toLowerCase() === nombreCuenta.toLowerCase()
+      )
+      
+      if (existing) {
+        console.log('✅ [Gastos] Cuenta existente encontrada:', existing.nombre, '→', existing.id)
+        return existing.id
+      }
+      
+      // Crear con los datos del usuario
+      console.log('🔵 [Gastos] Creando cuenta con datos del usuario:', nombreCuenta)
+      const result = await addTarjeta({
+        nombre: nombreCuenta,
+        tipo: aiNewCuentaData.tipo,
+        banco: aiNewCuentaData.banco || null,
+        digitos: aiNewCuentaData.digitos || null,
+        cierre: null
+      })
+      
+      if (result.error) {
+        console.error('❌ [Gastos] Error creando cuenta automáticamente:', result.error)
+        return null
+      }
+      
+      console.log('✅ [Gastos] Cuenta creada con ID:', nombreCuenta, '→', result.id)
+      return result.id || null
+    }
+    
+    // Lógica original: usar cuentaData detectada
+    if (!cuentaData) return null
+    
+    // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
+    const accountSuggestion = cuentaData?.accountSuggestion || cuentaData
+    
+    // Validar que tenga información suficiente
+    if (!accountSuggestion.nombre && !accountSuggestion.banco && !accountSuggestion.tipo && !accountSuggestion.tipo_tarjeta) {
+      return null
+    }
+    
+    const nombreCuenta = buildDetectedTarjetaName(cuentaData)
+    
+    // Buscar si ya existe (por nombre, banco, o últimos dígitos)
+    const ultimosDigitos = accountSuggestion?.ultimosDigitos || accountSuggestion?.ultimos_digitos
+    const banco = accountSuggestion?.banco
+    
+    const existing = tarjetas.find(t => {
+      // Buscar por nombre
+      if (t.nombre.toLowerCase().includes(nombreCuenta.toLowerCase()) ||
+          nombreCuenta.toLowerCase().includes(t.nombre.toLowerCase())) {
+        return true
+      }
+      // Buscar por banco y últimos dígitos
+      if (banco && t.banco && t.banco.toLowerCase() === banco.toLowerCase()) {
+        if (ultimosDigitos && t.digitos && t.digitos.includes(ultimosDigitos)) {
+          return true
+        }
+        // Si no hay últimos dígitos pero el banco coincide y el nombre es similar
+        if (!ultimosDigitos && !t.digitos) {
+          return true
+        }
+      }
+      return false
+    })
+    
+    if (existing) {
+      console.log('✅ [Gastos] Cuenta existente encontrada:', existing.nombre, '→', existing.id)
+      return existing.id
+    }
+    
+    // Determinar tipo de tarjeta
+    const tipoStr = (accountSuggestion?.tipo || accountSuggestion?.tipo_tarjeta || '').toLowerCase()
+    let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+    if (tipoStr.includes('visa')) {
+      tipo = 'visa'
+    } else if (tipoStr.includes('master')) {
+      tipo = 'mastercard'
+    } else if (tipoStr.includes('amex') || tipoStr.includes('american')) {
+      tipo = 'amex'
+    } else if (tipoStr === 'tarjeta') {
+      tipo = 'other' // Tarjeta genérica
+    } else if (tipoStr === 'cuenta') {
+      tipo = 'other' // Cuenta bancaria
+    }
+    
+    // Crear automáticamente
+    console.log('🔵 [Gastos] Creando cuenta automáticamente:', nombreCuenta)
+    const result = await addTarjeta({
+      nombre: nombreCuenta,
+      tipo: tipo,
+      banco: banco || null,
+      digitos: ultimosDigitos || null,
+      cierre: null
+    })
+    
+    if (result.error) {
+      console.error('❌ [Gastos] Error creando cuenta automáticamente:', result.error)
+      return null
+    }
+    
+    console.log('✅ [Gastos] Cuenta creada con ID:', nombreCuenta, '→', result.id)
+    return result.id || null
   }
 
   const handleAddNewTarjetaAI = async () => {
@@ -1162,8 +1294,17 @@ export default function GastosPage() {
       // Usar el mapa global para evitar crear categorías duplicadas
       // El mapa global ya está inicializado arriba con useRef
       
-      // Usar la tarjeta seleccionada en el modal, o la del formulario como fallback
-      const tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
+      // Crear cuenta/tarjeta automáticamente si fue detectada y no se seleccionó ninguna
+      let tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
+      
+      // Si hay tarjeta detectada pero no se seleccionó ninguna, intentar crear automáticamente
+      if (detectedTarjeta && !tarjetaIdToUse) {
+        tarjetaIdToUse = await ensureCuentaExists(detectedTarjeta)
+        if (tarjetaIdToUse) {
+          setSelectedTarjetaId(tarjetaIdToUse)
+        }
+      }
+      
       console.log('🔵 [GastosPage] handleConfirmExtractedData - tarjetaIdToUse:', tarjetaIdToUse)
       
       // Agregar cada transacción seleccionada como gasto individual
@@ -3035,7 +3176,6 @@ export default function GastosPage() {
                               />
                             </th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
-                            <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Categoría</th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Monto</th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Cuotas</th>
@@ -3084,41 +3224,55 @@ export default function GastosPage() {
                                   />
                                 </td>
                                 <td className="p-3">
-                                  <div className="font-medium">{descripcion || 'Sin descripción'}</div>
-                                  {trans.comercio && (
-                                    <div className="text-xs text-blue-600 mt-1">📍 {trans.comercio}</div>
-                                  )}
-                                  {tagIds.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                      {tagIds.map((tagId: string) => {
-                                        const tag = tags.find(t => t.id === tagId)
-                                        return tag ? (
-                                          <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
-                                            {tag.nombre}
-                                          </span>
-                                        ) : null
-                                      })}
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
+                                      {categoria?.icono || '💰'}
                                     </div>
-                                  )}
-                                </td>
-                                <td className="p-3">
-                                  {categoria ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <span>{categoria.icono}</span>
-                                      <span>{categoria.nombre}</span>
-                                    </span>
-                                  ) : trans.categoria ? (
-                                    <span className="text-xs text-slate-500">Sugerida: {trans.categoria}</span>
-                                  ) : (
-                                    <span className="text-xs text-slate-400">Sin categoría</span>
-                                  )}
+                                    <div>
+                                      <div className="font-semibold">{descripcion || 'Sin descripción'}</div>
+                                      {trans.comercio && (
+                                        <div className="text-xs text-blue-600 mt-1">📍 {trans.comercio}</div>
+                                      )}
+                                      <div className="text-xs text-slate-500">
+                                        {categoria ? categoria.nombre : (trans.categoria ? `Sugerida: ${trans.categoria}` : 'Sin categoría')}
+                                        {esFijo && ' 📌'}
+                                      </div>
+                                      {tagIds.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {tagIds.map((tagId: string) => {
+                                            const tag = tags.find(t => t.id === tagId)
+                                            return tag ? (
+                                              <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                                {tag.nombre}
+                                              </span>
+                                            ) : null
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="p-3">
                                   {tarjetaId ? (
                                     tarjetaMap[tarjetaId] ? (
-                                      <span className={`tag ${getTagClass(tarjetaMap[tarjetaId].tipo)}`}>
-                                        {tarjetaMap[tarjetaId].nombre}
-                                      </span>
+                                      <div>
+                                        <span className={`tag ${getTagClass(tarjetaMap[tarjetaId].tipo)}`}>
+                                          {tarjetaMap[tarjetaId].nombre}
+                                        </span>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                          {tarjetaMap[tarjetaId].banco && <span>{tarjetaMap[tarjetaId].banco}</span>}
+                                          {tarjetaMap[tarjetaId].digitos && (
+                                            <span>{tarjetaMap[tarjetaId].banco ? ' • ' : ''}****{tarjetaMap[tarjetaId].digitos}</span>
+                                          )}
+                                          {(tarjetaMap[tarjetaId].cierre || tarjetaMap[tarjetaId].vencimiento) && (
+                                            <span className="block mt-0.5">
+                                              {tarjetaMap[tarjetaId].cierre && `Cierre: día ${tarjetaMap[tarjetaId].cierre}`}
+                                              {tarjetaMap[tarjetaId].cierre && tarjetaMap[tarjetaId].vencimiento && ' • '}
+                                              {tarjetaMap[tarjetaId].vencimiento && `Venc: día ${tarjetaMap[tarjetaId].vencimiento}`}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     ) : (
                                       <span className="text-xs text-slate-400">ID: {tarjetaId.slice(0, 8)}...</span>
                                     )

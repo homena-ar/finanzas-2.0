@@ -265,7 +265,7 @@ REGLAS PARA DETECTAR DECIMALES:
   },
   "transacciones": [
     {
-      "descripcion": "descripción exacta del consumo (ej: nombre del comercio, descripción del consumo)",
+      "descripcion": "descripción limpia del consumo SIN caracteres raros sin sentido como '*' o 'K' al inicio (ej: si ves 'K DLO*PEDIDOSYA MAR' extrae solo 'PEDIDOSYA', si ves '* BILLABONG' extrae 'BILLABONG', si ves 'K AMAZON MKTPL*BI9168ZS2' extrae 'AMAZON MKTPL'). Limpia la descripción eliminando prefijos sin sentido y caracteres especiales innecesarios, manteniendo solo el nombre del comercio o establecimiento relevante",
       "monto": número decimal usando PUNTO (.) como separador decimal, SIN puntos de miles (⚠️⚠️⚠️ CRÍTICO - LEE ESTO CUIDADOSAMENTE: 
         - REGLA ABSOLUTA: SIEMPRE devuelve el monto TAL CUAL aparece en el resumen, SIN MULTIPLICAR POR NADA
         - El monto mostrado en el resumen es el valor de UNA CUOTA INDIVIDUAL cuando hay cuotas
