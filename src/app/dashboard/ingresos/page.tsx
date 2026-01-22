@@ -504,6 +504,20 @@ export default function IngresosPage() {
 
   let ingresosMes = getIngresosMes(monthKey)
 
+  // Create lookup maps for categorias
+  const categoriaMap = Object.fromEntries(categoriasIngresos.map(c => [c.id, c]))
+
+  // Función para obtener el nombre del usuario que creó el ingreso
+  const getUserLabel = (userId: string) => {
+    if (!currentWorkspace) return null; // No mostrar en modo personal
+    if (userId === user?.uid) return 'Tú'; // Si soy yo
+    if (userId === currentWorkspace.owner_id) return 'Propietario';
+    
+    const member = members.find(m => m.user_id === userId && m.workspace_id === currentWorkspace.id);
+    // Usar display_name si existe, sino usar email (antes del @) o "Desconocido"
+    return member ? (member.display_name || member.user_email.split('@')[0]) : 'Desconocido';
+  }
+
   // Apply filters
   if (filters.search) {
     ingresosMes = ingresosMes.filter(i =>
@@ -1560,7 +1574,6 @@ export default function IngresosPage() {
                   />
                 </th>
                 <th className="text-left p-4 font-semibold text-slate-700">Descripción</th>
-                <th className="text-left p-4 font-semibold text-slate-700">Categoría</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Cuenta</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Fecha</th>
                 <th className="text-right p-4 font-semibold text-slate-700">Monto</th>
@@ -1572,7 +1585,7 @@ export default function IngresosPage() {
             <tbody>
               {ingresosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center p-12">
+                  <td colSpan={8} className="text-center p-12">
                     <Wallet className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                     <p className="text-slate-500 mb-4">No hay ingresos registrados para este mes</p>
                     <button
@@ -1586,6 +1599,7 @@ export default function IngresosPage() {
               ) : ingresosMes.map(ingreso => {
                 const categoria = categoriasIngresos.find(c => c.id === ingreso.categoria_id)
                 const cuenta = tarjetas.find(t => t.id === (ingreso as any).cuenta_bancaria_id)
+                const authorLabel = getUserLabel(ingreso.user_id)
                 return (
                   <tr key={ingreso.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
                     <td className="p-4">
@@ -1606,38 +1620,70 @@ export default function IngresosPage() {
                       />
                     </td>
                     <td className="p-4">
-                      <div className="font-medium">{ingreso.descripcion}</div>
-                      {ingreso.tag_ids && ingreso.tag_ids.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {ingreso.tag_ids.map(tagId => {
-                            const tag = tagsIngresos.find(t => t.id === tagId)
-                            return tag ? (
-                              <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                                {tag.nombre}
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
+                          {categoriaMap[ingreso.categoria_id || '']?.icono || '💰'}
+                        </div>
+                        <div>
+                          <div className="font-semibold">{ingreso.descripcion}</div>
+                          
+                          {/* ETIQUETA DE AUTOR */}
+                          {currentWorkspace && authorLabel && (
+                            <div className="mb-1">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${
+                                authorLabel === 'Tú' 
+                                  ? 'bg-slate-100 text-slate-500 border-slate-200' 
+                                  : 'bg-purple-100 text-purple-700 border-purple-200'
+                              }`}>
+                                {authorLabel === 'Tú' ? '👤 Tú' : `👤 ${authorLabel}`}
                               </span>
-                            ) : null
-                          })}
+                            </div>
+                          )}
+
+                          <div className="text-xs text-slate-500">
+                            {categoriaMap[ingreso.categoria_id || '']?.nombre || 'Sin categoría'}
+                            {(ingreso as any).es_fijo && ' 📌'}
+                          </div>
+                          {ingreso.tag_ids && ingreso.tag_ids.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {ingreso.tag_ids.map(tagId => {
+                                const tag = tagsIngresos.find(t => t.id === tagId)
+                                return tag ? (
+                                  <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                    {tag.nombre}
+                                  </span>
+                                ) : null
+                              })}
+                            </div>
+                          )}
+                          {(ingreso as any).comprobante_url && (
+                            <div className="mt-1">
+                              <span className="text-xs text-slate-500">📎 {(ingreso as any).comprobante_nombre || 'Comprobante'}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {(ingreso as any).comprobante_url && (
-                        <div className="mt-1">
-                          <span className="text-xs text-slate-500">📎 {(ingreso as any).comprobante_nombre || 'Comprobante'}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      {categoria && (
-                        <span className="inline-flex items-center gap-1">
-                          <span>{categoria.icono}</span>
-                          <span>{categoria.nombre}</span>
-                        </span>
-                      )}
+                      </div>
                     </td>
                     <td className="p-4">
                       {cuenta ? (
-                        <span className="inline-flex items-center gap-1 text-sm">
-                          <span className="text-slate-600">{cuenta.nombre}</span>
-                        </span>
+                        <div>
+                          <span className="inline-flex items-center gap-1 text-sm text-slate-600 font-medium">
+                            {cuenta.nombre}
+                          </span>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {cuenta.banco && <span>{cuenta.banco}</span>}
+                            {cuenta.digitos && (
+                              <span>{cuenta.banco ? ' • ' : ''}****{cuenta.digitos}</span>
+                            )}
+                            {(cuenta.cierre || cuenta.vencimiento) && (
+                              <span className="block mt-0.5">
+                                {cuenta.cierre && `Cierre: día ${cuenta.cierre}`}
+                                {cuenta.cierre && cuenta.vencimiento && ' • '}
+                                {cuenta.vencimiento && `Venc: día ${cuenta.vencimiento}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-slate-400 text-sm">-</span>
                       )}

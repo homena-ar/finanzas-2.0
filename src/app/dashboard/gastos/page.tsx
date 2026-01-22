@@ -1739,9 +1739,24 @@ export default function GastosPage() {
                     </td>
                     <td className="p-4">
                       {tarjetaMap[g.tarjeta_id || ''] ? (
-                        <span className={`tag ${getTagClass(tarjetaMap[g.tarjeta_id || ''].tipo)}`}>
-                          {tarjetaMap[g.tarjeta_id || ''].nombre}
-                        </span>
+                        <div>
+                          <span className={`tag ${getTagClass(tarjetaMap[g.tarjeta_id || ''].tipo)}`}>
+                            {tarjetaMap[g.tarjeta_id || ''].nombre}
+                          </span>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {tarjetaMap[g.tarjeta_id || ''].banco && <span>{tarjetaMap[g.tarjeta_id || ''].banco}</span>}
+                            {tarjetaMap[g.tarjeta_id || ''].digitos && (
+                              <span>{tarjetaMap[g.tarjeta_id || ''].banco ? ' • ' : ''}****{tarjetaMap[g.tarjeta_id || ''].digitos}</span>
+                            )}
+                            {(tarjetaMap[g.tarjeta_id || ''].cierre || tarjetaMap[g.tarjeta_id || ''].vencimiento) && (
+                              <span className="block mt-0.5">
+                                {tarjetaMap[g.tarjeta_id || ''].cierre && `Cierre: día ${tarjetaMap[g.tarjeta_id || ''].cierre}`}
+                                {tarjetaMap[g.tarjeta_id || ''].cierre && tarjetaMap[g.tarjeta_id || ''].vencimiento && ' • '}
+                                {tarjetaMap[g.tarjeta_id || ''].vencimiento && `Venc: día ${tarjetaMap[g.tarjeta_id || ''].vencimiento}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       ) : (
                         <span className="tag bg-emerald-100 text-emerald-700">
                           💵 Efectivo
