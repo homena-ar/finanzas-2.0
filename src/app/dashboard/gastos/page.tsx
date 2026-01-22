@@ -708,7 +708,6 @@ export default function GastosPage() {
       'utilities': '⚡',
       'servicios publicos': '⚡',
       'health': '💊',
-      'salud': '💊',
       'insurance': '🛡️',
       'seguro': '🛡️',
       'otros': '💰'
