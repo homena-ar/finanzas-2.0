@@ -88,13 +88,47 @@ export default function IngresosPage() {
     notificar_correo: true
   })
 
+  // Función auxiliar para normalizar nombres de categorías (quitar acentos, espacios extra, etc.)
+  const normalizeCategoriaName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+      .replace(/\s+/g, ' ') // Normalizar espacios
+      .trim()
+  }
+
   const findCategoriaIdFromLabel = (label?: string) => {
-    const normalized = (label || '').trim().toLowerCase()
+    if (!label) return ''
+    const normalized = normalizeCategoriaName(label)
     if (!normalized) return ''
-    const match = categoriasIngresos.find(
-      c => c.nombre.toLowerCase().includes(normalized) || normalized.includes(c.nombre.toLowerCase())
+    
+    // Buscar coincidencia exacta primero
+    const exactMatch = categoriasIngresos.find(
+      c => normalizeCategoriaName(c.nombre) === normalized
     )
-    return match?.id || ''
+    if (exactMatch) return exactMatch.id
+    
+    // Buscar coincidencia parcial (una contiene a la otra)
+    const partialMatch = categoriasIngresos.find(c => {
+      const catNormalized = normalizeCategoriaName(c.nombre)
+      return catNormalized.includes(normalized) || normalized.includes(catNormalized)
+    })
+    if (partialMatch) return partialMatch.id
+    
+    // Buscar palabras clave comunes (si una categoría tiene palabras clave de otra)
+    const words = normalized.split(/\s+/).filter(w => w.length > 2) // Palabras de más de 2 caracteres
+    if (words.length > 0) {
+      const keywordMatch = categoriasIngresos.find(c => {
+        const catNormalized = normalizeCategoriaName(c.nombre)
+        const catWords = catNormalized.split(/\s+/).filter(w => w.length > 2)
+        // Si comparten al menos una palabra clave importante
+        return words.some(w => catWords.includes(w)) || catWords.some(w => words.includes(w))
+      })
+      if (keywordMatch) return keywordMatch.id
+    }
+    
+    return ''
   }
 
   const updateEditedTransaction = (index: number, field: string, value: any) => {
@@ -1067,11 +1101,25 @@ export default function IngresosPage() {
           const categoriaLabel = trans.categoria.trim()
           const categoriaIcono = (trans as any).categoria_icono || undefined
           
-          // Verificar si ya creamos esta categoría en este proceso
-          if (categoriasCreadas.has(categoriaLabel)) {
-            categoriaId = categoriasCreadas.get(categoriaLabel)!
-            console.log('✅ [Ingresos] Reutilizando categoría ya creada en este proceso:', categoriaLabel, '→', categoriaId)
-          } else {
+          // Normalizar el nombre para buscar en el mapa
+          const normalizedLabel = normalizeCategoriaName(categoriaLabel)
+          
+          // Verificar si ya creamos esta categoría (o una similar) en este proceso
+          let foundInMap = false
+          for (const [mapLabel, mapId] of categoriasCreadas.entries()) {
+            const mapNormalized = normalizeCategoriaName(mapLabel)
+            // Si son iguales o similares (una contiene a la otra)
+            if (mapNormalized === normalizedLabel || 
+                mapNormalized.includes(normalizedLabel) || 
+                normalizedLabel.includes(mapNormalized)) {
+              categoriaId = mapId
+              foundInMap = true
+              console.log('✅ [Ingresos] Reutilizando categoría ya creada en este proceso:', categoriaLabel, '→', categoriaId, '(similar a:', mapLabel, ')')
+              break
+            }
+          }
+          
+          if (!foundInMap) {
             // Intentar encontrar primero en las existentes
             categoriaId = findCategoriaIdFromLabel(categoriaLabel)
             // Si no existe, crearla automáticamente con el icono de la IA
@@ -1079,7 +1127,7 @@ export default function IngresosPage() {
               console.log('🔵 [Ingresos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', categoriaIcono || 'por defecto')
               categoriaId = (await ensureCategoriaExists(categoriaLabel, categoriaIcono)) || ''
               if (categoriaId) {
-                // Guardar en el mapa para reutilizar
+                // Guardar en el mapa para reutilizar (usar el label original como clave)
                 categoriasCreadas.set(categoriaLabel, categoriaId)
                 console.log('✅ [Ingresos] Categoría creada y guardada en mapa:', categoriaLabel, '→', categoriaId)
               } else {

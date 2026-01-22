@@ -125,13 +125,47 @@ export default function GastosPage() {
     es_fijo: false
   })
 
+  // Función auxiliar para normalizar nombres de categorías (quitar acentos, espacios extra, etc.)
+  const normalizeCategoriaName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+      .replace(/\s+/g, ' ') // Normalizar espacios
+      .trim()
+  }
+
   const findCategoriaIdFromLabel = (label?: string) => {
-    const normalized = (label || '').trim().toLowerCase()
+    if (!label) return ''
+    const normalized = normalizeCategoriaName(label)
     if (!normalized) return ''
-    const match = categorias.find(
-      c => c.nombre.toLowerCase().includes(normalized) || normalized.includes(c.nombre.toLowerCase())
+    
+    // Buscar coincidencia exacta primero
+    const exactMatch = categorias.find(
+      c => normalizeCategoriaName(c.nombre) === normalized
     )
-    return match?.id || ''
+    if (exactMatch) return exactMatch.id
+    
+    // Buscar coincidencia parcial (una contiene a la otra)
+    const partialMatch = categorias.find(c => {
+      const catNormalized = normalizeCategoriaName(c.nombre)
+      return catNormalized.includes(normalized) || normalized.includes(catNormalized)
+    })
+    if (partialMatch) return partialMatch.id
+    
+    // Buscar palabras clave comunes (si una categoría tiene palabras clave de otra)
+    const words = normalized.split(/\s+/).filter(w => w.length > 2) // Palabras de más de 2 caracteres
+    if (words.length > 0) {
+      const keywordMatch = categorias.find(c => {
+        const catNormalized = normalizeCategoriaName(c.nombre)
+        const catWords = catNormalized.split(/\s+/).filter(w => w.length > 2)
+        // Si comparten al menos una palabra clave importante
+        return words.some(w => catWords.includes(w)) || catWords.some(w => words.includes(w))
+      })
+      if (keywordMatch) return keywordMatch.id
+    }
+    
+    return ''
   }
 
   const getTransactionTagIds = (index: number) => {
@@ -589,6 +623,83 @@ export default function GastosPage() {
     setAiShowNewTagInput(false)
   }
 
+  // Función para crear automáticamente categoría si no existe y la IA la sugiere
+  const ensureCategoriaExists = async (categoriaLabel: string, categoriaIcono?: string): Promise<string | null> => {
+    if (!categoriaLabel) return null
+    
+    // Normalizar el nombre para buscar
+    const normalizedLabel = normalizeCategoriaName(categoriaLabel)
+    
+    // Buscar si ya existe (usando la función mejorada)
+    const existingId = findCategoriaIdFromLabel(categoriaLabel)
+    if (existingId) {
+      console.log('✅ [Gastos] Categoría ya existe:', categoriaLabel, '→', existingId)
+      return existingId
+    }
+    
+    // Mapeo de iconos por tipo de categoría (si no viene de la IA)
+    const iconoMap: Record<string, string> = {
+      'supermercado': '🛒',
+      'comida': '🍔',
+      'restaurante': '🍽️',
+      'transporte': '🚗',
+      'taxi': '🚕',
+      'uber': '🚕',
+      'telefonia': '📞',
+      'internet': '🌐',
+      'servicios': '⚡',
+      'suscripcion': '📱',
+      'netflix': '📺',
+      'spotify': '🎵',
+      'ropa': '👕',
+      'salud': '💊',
+      'farmacia': '💊',
+      'educacion': '📚',
+      'entretenimiento': '🎮',
+      'hogar': '🏠',
+      'alquiler': '🏠',
+      'otros': '💰'
+    }
+    
+    // Determinar el icono a usar
+    let iconoFinal = categoriaIcono || '💰' // Usar el icono de la IA si está disponible
+    if (!categoriaIcono) {
+      // Si no hay icono de la IA, buscar en el mapa
+      for (const [key, icono] of Object.entries(iconoMap)) {
+        if (normalizedLabel.includes(key)) {
+          iconoFinal = icono
+          break
+        }
+      }
+    }
+    
+    // Crear automáticamente
+    console.log('🔵 [Gastos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', iconoFinal)
+    const { error } = await addCategoria({
+      nombre: categoriaLabel.trim(),
+      icono: iconoFinal,
+      color: '#6366f1' // Color por defecto para gastos
+    })
+    
+    if (error) {
+      console.error('❌ [Gastos] Error creando categoría automáticamente:', error)
+      return null
+    }
+    
+    // Esperar un momento para que se actualice la lista
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Buscar de nuevo en las categorías actualizadas
+    const newId = findCategoriaIdFromLabel(categoriaLabel)
+    if (newId) {
+      console.log('✅ [Gastos] Categoría creada y encontrada:', categoriaLabel, '→', newId)
+      return newId
+    }
+    
+    console.warn('⚠️ [Gastos] Categoría creada pero no encontrada después de esperar:', categoriaLabel)
+    return null
+  }
+
   const handleAddNewCategoriaAI = async () => {
     if (!aiNewCategoria.nombre.trim()) return
     await addCategoria({
@@ -993,10 +1104,13 @@ export default function GastosPage() {
       setSavingTransactions(true)
       setGastoError('')
       
+      // Mapa para evitar crear categorías duplicadas en el mismo proceso
+      const categoriasCreadas = new Map<string, string>() // Map<categoriaLabel, categoriaId>
+      
       // Usar la tarjeta seleccionada en el modal, o la del formulario como fallback
       const tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
       console.log('🔵 [GastosPage] handleConfirmExtractedData - tarjetaIdToUse:', tarjetaIdToUse)
-
+      
       // Agregar cada transacción seleccionada como gasto individual
       const addPromises = transactionsToAdd.map(async (trans: any, index: number) => {
         console.log(`🔵 [GastosPage] handleConfirmExtractedData - Procesando transacción ${index + 1}:`, trans)
@@ -1005,7 +1119,47 @@ export default function GastosPage() {
         if (trans.categoria_id) {
           categoriaId = String(trans.categoria_id)
         } else if (trans.categoria) {
-          categoriaId = findCategoriaIdFromLabel(trans.categoria)
+          const categoriaLabel = trans.categoria.trim()
+          const categoriaIcono = (trans as any).categoria_icono || undefined
+          
+          // Normalizar el nombre para buscar en el mapa
+          const normalizedLabel = normalizeCategoriaName(categoriaLabel)
+          
+          // Verificar si ya creamos esta categoría (o una similar) en este proceso
+          let foundInMap = false
+          for (const [mapLabel, mapId] of categoriasCreadas.entries()) {
+            const mapNormalized = normalizeCategoriaName(mapLabel)
+            // Si son iguales o similares (una contiene a la otra)
+            if (mapNormalized === normalizedLabel || 
+                mapNormalized.includes(normalizedLabel) || 
+                normalizedLabel.includes(mapNormalized)) {
+              categoriaId = mapId
+              foundInMap = true
+              console.log('✅ [Gastos] Reutilizando categoría ya creada en este proceso:', categoriaLabel, '→', categoriaId, '(similar a:', mapLabel, ')')
+              break
+            }
+          }
+          
+          if (!foundInMap) {
+            // Intentar encontrar primero en las existentes
+            categoriaId = findCategoriaIdFromLabel(categoriaLabel)
+            // Si no existe, crearla automáticamente con el icono de la IA
+            if (!categoriaId) {
+              console.log('🔵 [Gastos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', categoriaIcono || 'por defecto')
+              categoriaId = (await ensureCategoriaExists(categoriaLabel, categoriaIcono)) || ''
+              if (categoriaId) {
+                // Guardar en el mapa para reutilizar (usar el label original como clave)
+                categoriasCreadas.set(categoriaLabel, categoriaId)
+                console.log('✅ [Gastos] Categoría creada y guardada en mapa:', categoriaLabel, '→', categoriaId)
+              } else {
+                console.warn('⚠️ [Gastos] No se pudo crear/obtener categoría:', categoriaLabel)
+              }
+            } else {
+              // Guardar en el mapa para reutilizar
+              categoriasCreadas.set(categoriaLabel, categoriaId)
+              console.log('✅ [Gastos] Categoría encontrada y guardada en mapa:', categoriaLabel, '→', categoriaId)
+            }
+          }
         }
         
         // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
