@@ -260,10 +260,10 @@ REGLAS PARA DETECTAR DECIMALES:
   "tarjeta": {
     "banco": "nombre del banco o null si no se encuentra",
     "tipo_tarjeta": "Visa/Mastercard/Amex/CreditCard u otro, o null",
-    "ultimos_digitos": "últimos dígitos visibles o null",
+    "ultimos_digitos": "últimos 4 dígitos de la tarjeta visibles en el resumen (ej: si ves '****1234' o '1234' o 'XXXX XXXX XXXX 1234', usar '1234'). Busca en el encabezado del resumen, datos del titular, o cualquier lugar donde aparezcan los últimos dígitos. Si no se encuentra, null",
     "nombre_titular": "nombre del titular si está visible o null",
-    "fecha_cierre": número entero del 1 al 31 o null (día del mes en que cierra el resumen, ej: si cierra el día 15, usar 15. Si no se encuentra, null),
-    "fecha_vencimiento": número entero del 1 al 31 o null (día del mes en que vence el pago, ej: si vence el día 20, usar 20. Si no se encuentra, null)
+    "fecha_cierre": número entero del 1 al 31 o null (⚠️⚠️⚠️ IMPORTANTE: Busca en el resumen secciones como 'Cierre actual', 'Cierre:', 'Fecha de cierre', 'Período de cierre', o cualquier mención del día del mes en que cierra el resumen. Ejemplo: si ves 'Cierre actual: 31-Dic-25' o 'Cierre: día 15', extrae el día (31 o 15). Si no se encuentra, null),
+    "fecha_vencimiento": número entero del 1 al 31 o null (⚠️⚠️⚠️ IMPORTANTE: Busca en el resumen secciones como 'Vencimiento actual', 'Vencimiento:', 'Fecha de vencimiento', 'Vence el día', o cualquier mención del día del mes en que vence el pago. Ejemplo: si ves 'Vencimiento actual: 09-Ene-26' o 'Vence: día 20', extrae el día (9 o 20). Si no se encuentra, null)
   },
   "transacciones": [
     {

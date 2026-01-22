@@ -106,7 +106,9 @@ export default function GastosPage() {
     nombre: '',
     tipo: 'visa' as 'visa' | 'mastercard' | 'amex' | 'other',
     banco: '',
-    digitos: ''
+    digitos: '',
+    cierre: null as number | null,
+    vencimiento: null as number | null
   })
   const [aiExpandedTransaction, setAiExpandedTransaction] = useState<number | null>(null)
   
@@ -810,7 +812,7 @@ export default function GastosPage() {
     return parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
   }
 
-  const ensureCuentaExists = async (cuentaData: any, aiNewCuentaData?: { nombre: string; tipo: 'visa' | 'mastercard' | 'amex' | 'other'; banco: string; digitos: string }): Promise<string | null> => {
+  const ensureCuentaExists = async (cuentaData: any, aiNewCuentaData?: { nombre: string; tipo: 'visa' | 'mastercard' | 'amex' | 'other'; banco: string; digitos: string; cierre?: number | null; vencimiento?: number | null }): Promise<string | null> => {
     // Si se pasan datos modificados por el usuario, usarlos directamente
     if (aiNewCuentaData && aiNewCuentaData.nombre) {
       const nombreCuenta = aiNewCuentaData.nombre.trim()
@@ -833,7 +835,8 @@ export default function GastosPage() {
         tipo: aiNewCuentaData.tipo,
         banco: aiNewCuentaData.banco || null,
         digitos: aiNewCuentaData.digitos || null,
-        cierre: null
+        cierre: aiNewCuentaData.cierre || null,
+        vencimiento: aiNewCuentaData.vencimiento || null
       })
       
       if (result.error) {
@@ -933,12 +936,13 @@ export default function GastosPage() {
       tipo: aiNewTarjeta.tipo,
       banco: aiNewTarjeta.banco || null,
       digitos: aiNewTarjeta.digitos || null,
-      cierre: null
+      cierre: aiNewTarjeta.cierre || null,
+      vencimiento: aiNewTarjeta.vencimiento || null
     })
     if (!result.error && result.id) {
       setSelectedTarjetaId(result.id as string)
     }
-    setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: null, vencimiento: null })
     setAiShowNewTarjetaInput(false)
   }
 
@@ -975,7 +979,7 @@ export default function GastosPage() {
     setAiShowNewCategoriaInput(false)
     setAiNewCategoria({ nombre: '', icono: '💰' })
     setAiShowNewTarjetaInput(false)
-    setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+    setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: null, vencimiento: null })
     setDetectedTarjeta(null)
     setSelectedTarjetaId('')
     setGlobalDocumentDate(null)
@@ -1163,12 +1167,33 @@ export default function GastosPage() {
           
           // Si hay información de tarjeta detectada, configurarla
           if (result.data.tarjeta) {
-            // Guardar toda la información incluyendo accountSuggestion si existe
+            // Guardar toda la información incluyendo accountSuggestion si existe y fechas
             const tarjetaCompleta = {
               ...result.data.tarjeta,
-              accountSuggestion: result.data.accountSuggestion || null
+              accountSuggestion: result.data.accountSuggestion || null,
+              // Asegurar que las fechas estén disponibles
+              fecha_cierre: result.data.tarjeta.fecha_cierre || null,
+              fecha_vencimiento: result.data.tarjeta.fecha_vencimiento || null
             }
             setDetectedTarjeta(tarjetaCompleta)
+            
+            // Prellenar aiNewTarjeta con los datos detectados incluyendo fechas
+            if (tarjetaCompleta.fecha_cierre || tarjetaCompleta.fecha_vencimiento || tarjetaCompleta.ultimos_digitos) {
+              setAiNewTarjeta({
+                nombre: buildDetectedTarjetaName({ tarjeta: tarjetaCompleta, accountSuggestion: tarjetaCompleta.accountSuggestion || null }),
+                tipo: (() => {
+                  const tipoStr = (tarjetaCompleta.tipo_tarjeta || '').toLowerCase()
+                  if (tipoStr.includes('visa')) return 'visa'
+                  if (tipoStr.includes('master')) return 'mastercard'
+                  if (tipoStr.includes('amex') || tipoStr.includes('american')) return 'amex'
+                  return 'other'
+                })(),
+                banco: tarjetaCompleta.banco || '',
+                digitos: tarjetaCompleta.ultimos_digitos || '',
+                cierre: tarjetaCompleta.fecha_cierre ? parseInt(String(tarjetaCompleta.fecha_cierre)) : null,
+                vencimiento: tarjetaCompleta.fecha_vencimiento ? parseInt(String(tarjetaCompleta.fecha_vencimiento)) : null
+              })
+            }
             
             // Intentar encontrar una tarjeta existente que coincida
             const bancoMatch = result.data.tarjeta.banco ? 
@@ -1326,7 +1351,17 @@ export default function GastosPage() {
       if (detectedTarjeta && !tarjetaIdToUse) {
         // Pasar toda la información de la tarjeta detectada incluyendo fechas
         // detectedTarjeta ya incluye accountSuggestion si existe
-        tarjetaIdToUse = await ensureCuentaExists({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })
+        // Si el usuario modificó los datos en el modal (seleccionó __new_suggested__), usar esos
+        const cuentaDataCompleta = { tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null }
+        const aiNewCuentaData = (selectedTarjetaId === '__new_suggested__' && aiNewTarjeta.nombre) ? {
+          nombre: aiNewTarjeta.nombre,
+          tipo: aiNewTarjeta.tipo,
+          banco: aiNewTarjeta.banco,
+          digitos: aiNewTarjeta.digitos,
+          cierre: aiNewTarjeta.cierre,
+          vencimiento: aiNewTarjeta.vencimiento
+        } : undefined
+        tarjetaIdToUse = await ensureCuentaExists(cuentaDataCompleta, aiNewCuentaData)
         if (tarjetaIdToUse) {
           setSelectedTarjetaId(tarjetaIdToUse)
         }
@@ -2861,7 +2896,7 @@ export default function GastosPage() {
                   setAiShowNewCategoriaInput(false);
                   setAiNewCategoria({ nombre: '', icono: '💰' });
                   setAiShowNewTarjetaInput(false);
-                  setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' });
+                  setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '', cierre: null, vencimiento: null });
                 }} 
                 className="p-1.5 hover:bg-slate-100 rounded transition-colors"
               >
@@ -2900,122 +2935,143 @@ export default function GastosPage() {
                     </div>
                   )}
 
-                  {/* Información de tarjeta detectada - Compacto */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      {detectedTarjeta ? '💳 Tarjeta detectada' : '💳 Tarjeta (opcional)'}
-                    </label>
-                    {detectedTarjeta && (
-                      <div className="text-xs text-slate-600 mb-2 space-y-0.5">
-                        {detectedTarjeta.banco && <div><strong>Banco:</strong> {detectedTarjeta.banco}</div>}
-                        {detectedTarjeta.tipo_tarjeta && <div><strong>Tipo:</strong> {detectedTarjeta.tipo_tarjeta}</div>}
-                        {detectedTarjeta.ultimos_digitos && <div><strong>Dígitos:</strong> ****{detectedTarjeta.ultimos_digitos}</div>}
+                  {/* Selección de cuenta/tarjeta si fue detectada */}
+                  {detectedTarjeta && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                      <div className="text-sm font-semibold text-indigo-900 mb-2">
+                        💳 Cuenta/Tarjeta detectada: {buildDetectedTarjetaName({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })}
                       </div>
-                    )}
-                    <div className="relative">
-                      <select
-                        value={selectedTarjetaId || ''}
-                        onChange={(e) => {
-                          console.log('🔵 [GastosPage] Tarjeta seleccionada:', e.target.value)
-                          const tarjeta = tarjetas.find(t => t.id === e.target.value)
-                          console.log('🔵 [GastosPage] Tarjeta encontrada:', tarjeta)
-                          setSelectedTarjetaId(e.target.value)
-                        }}
-                        className="w-full h-8 text-xs font-semibold rounded-lg border-2 px-3 pr-8 cursor-pointer"
-                        style={{ 
-                          color: 'rgb(15, 23, 42) !important',
-                          backgroundColor: 'rgb(224, 242, 254) !important',
-                          borderColor: 'rgb(59, 130, 246) !important',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          appearance: 'none',
-                          fontWeight: '600'
-                        }}
-                      >
-                        <option value="" style={{ color: 'rgb(100, 116, 139)', backgroundColor: 'white', fontWeight: '400' }}>
-                          {detectedTarjeta ? 'Selecciona o deja vacío' : 'Sin tarjeta (efectivo)'}
-                        </option>
-                        {tarjetas.map(t => (
-                          <option 
-                            key={t.id} 
-                            value={t.id}
-                            style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '600' }}
-                          >
-                            {t.nombre} {t.banco ? `(${t.banco})` : ''} {t.digitos ? `****${t.digitos}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600">▼</div>
+                      <div className="space-y-2">
+                        <select
+                          className="input w-full"
+                          value={selectedTarjetaId}
+                          onChange={e => {
+                            setSelectedTarjetaId(e.target.value)
+                            // Si se selecciona crear nueva sugerida, prellenar campos
+                            if (e.target.value === '__new_suggested__') {
+                              const nombreSugerido = buildDetectedTarjetaName({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })
+                              const tipoStr = (detectedTarjeta?.tipo_tarjeta || detectedTarjeta?.tipo || '').toLowerCase()
+                              let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+                              if (tipoStr.includes('visa')) tipo = 'visa'
+                              else if (tipoStr.includes('master')) tipo = 'mastercard'
+                              else if (tipoStr.includes('amex') || tipoStr.includes('american')) tipo = 'amex'
+                              
+                              setAiNewTarjeta({
+                                nombre: nombreSugerido,
+                                tipo: tipo,
+                                banco: detectedTarjeta?.banco || '',
+                                digitos: detectedTarjeta?.ultimos_digitos || detectedTarjeta?.ultimosDigitos || '',
+                                cierre: detectedTarjeta?.fecha_cierre ? parseInt(String(detectedTarjeta.fecha_cierre)) : null,
+                                vencimiento: detectedTarjeta?.fecha_vencimiento ? parseInt(String(detectedTarjeta.fecha_vencimiento)) : null
+                              })
+                            }
+                          }}
+                        >
+                          <option value="">Sin cuenta específica</option>
+                          {tarjetas.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.nombre}
+                            </option>
+                          ))}
+                          {selectedTarjetaId === '__new_suggested__' || !tarjetas.find(t => {
+                            const nombreDetectado = buildDetectedTarjetaName({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })
+                            const ultimosDigitos = detectedTarjeta?.ultimos_digitos || detectedTarjeta?.ultimosDigitos
+                            const banco = detectedTarjeta?.banco
+                            return (
+                              t.nombre.toLowerCase().includes(nombreDetectado.toLowerCase()) ||
+                              nombreDetectado.toLowerCase().includes(t.nombre.toLowerCase()) ||
+                              (banco && t.banco && t.banco.toLowerCase() === banco.toLowerCase() && 
+                               ((ultimosDigitos && t.digitos && t.digitos.includes(ultimosDigitos)) || (!ultimosDigitos && !t.digitos)))
+                            )
+                          }) && (
+                            <option value="__new_suggested__">
+                              ➕ Crear nueva sugerida: {buildDetectedTarjetaName({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })}
+                            </option>
+                          )}
+                          <option value="__new__">➕ Crear nueva cuenta/tarjeta (manual)</option>
+                        </select>
+                        {(selectedTarjetaId === '__new_suggested__' || selectedTarjetaId === '__new__') && (
+                          <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-2">
+                            {selectedTarjetaId === '__new_suggested__' && (
+                              <div className="text-xs text-indigo-700 bg-indigo-50 p-2 rounded">
+                                💡 La cuenta se creará automáticamente al confirmar la importación
+                              </div>
+                            )}
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Nombre de la cuenta/tarjeta"
+                              value={aiNewTarjeta.nombre}
+                              onChange={e => setAiNewTarjeta(t => ({ ...t, nombre: e.target.value }))}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                className="input"
+                                value={aiNewTarjeta.tipo}
+                                onChange={e => setAiNewTarjeta(t => ({ ...t, tipo: e.target.value as any }))}
+                              >
+                                <option value="visa">Visa</option>
+                                <option value="mastercard">Mastercard</option>
+                                <option value="amex">Amex</option>
+                                <option value="other">Otra</option>
+                              </select>
+                              <input
+                                type="text"
+                                className="input"
+                                placeholder="Banco"
+                                value={aiNewTarjeta.banco}
+                                onChange={e => setAiNewTarjeta(t => ({ ...t, banco: e.target.value }))}
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Últimos 4 dígitos (opcional)"
+                              value={aiNewTarjeta.digitos}
+                              onChange={e => setAiNewTarjeta(t => ({ ...t, digitos: e.target.value }))}
+                              maxLength={4}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="number"
+                                className="input"
+                                placeholder="Día de cierre (1-31)"
+                                min="1"
+                                max="31"
+                                value={aiNewTarjeta.cierre || ''}
+                                onChange={e => setAiNewTarjeta(t => ({ ...t, cierre: e.target.value ? parseInt(e.target.value) : null }))}
+                              />
+                              <input
+                                type="number"
+                                className="input"
+                                placeholder="Día de vencimiento (1-31)"
+                                min="1"
+                                max="31"
+                                value={aiNewTarjeta.vencimiento || ''}
+                                onChange={e => setAiNewTarjeta(t => ({ ...t, vencimiento: e.target.value ? parseInt(e.target.value) : null }))}
+                              />
+                            </div>
+                            {selectedTarjetaId === '__new__' && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleAddNewTarjetaAI}
+                                  className="btn btn-primary btn-sm"
+                                >
+                                  Crear ahora
+                                </button>
+                                <button
+                                  onClick={() => setSelectedTarjetaId('')}
+                                  className="btn btn-secondary btn-sm"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Crear cuenta/tarjeta desde el preview */}
-                    {!aiShowNewTarjetaInput ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAiShowNewTarjetaInput(true)
-                          setAiNewTarjeta({
-                            nombre: detectedTarjeta ? buildDetectedTarjetaName(detectedTarjeta) : '',
-                            tipo: 'visa',
-                            banco: detectedTarjeta?.banco ? String(detectedTarjeta.banco) : '',
-                            digitos: detectedTarjeta?.ultimos_digitos ? String(detectedTarjeta.ultimos_digitos) : ''
-                          })
-                        }}
-                        className="mt-2 w-full px-3 py-2 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-xs font-bold hover:bg-purple-100 transition"
-                      >
-                        + Crear nueva cuenta/tarjeta
-                      </button>
-                    ) : (
-                      <div className="mt-2 space-y-2 p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200">
-                        <div className="text-xs font-bold text-purple-900">💳 Nueva Cuenta/Tarjeta</div>
-                        <input
-                          type="text"
-                          className="input w-full text-xs h-8"
-                          placeholder="Nombre (Ej: Visa BBVA, Cuenta Banco...)"
-                          value={aiNewTarjeta.nombre}
-                          onChange={e => setAiNewTarjeta(t => ({ ...t, nombre: e.target.value }))}
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <select
-                            className="input text-xs h-8"
-                            value={aiNewTarjeta.tipo}
-                            onChange={e => setAiNewTarjeta(t => ({ ...t, tipo: e.target.value as any }))}
-                          >
-                            <option value="visa">💳 Visa</option>
-                            <option value="mastercard">💳 Mastercard</option>
-                            <option value="amex">💳 Amex</option>
-                            <option value="other">🏦 Otra/Cuenta</option>
-                          </select>
-                          <input
-                            type="text"
-                            className="input text-xs h-8"
-                            placeholder="Banco (opcional)"
-                            value={aiNewTarjeta.banco}
-                            onChange={e => setAiNewTarjeta(t => ({ ...t, banco: e.target.value }))}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={handleAddNewTarjetaAI}
-                            className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 transition"
-                          >
-                            ✓ Crear
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAiShowNewTarjetaInput(false)
-                              setAiNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
-                            }}
-                            className="flex-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Selector de Fecha/Mes General - Compacto */}
                   <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
@@ -3093,93 +3149,6 @@ export default function GastosPage() {
                     })()}
                   </div>
 
-                  {/* Categorías / Tags (crear) */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-2">
-                    <div className="text-xs font-semibold text-slate-700">🏷️ Categorías y etiquetas</div>
-                    {!aiShowNewCategoriaInput ? (
-                      <button
-                        type="button"
-                        onClick={() => setAiShowNewCategoriaInput(true)}
-                        className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
-                      >
-                        + Crear nueva categoría
-                      </button>
-                    ) : (
-                      <div className="space-y-2 p-3 bg-white rounded-lg border border-indigo-200">
-                        <input
-                          type="text"
-                          className="input w-full text-xs h-8"
-                          placeholder="Nombre de categoría"
-                          value={aiNewCategoria.nombre}
-                          onChange={e => setAiNewCategoria(c => ({ ...c, nombre: e.target.value }))}
-                        />
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-600 mb-1">Icono</div>
-                          <EmojiPickerField
-                            value={aiNewCategoria.icono}
-                            onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
-                            placeholder="💰"
-                            size="sm"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={handleAddNewCategoriaAI}
-                            className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
-                          >
-                            ✓ Crear
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAiShowNewCategoriaInput(false)
-                              setAiNewCategoria({ nombre: '', icono: '💰' })
-                            }}
-                            className="flex-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {!aiShowNewTagInput ? (
-                      <button
-                        type="button"
-                        onClick={() => setAiShowNewTagInput(true)}
-                        className="w-full px-3 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-bold hover:bg-orange-100 transition"
-                      >
-                        + Crear nueva etiqueta
-                      </button>
-                    ) : (
-                      <div className="flex gap-2 p-3 bg-white rounded-lg border border-orange-200">
-                        <input
-                          type="text"
-                          className="input flex-1 text-xs h-8"
-                          placeholder="Nombre de etiqueta"
-                          value={aiNewTagName}
-                          onChange={e => setAiNewTagName(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleAddNewTagAI()}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddNewTagAI}
-                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAiShowNewTagInput(false); setAiNewTagName('') }}
-                          className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-                  </div>
 
                   {/* Lista de Transacciones - Tabla como en gastos normales */}
                   <div className="card overflow-hidden">
