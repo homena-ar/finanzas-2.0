@@ -3,15 +3,12 @@
 import { useEffect, useState } from 'react'
 import { Download, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { isMobileDevice, pwaPreferences } from '@/lib/utils'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
-
-const PWA_DISMISS_SESSION_KEY = 'fincontrol:pwa_install:dismissedAtSession'
-const PWA_LAST_UID_SESSION_KEY = 'fincontrol:pwa_install:lastUidSession'
-const PWA_DISMISS_COOLDOWN_MS = 1000 * 60 * 60 * 24 * 7 // 7 días
 
 export function InstallPWA() {
   const { user } = useAuth()
@@ -19,23 +16,27 @@ export function InstallPWA() {
   const [showInstallButton, setShowInstallButton] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
 
-  const isDismissedRecently = () => {
-    if (typeof window === 'undefined') return true
-    try {
-      const raw = window.sessionStorage.getItem(PWA_DISMISS_SESSION_KEY)
-      if (!raw) return false
-      const dismissedAt = Number(raw)
-      if (!Number.isFinite(dismissedAt)) return false
-      return Date.now() - dismissedAt < PWA_DISMISS_COOLDOWN_MS
-    } catch {
-      return false
-    }
-  }
-
   useEffect(() => {
-    // Verificar si ya está instalado
+    // Solo mostrar en mobile
+    if (!isMobileDevice()) {
+      return
+    }
+
+    // Verificar si ya está instalado (según preferencias guardadas)
+    if (pwaPreferences.isInstalled()) {
+      setIsInstalled(true)
+      return
+    }
+
+    // Verificar si ya está instalado (según display mode)
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true)
+      pwaPreferences.setInstalled()
+      return
+    }
+
+    // Verificar preferencias guardadas (dismissed, installed)
+    if (!pwaPreferences.shouldShow()) {
       return
     }
 
@@ -43,12 +44,15 @@ export function InstallPWA() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
-      if (!isDismissedRecently()) setShowInstallButton(true)
+      if (pwaPreferences.shouldShow()) {
+        setShowInstallButton(true)
+      }
     }
 
     // Escuchar cuando se instala la app
     const handleAppInstalled = () => {
       setIsInstalled(true)
+      pwaPreferences.setInstalled()
       setShowInstallButton(false)
       setDeferredPrompt(null)
     }
@@ -58,7 +62,7 @@ export function InstallPWA() {
 
     // Verificar si el prompt ya está disponible después de un delay
     const timeoutId = window.setTimeout(() => {
-      if (!isDismissedRecently() && !deferredPrompt && !isInstalled) {
+      if (pwaPreferences.shouldShow() && !deferredPrompt && !isInstalled) {
         // Si no hay prompt automático pero la app es instalable, mostrar botón manual
         if ('serviceWorker' in navigator && window.matchMedia('(display-mode: browser)').matches) {
           setShowInstallButton(true)
@@ -73,29 +77,11 @@ export function InstallPWA() {
     }
   }, [deferredPrompt, isInstalled])
 
-  // Si cambia el usuario (nuevo ingreso), permitir volver a mostrar el popup
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const lastUid = window.sessionStorage.getItem(PWA_LAST_UID_SESSION_KEY)
-      const currentUid = user?.uid || '__no_user__'
-      if (lastUid && lastUid !== currentUid) {
-        window.sessionStorage.removeItem(PWA_DISMISS_SESSION_KEY)
-      }
-      window.sessionStorage.setItem(PWA_LAST_UID_SESSION_KEY, currentUid)
-    } catch {
-      // ignore
-    }
-  }, [user?.uid])
-
   const handleDismiss = () => {
+    // Guardar preferencia: banner cerrado
+    pwaPreferences.setDismissed()
     setShowInstallButton(false)
     setDeferredPrompt(null)
-    try {
-      window.sessionStorage.setItem(PWA_DISMISS_SESSION_KEY, String(Date.now()))
-    } catch {
-      // ignore
-    }
   }
 
   const handleInstallClick = async () => {
@@ -118,8 +104,10 @@ export function InstallPWA() {
 
     if (outcome === 'accepted') {
       console.log('✅ Usuario aceptó instalar la app')
+      // La preferencia se guardará cuando se dispare el evento 'appinstalled'
     } else {
       console.log('❌ Usuario rechazó instalar la app')
+      // Si rechaza, no guardamos nada (puede cambiar de opinión más tarde)
     }
 
     setDeferredPrompt(null)

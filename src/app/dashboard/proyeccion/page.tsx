@@ -71,13 +71,15 @@ export default function ProyeccionPage() {
     })
 
     // Ingresos proyectados - solo usar ingresos que ya existen en ese mes específico
+    // Excluir ingresos pendientes: solo sumar confirmados o ingresos normales (sin estado pendiente)
     let totalIngresosARS = 0
     let totalIngresosUSD = 0
     
     if (showIngresos) {
       // Solo considerar ingresos que ya están registrados para ese mes específico (usar campo 'mes')
+      // Y que NO estén pendientes (o que estén confirmados)
       ingresos.forEach(i => {
-        if (i.mes === mesKey) {
+        if (i.mes === mesKey && (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)) {
           if (i.moneda === 'USD') {
             totalIngresosUSD += i.monto
           } else {

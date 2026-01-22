@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
-import { formatMoney, getMonthName } from '@/lib/utils'
+import { formatMoney, getMonthName, getMonthFromDateString, parseDateSafe } from '@/lib/utils'
 import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2, CheckCircle2, Download } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
@@ -132,10 +132,32 @@ export default function IngresosPage() {
   }
 
   const buildDetectedCuentaName = (t: any) => {
-    const banco = t?.banco ? String(t.banco).trim() : ''
-    const tipo = t?.tipo_tarjeta ? String(t.tipo_tarjeta).trim() : ''
-    const base = [tipo, banco].filter(Boolean).join(' ')
-    return base || 'Nueva cuenta/tarjeta'
+    // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
+    const accountSuggestion = t?.accountSuggestion || t
+    
+    // Si tiene nombre directo, usarlo
+    if (accountSuggestion?.nombre) {
+      return String(accountSuggestion.nombre).trim()
+    }
+    
+    // Construir nombre desde componentes
+    const banco = accountSuggestion?.banco ? String(accountSuggestion.banco).trim() : ''
+    const tipo = accountSuggestion?.tipo_tarjeta || accountSuggestion?.tipo ? 
+      String(accountSuggestion.tipo_tarjeta || accountSuggestion.tipo).trim() : ''
+    const ultimosDigitos = accountSuggestion?.ultimosDigitos || accountSuggestion?.ultimos_digitos ? 
+      String(accountSuggestion.ultimosDigitos || accountSuggestion.ultimos_digitos).trim() : ''
+    
+    // Construir nombre inteligente
+    const parts: string[] = []
+    if (tipo) {
+      // Capitalizar tipo
+      const tipoCapitalized = tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
+      parts.push(tipoCapitalized)
+    }
+    if (banco) parts.push(banco)
+    if (ultimosDigitos) parts.push(`****${ultimosDigitos}`)
+    
+    return parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
   }
 
   const handleAddNewCuentaAI = async () => {
@@ -232,28 +254,77 @@ export default function IngresosPage() {
 
   // Función para crear automáticamente cuenta/tarjeta si no existe
   const ensureCuentaExists = async (cuentaData: any): Promise<string | null> => {
-    if (!cuentaData || (!cuentaData.banco && !cuentaData.tipo_tarjeta)) return null
+    if (!cuentaData) return null
+    
+    // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
+    const accountSuggestion = cuentaData?.accountSuggestion || cuentaData
+    
+    // Validar que tenga información suficiente
+    if (!accountSuggestion.nombre && !accountSuggestion.banco && !accountSuggestion.tipo && !accountSuggestion.tipo_tarjeta) {
+      return null
+    }
     
     const nombreCuenta = buildDetectedCuentaName(cuentaData)
     
-    // Buscar si ya existe
-    const existing = tarjetas.find(t => 
-      t.nombre.toLowerCase().includes(nombreCuenta.toLowerCase()) ||
-      nombreCuenta.toLowerCase().includes(t.nombre.toLowerCase())
-    )
-    if (existing) return existing.id
+    // Buscar si ya existe (por nombre, banco, o últimos dígitos)
+    const ultimosDigitos = accountSuggestion?.ultimosDigitos || accountSuggestion?.ultimos_digitos
+    const banco = accountSuggestion?.banco
+    
+    const existing = tarjetas.find(t => {
+      // Buscar por nombre
+      if (t.nombre.toLowerCase().includes(nombreCuenta.toLowerCase()) ||
+          nombreCuenta.toLowerCase().includes(t.nombre.toLowerCase())) {
+        return true
+      }
+      // Buscar por banco y últimos dígitos
+      if (banco && t.banco && t.banco.toLowerCase() === banco.toLowerCase()) {
+        if (ultimosDigitos && t.digitos && t.digitos.includes(ultimosDigitos)) {
+          return true
+        }
+        // Si no hay últimos dígitos pero el banco coincide y el nombre es similar
+        if (!ultimosDigitos && !t.digitos) {
+          return true
+        }
+      }
+      return false
+    })
+    
+    if (existing) {
+      console.log('✅ [Ingresos] Cuenta existente encontrada:', existing.nombre, '→', existing.id)
+      return existing.id
+    }
+    
+    // Determinar tipo de tarjeta
+    const tipoStr = (accountSuggestion?.tipo || accountSuggestion?.tipo_tarjeta || '').toLowerCase()
+    let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+    if (tipoStr.includes('visa')) {
+      tipo = 'visa'
+    } else if (tipoStr.includes('master')) {
+      tipo = 'mastercard'
+    } else if (tipoStr.includes('amex') || tipoStr.includes('american')) {
+      tipo = 'amex'
+    } else if (tipoStr === 'tarjeta') {
+      tipo = 'other' // Tarjeta genérica
+    } else if (tipoStr === 'cuenta') {
+      tipo = 'other' // Cuenta bancaria
+    }
     
     // Crear automáticamente
+    console.log('🔵 [Ingresos] Creando cuenta automáticamente:', nombreCuenta)
     const result = await addTarjeta({
       nombre: nombreCuenta,
-      tipo: cuentaData.tipo_tarjeta?.toLowerCase().includes('master') ? 'mastercard' :
-            cuentaData.tipo_tarjeta?.toLowerCase().includes('amex') ? 'amex' :
-            cuentaData.tipo_tarjeta?.toLowerCase().includes('visa') ? 'visa' : 'other',
-      banco: cuentaData.banco || null,
-      digitos: cuentaData.ultimos_digitos || null,
+      tipo: tipo,
+      banco: banco || null,
+      digitos: ultimosDigitos || null,
       cierre: null
     })
     
+    if (result.error) {
+      console.error('❌ [Ingresos] Error creando cuenta automáticamente:', result.error)
+      return null
+    }
+    
+    console.log('✅ [Ingresos] Cuenta creada con ID:', nombreCuenta, '→', result.id)
     return result.id || null
   }
 
@@ -417,8 +488,8 @@ export default function IngresosPage() {
 
     setSaving(true)
 
-    const fecha = new Date(form.fecha)
-    const mes = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`
+    // Calcular mes de forma segura sin problemas de timezone
+    const mes = getMonthFromDateString(form.fecha)
 
     // Convertir comprobante a base64 si existe
     let comprobanteUrl = null
@@ -653,9 +724,8 @@ export default function IngresosPage() {
         } else if (result.data?.transacciones && result.data.transacciones.length > 0) {
           const firstDate = result.data.transacciones[0]?.fecha
           if (firstDate) {
-            // Si hay fecha, usar el primer día de ese mes
-            const fechaDate = new Date(firstDate)
-            const mesResumen = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
+            // Si hay fecha, usar el primer día de ese mes (parsear de forma segura)
+            const mesResumen = getMonthFromDateString(firstDate)
             setGlobalDocumentDate(`${mesResumen}-01`)
             setUseGlobalDate(true)
           } else {
@@ -674,16 +744,40 @@ export default function IngresosPage() {
         }
 
         // Si hay información de cuenta/tarjeta detectada, configurarla
-        if (result.data?.tarjeta) {
-          setDetectedCuenta(result.data.tarjeta)
-          // Intentar encontrar tarjeta existente
-          const nombreDetectado = buildDetectedCuentaName(result.data.tarjeta)
-          const existing = tarjetas.find(t => 
-            t.nombre.toLowerCase().includes(nombreDetectado.toLowerCase()) ||
-            nombreDetectado.toLowerCase().includes(t.nombre.toLowerCase())
-          )
+        // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
+        const accountInfo = result.data?.accountSuggestion || result.data?.tarjeta
+        if (accountInfo) {
+          setDetectedCuenta(accountInfo)
+          // Intentar encontrar cuenta existente
+          const nombreDetectado = buildDetectedCuentaName(accountInfo)
+          const ultimosDigitos = accountInfo?.ultimosDigitos || accountInfo?.ultimos_digitos
+          const banco = accountInfo?.banco
+          
+          const existing = tarjetas.find(t => {
+            // Buscar por nombre
+            if (t.nombre.toLowerCase().includes(nombreDetectado.toLowerCase()) ||
+                nombreDetectado.toLowerCase().includes(t.nombre.toLowerCase())) {
+              return true
+            }
+            // Buscar por banco y últimos dígitos
+            if (banco && t.banco && t.banco.toLowerCase() === banco.toLowerCase()) {
+              if (ultimosDigitos && t.digitos && t.digitos.includes(ultimosDigitos)) {
+                return true
+              }
+              // Si no hay últimos dígitos pero el banco coincide
+              if (!ultimosDigitos && !t.digitos) {
+                return true
+              }
+            }
+            return false
+          })
+          
           if (existing) {
+            console.log('✅ [Ingresos] Cuenta existente encontrada y preseleccionada:', existing.nombre)
             setSelectedCuentaId(existing.id)
+          } else {
+            // Si no existe, preseleccionar opción de crear nueva
+            setSelectedCuentaId('__new_suggested__')
           }
         }
         
@@ -766,9 +860,23 @@ export default function IngresosPage() {
 
       setSavingTransactions(true)
 
-      // Crear cuenta/tarjeta automáticamente si fue detectada y no existe
+      // Crear cuenta/tarjeta automáticamente si fue detectada y se seleccionó crear nueva sugerida
       let cuentaIdToUse = selectedCuentaId || null
-      if (detectedCuenta && !cuentaIdToUse) {
+      
+      // Si se seleccionó crear nueva sugerida, crear la cuenta automáticamente
+      if (selectedCuentaId === '__new_suggested__' && detectedCuenta) {
+        console.log('🔵 [Ingresos] Creando cuenta sugerida automáticamente...')
+        cuentaIdToUse = await ensureCuentaExists(detectedCuenta)
+        if (cuentaIdToUse) {
+          console.log('✅ [Ingresos] Cuenta sugerida creada con ID:', cuentaIdToUse)
+          setSelectedCuentaId(cuentaIdToUse)
+        } else {
+          console.warn('⚠️ [Ingresos] No se pudo crear la cuenta sugerida')
+          // Si no se pudo crear, usar null (sin cuenta)
+          cuentaIdToUse = null
+        }
+      } else if (detectedCuenta && !cuentaIdToUse) {
+        // Fallback: si hay cuenta detectada pero no se seleccionó nada, intentar crear automáticamente
         cuentaIdToUse = await ensureCuentaExists(detectedCuenta)
         if (cuentaIdToUse) {
           setSelectedCuentaId(cuentaIdToUse)
@@ -831,8 +939,8 @@ export default function IngresosPage() {
           fecha = `${year}-${month}-01`
         }
         
-        const fechaDate = new Date(fecha)
-        const mes = `${fechaDate.getFullYear()}-${String(fechaDate.getMonth() + 1).padStart(2, '0')}`
+        // Calcular mes de forma segura sin problemas de timezone
+        const mes = getMonthFromDateString(fecha)
         const tagIds = Array.isArray(edited.tag_ids) ? edited.tag_ids : (Array.isArray(trans.tag_ids) ? trans.tag_ids : (form.tag_ids || []))
         
         // Determinar si está pendiente de cobro (desde ediciones o por defecto false)
@@ -880,7 +988,9 @@ export default function IngresosPage() {
           cuenta_bancaria_id: edited.cuenta_bancaria_id || cuentaIdToUse,
           pendiente_cobro: pendienteCobro,
           fecha_cobro_esperada: fechaCobroEsperada,
-          fecha_cobro_confirmada: pendienteCobro ? null : fecha, // Solo se confirma si no está pendiente
+          // Ingresos creados por IA deben ser normales sin estado visible (sin fecha_cobro_confirmada)
+          // Solo se establece fecha_cobro_confirmada cuando el usuario explícitamente confirma un pendiente
+          fecha_cobro_confirmada: null,
           notificar_celular: edited.notificar_celular !== undefined ? edited.notificar_celular : (pendienteCobro ? true : false), // Notificar solo si está pendiente
           notificar_correo: edited.notificar_correo !== undefined ? edited.notificar_correo : (pendienteCobro ? true : false) // Notificar solo si está pendiente
         }
@@ -925,7 +1035,7 @@ export default function IngresosPage() {
             origen: extractedData.total.periodo || '',
             cuenta_bancaria_id: cuentaIdToUse,
             pendiente_cobro: false,
-            fecha_cobro_confirmada: totalFecha
+            fecha_cobro_confirmada: null // Ingresos creados por IA deben ser normales sin estado visible
           })
 
           if (error) {
@@ -1840,18 +1950,56 @@ export default function IngresosPage() {
                         <select
                           className="input w-full"
                           value={selectedCuentaId}
-                          onChange={e => setSelectedCuentaId(e.target.value)}
+                          onChange={e => {
+                            setSelectedCuentaId(e.target.value)
+                            // Si se selecciona crear nueva sugerida, prellenar campos
+                            if (e.target.value === '__new_suggested__') {
+                              const nombreSugerido = buildDetectedCuentaName(detectedCuenta)
+                              const tipoStr = (detectedCuenta?.tipo || detectedCuenta?.tipo_tarjeta || '').toLowerCase()
+                              let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+                              if (tipoStr.includes('visa')) tipo = 'visa'
+                              else if (tipoStr.includes('master')) tipo = 'mastercard'
+                              else if (tipoStr.includes('amex') || tipoStr.includes('american')) tipo = 'amex'
+                              
+                              setAiNewCuenta({
+                                nombre: nombreSugerido,
+                                tipo: tipo,
+                                banco: detectedCuenta?.banco || '',
+                                digitos: detectedCuenta?.ultimosDigitos || detectedCuenta?.ultimos_digitos || ''
+                              })
+                            }
+                          }}
                         >
-                          <option value="">No asignar cuenta</option>
+                          <option value="">Sin cuenta específica</option>
                           {tarjetas.map(t => (
                             <option key={t.id} value={t.id}>
                               {t.nombre}
                             </option>
                           ))}
-                          <option value="__new__">➕ Crear nueva cuenta/tarjeta</option>
+                          {selectedCuentaId === '__new_suggested__' || !tarjetas.find(t => {
+                            const nombreDetectado = buildDetectedCuentaName(detectedCuenta)
+                            const ultimosDigitos = detectedCuenta?.ultimosDigitos || detectedCuenta?.ultimos_digitos
+                            const banco = detectedCuenta?.banco
+                            return (
+                              t.nombre.toLowerCase().includes(nombreDetectado.toLowerCase()) ||
+                              nombreDetectado.toLowerCase().includes(t.nombre.toLowerCase()) ||
+                              (banco && t.banco && t.banco.toLowerCase() === banco.toLowerCase() && 
+                               ((ultimosDigitos && t.digitos && t.digitos.includes(ultimosDigitos)) || (!ultimosDigitos && !t.digitos)))
+                            )
+                          }) && (
+                            <option value="__new_suggested__">
+                              ➕ Crear nueva sugerida: {buildDetectedCuentaName(detectedCuenta)}
+                            </option>
+                          )}
+                          <option value="__new__">➕ Crear nueva cuenta/tarjeta (manual)</option>
                         </select>
-                        {selectedCuentaId === '__new__' && (
+                        {(selectedCuentaId === '__new_suggested__' || selectedCuentaId === '__new__') && (
                           <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-2">
+                            {selectedCuentaId === '__new_suggested__' && (
+                              <div className="text-xs text-indigo-700 bg-indigo-50 p-2 rounded">
+                                💡 La cuenta se creará automáticamente al confirmar la importación
+                              </div>
+                            )}
                             <input
                               type="text"
                               className="input"
@@ -1878,20 +2026,30 @@ export default function IngresosPage() {
                                 onChange={e => setAiNewCuenta(c => ({ ...c, banco: e.target.value }))}
                               />
                             </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleAddNewCuentaAI}
-                                className="btn btn-primary btn-sm"
-                              >
-                                Crear
-                              </button>
-                              <button
-                                onClick={() => setSelectedCuentaId('')}
-                                className="btn btn-secondary btn-sm"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Últimos 4 dígitos (opcional)"
+                              value={aiNewCuenta.digitos}
+                              onChange={e => setAiNewCuenta(c => ({ ...c, digitos: e.target.value }))}
+                              maxLength={4}
+                            />
+                            {selectedCuentaId === '__new__' && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleAddNewCuentaAI}
+                                  className="btn btn-primary btn-sm"
+                                >
+                                  Crear ahora
+                                </button>
+                                <button
+                                  onClick={() => setSelectedCuentaId('')}
+                                  className="btn btn-secondary btn-sm"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

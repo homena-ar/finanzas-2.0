@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identificar al usuario
 import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy yo"
-import { formatMoney, getMonthName, getTagClass } from '@/lib/utils'
+import { formatMoney, getMonthName, getTagClass, formatDateSafe } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react'
 import { Gasto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
@@ -772,7 +772,8 @@ export default function GastosPage() {
               setGlobalDocumentDate(firstDate)
               setUseGlobalDate(true)
             } else {
-              setGlobalDocumentDate(new Date().toISOString().split('T')[0])
+              const hoy = new Date()
+              setGlobalDocumentDate(formatDateSafe(hoy))
               setUseGlobalDate(false)
             }
           }

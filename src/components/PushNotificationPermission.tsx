@@ -6,6 +6,7 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { Bell, X } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { collection, doc, setDoc, deleteDoc, query, where, getDocs } from 'firebase/firestore'
+import { isMobileDevice, notificationPreferences } from '@/lib/utils'
 
 export function PushNotificationPermission() {
   const { user } = useAuth()
@@ -15,6 +16,11 @@ export function PushNotificationPermission() {
 
   useEffect(() => {
     if (!user) return
+
+    // OPCIÓN A: No mostrar en desktop (PC)
+    if (!isMobileDevice()) {
+      return
+    }
 
     // Verificar si el navegador soporta notificaciones
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -26,6 +32,17 @@ export function PushNotificationPermission() {
 
     // Si ya dio permiso o lo rechazó, no mostrar el prompt
     if (Notification.permission !== 'default') {
+      // Si ya está habilitado, guardar preferencia
+      if (Notification.permission === 'granted') {
+        notificationPreferences.setEnabled()
+      } else if (Notification.permission === 'denied') {
+        notificationPreferences.setDenied()
+      }
+      return
+    }
+
+    // Verificar preferencias guardadas (dismissed, enabled, denied)
+    if (!notificationPreferences.shouldShow()) {
       return
     }
 
@@ -45,6 +62,12 @@ export function PushNotificationPermission() {
       if (permission === 'granted') {
         // Registrar el token de push
         await subscribeToPushNotifications()
+        // Guardar preferencia: notificaciones habilitadas
+        notificationPreferences.setEnabled()
+        setShowPrompt(false)
+      } else if (permission === 'denied') {
+        // Guardar preferencia: notificaciones rechazadas
+        notificationPreferences.setDenied()
         setShowPrompt(false)
       } else {
         setShowPrompt(false)
@@ -53,6 +76,12 @@ export function PushNotificationPermission() {
       console.error('Error solicitando permiso de notificaciones:', error)
       setShowPrompt(false)
     }
+  }
+
+  const handleDismiss = () => {
+    // Guardar preferencia: banner cerrado
+    notificationPreferences.setDismissed()
+    setShowPrompt(false)
   }
 
   const subscribeToPushNotifications = async () => {
@@ -141,7 +170,7 @@ export function PushNotificationPermission() {
                 Activar
               </button>
               <button
-                onClick={() => setShowPrompt(false)}
+                onClick={handleDismiss}
                 className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
                 aria-label="Cerrar"
               >

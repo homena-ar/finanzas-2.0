@@ -28,6 +28,7 @@ export default function DashboardPage() {
   } = useData()
   const [dolar, setDolar] = useState(1050)
   const [showEndingModal, setShowEndingModal] = useState(false)
+  const [currencyFilter, setCurrencyFilter] = useState<'ARS' | 'USD' | 'AMBOS'>('ARS')
 
   console.log('📄 [ResumenPage] Render - loading:', loading)
 
@@ -224,54 +225,101 @@ export default function DashboardPage() {
   // La generación automática desde el cliente provoca permission-denied en algunos entornos/workspaces viejos.
   // Las notificaciones deberían generarse vía backend (Admin SDK / cron) para evitar problemas de reglas.
 
-  // Chart data por categoría
-  const catTotals: Record<string, number> = {}
-  gastosMes.filter(g => g.moneda === 'ARS').forEach(g => {
+  // Chart data por categoría - respetar selector de moneda
+  const catTotalsARS: Record<string, number> = {}
+  const catTotalsUSD: Record<string, number> = {}
+  
+  gastosMes.filter(g => !g.pagado).forEach(g => {
     const catName = categoriaMap[g.categoria_id || '']?.nombre || 'Otros'
     const monto = g.cuotas > 1 ? g.monto / g.cuotas : g.monto
-    catTotals[catName] = (catTotals[catName] || 0) + monto
+    
+    if (currencyFilter === 'ARS' && g.moneda === 'ARS') {
+      catTotalsARS[catName] = (catTotalsARS[catName] || 0) + monto
+    } else if (currencyFilter === 'USD' && g.moneda === 'USD') {
+      catTotalsUSD[catName] = (catTotalsUSD[catName] || 0) + monto
+    } else if (currencyFilter === 'AMBOS') {
+      if (g.moneda === 'ARS') {
+        catTotalsARS[catName] = (catTotalsARS[catName] || 0) + monto
+      } else {
+        catTotalsUSD[catName] = (catTotalsUSD[catName] || 0) + monto
+      }
+    }
   })
 
-  const chartData = {
-    labels: Object.keys(catTotals),
+  const chartDataARS = {
+    labels: Object.keys(catTotalsARS),
     datasets: [{
-      data: Object.values(catTotals),
+      data: Object.values(catTotalsARS),
       backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'],
       borderWidth: 0
     }]
   }
 
-  // ===================== INGRESOS (si aplica) =====================
-  const totalIngresosARS = showIngresos
-    ? ingresosMes.filter(i => i.moneda === 'ARS').reduce((s, i) => s + i.monto, 0)
-    : 0
-  const totalIngresosUSD = showIngresos
-    ? ingresosMes.filter(i => i.moneda === 'USD').reduce((s, i) => s + i.monto, 0)
-    : 0
-  const ingresosUsdEnPesos = totalIngresosUSD * dolar
-  const ingresosTotalEnPesos = totalIngresosARS + ingresosUsdEnPesos
-  const balanceEnPesos = ingresosTotalEnPesos - totalActual
-
-  // Chart data ingresos por categoría (ARS)
-  const ingCatTotals: Record<string, number> = {}
-  if (showIngresos) {
-    ingresosMes.filter(i => i.moneda === 'ARS').forEach(i => {
-      const catName = categoriaIngresoMap[i.categoria_id || '']?.nombre || 'Otros'
-      ingCatTotals[catName] = (ingCatTotals[catName] || 0) + i.monto
-    })
-  }
-  const ingresosChartData = {
-    labels: Object.keys(ingCatTotals),
+  const chartDataUSD = {
+    labels: Object.keys(catTotalsUSD),
     datasets: [{
-      data: Object.values(ingCatTotals),
+      data: Object.values(catTotalsUSD),
       backgroundColor: ['#10b981', '#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#f59e0b', '#ec4899'],
       borderWidth: 0
     }]
   }
 
-  // Top 5 ingresos (ordenados por ARS aprox)
+  // ===================== INGRESOS (si aplica) =====================
+  // Filtrar ingresos pendientes: solo sumar confirmados o ingresos normales (sin estado pendiente)
+  const totalIngresosARS = showIngresos
+    ? ingresosMes.filter(i => i.moneda === 'ARS' && (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)).reduce((s, i) => s + i.monto, 0)
+    : 0
+  const totalIngresosUSD = showIngresos
+    ? ingresosMes.filter(i => i.moneda === 'USD' && (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)).reduce((s, i) => s + i.monto, 0)
+    : 0
+  const ingresosUsdEnPesos = totalIngresosUSD * dolar
+  const ingresosTotalEnPesos = totalIngresosARS + ingresosUsdEnPesos
+  const balanceEnPesos = ingresosTotalEnPesos - totalActual
+
+  // Chart data ingresos por categoría - respetar selector de moneda - excluir pendientes
+  const ingCatTotalsARS: Record<string, number> = {}
+  const ingCatTotalsUSD: Record<string, number> = {}
+  
+  if (showIngresos) {
+    ingresosMes.filter(i => (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)).forEach(i => {
+      const catName = categoriaIngresoMap[i.categoria_id || '']?.nombre || 'Otros'
+      
+      if (currencyFilter === 'ARS' && i.moneda === 'ARS') {
+        ingCatTotalsARS[catName] = (ingCatTotalsARS[catName] || 0) + i.monto
+      } else if (currencyFilter === 'USD' && i.moneda === 'USD') {
+        ingCatTotalsUSD[catName] = (ingCatTotalsUSD[catName] || 0) + i.monto
+      } else if (currencyFilter === 'AMBOS') {
+        if (i.moneda === 'ARS') {
+          ingCatTotalsARS[catName] = (ingCatTotalsARS[catName] || 0) + i.monto
+        } else {
+          ingCatTotalsUSD[catName] = (ingCatTotalsUSD[catName] || 0) + i.monto
+        }
+      }
+    })
+  }
+  
+  const ingresosChartDataARS = {
+    labels: Object.keys(ingCatTotalsARS),
+    datasets: [{
+      data: Object.values(ingCatTotalsARS),
+      backgroundColor: ['#10b981', '#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#f59e0b', '#ec4899'],
+      borderWidth: 0
+    }]
+  }
+
+  const ingresosChartDataUSD = {
+    labels: Object.keys(ingCatTotalsUSD),
+    datasets: [{
+      data: Object.values(ingCatTotalsUSD),
+      backgroundColor: ['#10b981', '#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#f59e0b', '#ec4899'],
+      borderWidth: 0
+    }]
+  }
+
+  // Top 5 ingresos (ordenados por ARS aprox) - excluir pendientes
   const topIngresos = showIngresos
     ? [...ingresosMes]
+      .filter(i => !(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)
       .sort((a, b) => {
         const aArs = a.moneda === 'USD' ? a.monto * dolar : a.monto
         const bArs = b.moneda === 'USD' ? b.monto * dolar : b.monto
@@ -280,9 +328,14 @@ export default function DashboardPage() {
       .slice(0, 5)
     : []
 
-  // Top 5 gastos (sin contar pagados)
+  // Top 5 gastos (sin contar pagados) - respetar selector de moneda
   const topGastos = [...gastosMes]
-    .filter(g => g.moneda === 'ARS' && !g.pagado)
+    .filter(g => {
+      if (g.pagado) return false
+      if (currencyFilter === 'ARS') return g.moneda === 'ARS'
+      if (currencyFilter === 'USD') return g.moneda === 'USD'
+      return true // AMBOS: incluir todos
+    })
     .sort((a, b) => {
       const montoA = a.cuotas > 1 ? a.monto / a.cuotas : a.monto
       const montoB = b.cuotas > 1 ? b.monto / b.cuotas : b.monto
@@ -474,12 +527,46 @@ export default function DashboardPage() {
               <ArrowUpCircle className="w-5 h-5 text-emerald-600" />
               Ingresos
             </h2>
-            <button
-              onClick={() => router.push('/dashboard/ingresos')}
-              className="btn btn-secondary btn-sm"
-            >
-              Ver ingresos
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex gap-2 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setCurrencyFilter('ARS')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    currencyFilter === 'ARS' 
+                      ? 'bg-emerald-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  ARS
+                </button>
+                <button
+                  onClick={() => setCurrencyFilter('USD')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    currencyFilter === 'USD' 
+                      ? 'bg-emerald-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  USD
+                </button>
+                <button
+                  onClick={() => setCurrencyFilter('AMBOS')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    currencyFilter === 'AMBOS' 
+                      ? 'bg-emerald-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Ambos
+                </button>
+              </div>
+              <button
+                onClick={() => router.push('/dashboard/ingresos')}
+                className="btn btn-secondary btn-sm"
+              >
+                Ver ingresos
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -522,25 +609,68 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
-            <div className="card p-6">
-              <h3 className="font-bold mb-4">📊 Ingresos por Categoría (ARS)</h3>
-              <div className="h-64">
-                {Object.keys(ingCatTotals).length > 0 ? (
-                  <Doughnut
-                    data={ingresosChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { position: 'right' } }
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-slate-400">
-                    Sin ingresos ARS este mes
+            {currencyFilter === 'AMBOS' ? (
+              <>
+                <div className="card p-6">
+                  <h3 className="font-bold mb-4">📊 Ingresos por Categoría (ARS)</h3>
+                  <div className="h-64">
+                    {Object.keys(ingCatTotalsARS).length > 0 ? (
+                      <Doughnut
+                        data={ingresosChartDataARS}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: { legend: { position: 'right' } }
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-slate-400">
+                        Sin ingresos ARS este mes
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+                <div className="card p-6">
+                  <h3 className="font-bold mb-4">📊 Ingresos por Categoría (USD)</h3>
+                  <div className="h-64">
+                    {Object.keys(ingCatTotalsUSD).length > 0 ? (
+                      <Doughnut
+                        data={ingresosChartDataUSD}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: { legend: { position: 'right' } }
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-slate-400">
+                        Sin ingresos USD este mes
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="card p-6">
+                <h3 className="font-bold mb-4">📊 Ingresos por Categoría ({currencyFilter})</h3>
+                <div className="h-64">
+                  {(currencyFilter === 'ARS' ? Object.keys(ingCatTotalsARS).length : Object.keys(ingCatTotalsUSD).length) > 0 ? (
+                    <Doughnut
+                      data={currencyFilter === 'ARS' ? ingresosChartDataARS : ingresosChartDataUSD}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right' } }
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400">
+                      Sin ingresos {currencyFilter} este mes
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="card p-6">
               <h3 className="font-bold mb-4">🔝 Mayores Ingresos</h3>
@@ -574,28 +704,109 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Donut Chart */}
         <div className="card p-6">
-          <h3 className="font-bold mb-4">📊 Por Categoría</h3>
-          <div className="h-64">
-            {Object.keys(catTotals).length > 0 ? (
-              <Doughnut 
-                data={chartData} 
-                options={{ 
-                  responsive: true, 
-                  maintainAspectRatio: false,
-                  plugins: { legend: { position: 'right' } }
-                }} 
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">
-                Sin datos este mes
-              </div>
-            )}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold">📊 Por Categoría</h3>
+            <div className="flex gap-2 bg-slate-100 rounded-lg p-1">
+              <button
+                onClick={() => setCurrencyFilter('ARS')}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  currencyFilter === 'ARS' 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                ARS
+              </button>
+              <button
+                onClick={() => setCurrencyFilter('USD')}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  currencyFilter === 'USD' 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                USD
+              </button>
+              <button
+                onClick={() => setCurrencyFilter('AMBOS')}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  currencyFilter === 'AMBOS' 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Ambos
+              </button>
+            </div>
           </div>
+          {currencyFilter === 'AMBOS' ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-64">
+                {Object.keys(catTotalsARS).length > 0 ? (
+                  <>
+                    <div className="text-xs text-slate-500 mb-2 text-center font-semibold">ARS</div>
+                    <Doughnut 
+                      data={chartDataARS} 
+                      options={{ 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+                      }} 
+                    />
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                    Sin gastos ARS
+                  </div>
+                )}
+              </div>
+              <div className="h-64">
+                {Object.keys(catTotalsUSD).length > 0 ? (
+                  <>
+                    <div className="text-xs text-slate-500 mb-2 text-center font-semibold">USD</div>
+                    <Doughnut 
+                      data={chartDataUSD} 
+                      options={{ 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+                      }} 
+                    />
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                    Sin gastos USD
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="h-64">
+              {(currencyFilter === 'ARS' ? Object.keys(catTotalsARS).length : Object.keys(catTotalsUSD).length) > 0 ? (
+                <Doughnut 
+                  data={currencyFilter === 'ARS' ? chartDataARS : chartDataUSD} 
+                  options={{ 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
+                  }} 
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-400">
+                  Sin datos {currencyFilter} este mes
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Top Gastos */}
         <div className="card p-6">
-          <h3 className="font-bold mb-4">🔝 Mayores Gastos</h3>
+          <h3 className="font-bold mb-4">
+            🔝 Mayores Gastos
+            {currencyFilter === 'AMBOS' && <span className="text-xs font-normal text-slate-500 ml-2">(ARS y USD)</span>}
+            {currencyFilter !== 'AMBOS' && <span className="text-xs font-normal text-slate-500 ml-2">({currencyFilter})</span>}
+          </h3>
           <div className="space-y-3">
             {topGastos.length > 0 ? topGastos.map((g, i) => {
               const monto = g.cuotas > 1 ? g.monto / g.cuotas : g.monto
@@ -613,7 +824,7 @@ export default function DashboardPage() {
                     <div className="font-semibold text-sm truncate">{g.descripcion}</div>
                     <div className="text-xs text-slate-500">{categoriaMap[g.categoria_id || '']?.nombre || 'Sin categoría'}</div>
                   </div>
-                  <div className="font-bold">{formatMoney(monto)}</div>
+                    <div className="font-bold">{formatMoney(monto, g.moneda)}</div>
                 </div>
               )
             }) : (

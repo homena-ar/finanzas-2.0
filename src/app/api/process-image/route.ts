@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { formatDateSafe } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -416,6 +417,13 @@ Responde en formato JSON con un array "transacciones" que contenga cada ingreso 
     "moneda": "ARS" o "USD",
     "periodo": "fecha de cierre o período del resumen",
     "mes_resumen": "YYYY-MM" (mes del resumen detectado)
+  },
+  "accountSuggestion": {
+    "nombre": "nombre de la cuenta/tarjeta detectada (ej: Cuenta Corriente BBVA, Visa Galicia, Mastercard Santander, etc.) - null si no se detecta",
+    "banco": "nombre del banco si está visible (ej: BBVA, Galicia, Santander, etc.) - null si no se detecta",
+    "ultimosDigitos": "últimos 4 dígitos de la tarjeta o cuenta si están visibles (ej: 1234) - null si no se detecta",
+    "tipo": "cuenta" o "tarjeta" según lo que sea (si es extracto bancario usar "cuenta", si es resumen de tarjeta usar "tarjeta") - null si no se puede determinar,
+    "moneda": "ARS" o "USD" si la cuenta/tarjeta está en una moneda específica - null si no aplica o no se detecta
   }
 }
 
@@ -451,6 +459,16 @@ Si encuentras múltiples ingresos del período actual, inclúyelos todos en el a
   "categoria": "categoría sugerida en ESPAÑOL (ej: Salario, Trabajo Freelance, Inversiones, Alquiler, Venta, Reembolso, Intereses Bancarios, Transferencia Personal, etc.) - IMPORTANTE: SIEMPRE en español, NUNCA en inglés",
   "categoria_icono": "emoji o icono apropiado para la categoría sugerida (ej: 💰 para Salario, 💼 para Trabajo Freelance, 📈 para Inversiones, 🏠 para Alquiler, 💵 para Venta, 🔄 para Reembolso, 🏦 para Intereses Bancarios, 👤 para Transferencia Personal, etc.) - DEBE ser diferente según el tipo de ingreso, NO uses siempre el mismo icono",
   "origen": "origen del ingreso (banco, empresa, persona, etc.) - nombre de la entidad/persona que pagó"
+}
+
+Si detectas información de cuenta bancaria o tarjeta en el documento, agrega también:
+
+"accountSuggestion": {
+  "nombre": "nombre de la cuenta/tarjeta detectada (ej: Cuenta Corriente BBVA, Visa Galicia, Mastercard Santander, etc.) - null si no se detecta",
+  "banco": "nombre del banco si está visible (ej: BBVA, Galicia, Santander, etc.) - null si no se detecta",
+  "ultimosDigitos": "últimos 4 dígitos de la tarjeta o cuenta si están visibles (ej: 1234) - null si no se detecta",
+  "tipo": "cuenta" o "tarjeta" según lo que sea - null si no se puede determinar,
+  "moneda": "ARS" o "USD" si la cuenta/tarjeta está en una moneda específica - null si no aplica o no se detecta
 }
 
 Si no puedes identificar algún campo, usa null. Asegúrate de que el monto sea solo el número sin símbolos de moneda ni puntos de miles. La fecha debe estar en formato YYYY-MM-DD.`
@@ -647,23 +665,12 @@ Responde solo con el JSON, sin texto adicional.`
         // El frontend se encargará de multiplicarlo según las cuotas restantes
         
         if (trans.fecha) {
-          const fechaStr = String(trans.fecha)
-          if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            cleaned.fecha = fechaStr
-          } else {
-            try {
-              const fecha = new Date(fechaStr)
-              if (!isNaN(fecha.getTime())) {
-                cleaned.fecha = fecha.toISOString().split('T')[0]
-              } else {
-                cleaned.fecha = new Date().toISOString().split('T')[0]
-              }
-            } catch {
-              cleaned.fecha = new Date().toISOString().split('T')[0]
-            }
-          }
+          // Usar formatDateSafe para evitar problemas de timezone
+          cleaned.fecha = formatDateSafe(String(trans.fecha))
         } else {
-          cleaned.fecha = new Date().toISOString().split('T')[0]
+          // Si no hay fecha, usar la fecha actual en formato seguro
+          const hoy = new Date()
+          cleaned.fecha = formatDateSafe(hoy)
         }
         
         if (trans.categoria) {
@@ -767,23 +774,12 @@ Responde solo con el JSON, sin texto adicional.`
           }
           
           if (imp.fecha) {
-            const fechaStr = String(imp.fecha)
-            if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              cleaned.fecha = fechaStr
-            } else {
-              try {
-                const fecha = new Date(fechaStr)
-                if (!isNaN(fecha.getTime())) {
-                  cleaned.fecha = fecha.toISOString().split('T')[0]
-                } else {
-                  cleaned.fecha = new Date().toISOString().split('T')[0]
-                }
-              } catch {
-                cleaned.fecha = new Date().toISOString().split('T')[0]
-              }
-            }
+            // Usar formatDateSafe para evitar problemas de timezone
+            cleaned.fecha = formatDateSafe(String(imp.fecha))
           } else {
-            cleaned.fecha = new Date().toISOString().split('T')[0]
+            // Si no hay fecha, usar la fecha actual en formato seguro
+            const hoy = new Date()
+            cleaned.fecha = formatDateSafe(hoy)
           }
           
           return cleaned
@@ -805,7 +801,7 @@ Responde solo con el JSON, sin texto adicional.`
         }
       }
       
-      // Procesar información de tarjeta si existe
+      // Procesar información de tarjeta si existe (compatibilidad con formato antiguo)
       const cleanedTarjeta: any = {}
       if (extractedData.tarjeta) {
         if (extractedData.tarjeta.banco) {
@@ -822,13 +818,41 @@ Responde solo con el JSON, sin texto adicional.`
         }
       }
       
+      // Procesar accountSuggestion si existe (nuevo formato)
+      const cleanedAccountSuggestion: any = {}
+      if (extractedData.accountSuggestion) {
+        if (extractedData.accountSuggestion.nombre) {
+          cleanedAccountSuggestion.nombre = String(extractedData.accountSuggestion.nombre).trim()
+        }
+        if (extractedData.accountSuggestion.banco) {
+          cleanedAccountSuggestion.banco = String(extractedData.accountSuggestion.banco).trim()
+        }
+        if (extractedData.accountSuggestion.ultimosDigitos) {
+          cleanedAccountSuggestion.ultimosDigitos = String(extractedData.accountSuggestion.ultimosDigitos).trim()
+        }
+        if (extractedData.accountSuggestion.tipo) {
+          const tipo = String(extractedData.accountSuggestion.tipo).toLowerCase().trim()
+          cleanedAccountSuggestion.tipo = (tipo === 'cuenta' || tipo === 'tarjeta') ? tipo : null
+        }
+        if (extractedData.accountSuggestion.moneda) {
+          const moneda = String(extractedData.accountSuggestion.moneda).toUpperCase()
+          cleanedAccountSuggestion.moneda = (moneda === 'USD' || moneda === 'ARS') ? moneda : null
+        }
+      }
+      
+      // Priorizar accountSuggestion sobre tarjeta (formato antiguo)
+      const accountInfo = Object.keys(cleanedAccountSuggestion).length > 0 
+        ? cleanedAccountSuggestion 
+        : (Object.keys(cleanedTarjeta).length > 0 ? cleanedTarjeta : null)
+      
       return NextResponse.json({
         success: true,
         data: {
           transacciones: cleanedTransactions,
           impuestos: cleanedImpuestos.length > 0 ? cleanedImpuestos : null,
           total: Object.keys(cleanedTotal).length > 0 ? cleanedTotal : null,
-          tarjeta: Object.keys(cleanedTarjeta).length > 0 ? cleanedTarjeta : null,
+          tarjeta: accountInfo, // Mantener compatibilidad con nombre 'tarjeta'
+          accountSuggestion: accountInfo, // Nuevo formato
           esResumen: true
         },
         rawResponse: text
@@ -859,25 +883,12 @@ Responde solo con el JSON, sin texto adicional.`
     }
     
     if (extractedData.fecha) {
-      // Validar formato de fecha
-      const fechaStr = String(extractedData.fecha)
-      if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        cleanedData.fecha = fechaStr
-      } else {
-        // Intentar convertir fecha
-        try {
-          const fecha = new Date(fechaStr)
-          if (!isNaN(fecha.getTime())) {
-            cleanedData.fecha = fecha.toISOString().split('T')[0]
-          } else {
-            cleanedData.fecha = new Date().toISOString().split('T')[0]
-          }
-        } catch {
-          cleanedData.fecha = new Date().toISOString().split('T')[0]
-        }
-      }
+      // Usar formatDateSafe para evitar problemas de timezone
+      cleanedData.fecha = formatDateSafe(String(extractedData.fecha))
     } else {
-      cleanedData.fecha = new Date().toISOString().split('T')[0]
+      // Si no hay fecha, usar la fecha actual en formato seguro
+      const hoy = new Date()
+      cleanedData.fecha = formatDateSafe(hoy)
     }
     
     if (extractedData.categoria) {
@@ -891,10 +902,35 @@ Responde solo con el JSON, sin texto adicional.`
     if (extractedData.origen) {
       cleanedData.origen = String(extractedData.origen).trim()
     }
+    
+    // Procesar accountSuggestion si existe (para transacciones únicas también)
+    const cleanedAccountSuggestion: any = {}
+    if (extractedData.accountSuggestion) {
+      if (extractedData.accountSuggestion.nombre) {
+        cleanedAccountSuggestion.nombre = String(extractedData.accountSuggestion.nombre).trim()
+      }
+      if (extractedData.accountSuggestion.banco) {
+        cleanedAccountSuggestion.banco = String(extractedData.accountSuggestion.banco).trim()
+      }
+      if (extractedData.accountSuggestion.ultimosDigitos) {
+        cleanedAccountSuggestion.ultimosDigitos = String(extractedData.accountSuggestion.ultimosDigitos).trim()
+      }
+      if (extractedData.accountSuggestion.tipo) {
+        const tipo = String(extractedData.accountSuggestion.tipo).toLowerCase().trim()
+        cleanedAccountSuggestion.tipo = (tipo === 'cuenta' || tipo === 'tarjeta') ? tipo : null
+      }
+      if (extractedData.accountSuggestion.moneda) {
+        const moneda = String(extractedData.accountSuggestion.moneda).toUpperCase()
+        cleanedAccountSuggestion.moneda = (moneda === 'USD' || moneda === 'ARS') ? moneda : null
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      data: cleanedData,
+      data: {
+        ...cleanedData,
+        accountSuggestion: Object.keys(cleanedAccountSuggestion).length > 0 ? cleanedAccountSuggestion : null
+      },
       rawResponse: text
     })
 
