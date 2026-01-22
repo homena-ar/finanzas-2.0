@@ -43,17 +43,6 @@ export default function ProyeccionPage() {
     else totalFijosARS += g.monto
   })
 
-  // Calcular ingresos promedio del mes actual (para proyección)
-  const mesActualKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
-  const ingresosMesActual = showIngresos ? ingresos.filter(i => i.mes === mesActualKey) : []
-  let promedioIngresosARS = 0, promedioIngresosUSD = 0
-  if (ingresosMesActual.length > 0) {
-    ingresosMesActual.forEach(i => {
-      if (i.moneda === 'USD') promedioIngresosUSD += i.monto
-      else promedioIngresosARS += i.monto
-    })
-  }
-
   // Cuotas pendientes
   const cuotas = gastos.filter(g => g.cuotas > 1 && !g.es_fijo)
 
@@ -81,19 +70,14 @@ export default function ProyeccionPage() {
       }
     })
 
-    // Ingresos proyectados (usar promedio del mes actual si hay ingresos habilitados)
+    // Ingresos proyectados - solo usar ingresos que ya existen en ese mes específico
     let totalIngresosARS = 0
     let totalIngresosUSD = 0
     
     if (showIngresos) {
-      // Usar el promedio del mes actual como proyección
-      totalIngresosARS = promedioIngresosARS
-      totalIngresosUSD = promedioIngresosUSD
-      
-      // También considerar ingresos específicos de ese mes si existen
+      // Solo considerar ingresos que ya están registrados para ese mes específico (usar campo 'mes')
       ingresos.forEach(i => {
-        const ingresoMes = new Date(i.fecha)
-        if (ingresoMes.getFullYear() === mes.getFullYear() && ingresoMes.getMonth() === mes.getMonth()) {
+        if (i.mes === mesKey) {
           if (i.moneda === 'USD') {
             totalIngresosUSD += i.monto
           } else {
@@ -226,7 +210,7 @@ export default function ProyeccionPage() {
         {/* Próximos 12 meses */}
         <motion.div variants={itemVariants} className="card p-5">
           <h3 className="font-bold mb-4">📅 Próximos 12 Meses</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2">
             {proyeccion.map(p => (
               <div key={p.mesKey} className="py-3 border-b border-slate-100 last:border-0">
                 <div className="flex justify-between items-center mb-1">

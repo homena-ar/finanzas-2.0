@@ -2056,7 +2056,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Sección Cambio de Contraseña */}
-      <div className="card p-5 order-6 mb-8">
+      <div className="card p-5 order-4 mb-8">
         <h3 className="font-bold mb-4">🔐 Seguridad</h3>
         {!showPasswordChange ? (
           <button
@@ -2161,7 +2161,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Info */}
-      <div className="card p-5 bg-slate-50 order-4 mb-8">
+      <div className="card p-5 bg-slate-50 order-5 mb-8">
         <h3 className="font-bold mb-2">ℹ️ Información</h3>
         <div className="text-sm text-slate-600 space-y-1">
           <p><strong>Email:</strong> {profile?.email}</p>
