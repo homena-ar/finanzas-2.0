@@ -26,7 +26,7 @@ export default function GastosPage() {
   const { user, profile } = useAuth()
   const { currentWorkspace, members } = useWorkspace() // Traemos info del workspace
   const {
-    tarjetas, categorias, tags, mediosPago,
+    tarjetas, categorias, tags, mediosPago, gastos,
     currentMonth, monthKey, getGastosMes, getImpuestosMes,
     addGasto, updateGasto, deleteGasto,
     addImpuesto, updateImpuesto, deleteImpuesto,
