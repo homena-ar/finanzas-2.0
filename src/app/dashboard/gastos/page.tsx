@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identificar al usuario
@@ -109,6 +109,10 @@ export default function GastosPage() {
     digitos: ''
   })
   const [aiExpandedTransaction, setAiExpandedTransaction] = useState<number | null>(null)
+  
+  // Set global para rastrear categorías que se están creando (evitar duplicados en paralelo)
+  const categoriasEnCreacion = useRef<Set<string>>(new Set())
+  const categoriasCreadasGlobal = useRef<Map<string, string>>(new Map())
   
   // Modal de edición de transacción individual del preview
   const [editingAiTransaction, setEditingAiTransaction] = useState<number | null>(null)
@@ -627,13 +631,50 @@ export default function GastosPage() {
   const ensureCategoriaExists = async (categoriaLabel: string, categoriaIcono?: string): Promise<string | null> => {
     if (!categoriaLabel) return null
     
-    // Normalizar el nombre para buscar
     const normalizedLabel = normalizeCategoriaName(categoriaLabel)
     
-    // Buscar si ya existe (usando la función mejorada)
+    // 1. Verificar en el mapa global de categorías ya creadas en esta sesión
+    const categoriasCreadasArray = Array.from(categoriasCreadasGlobal.current.entries())
+    for (let i = 0; i < categoriasCreadasArray.length; i++) {
+      const [mapLabel, mapId] = categoriasCreadasArray[i]
+      const mapNormalized = normalizeCategoriaName(mapLabel)
+      if (mapNormalized === normalizedLabel || 
+          mapNormalized.includes(normalizedLabel) || 
+          normalizedLabel.includes(mapNormalized)) {
+        console.log('✅ [Gastos] Categoría encontrada en mapa global:', categoriaLabel, '→', mapId, '(similar a:', mapLabel, ')')
+        return mapId
+      }
+    }
+    
+    // 2. Verificar si se está creando actualmente (evitar race conditions)
+    if (categoriasEnCreacion.current.has(normalizedLabel)) {
+      console.log('⏳ [Gastos] Categoría en proceso de creación, esperando...', categoriaLabel)
+      // Esperar hasta que se complete la creación
+      let attempts = 0
+      while (categoriasEnCreacion.current.has(normalizedLabel) && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        attempts++
+        // Verificar si ya se creó mientras esperábamos
+        const categoriasCreadasArray2 = Array.from(categoriasCreadasGlobal.current.entries())
+        for (let j = 0; j < categoriasCreadasArray2.length; j++) {
+          const [mapLabel, mapId] = categoriasCreadasArray2[j]
+          const mapNormalized = normalizeCategoriaName(mapLabel)
+          if (mapNormalized === normalizedLabel || 
+              mapNormalized.includes(normalizedLabel) || 
+              normalizedLabel.includes(mapNormalized)) {
+            console.log('✅ [Gastos] Categoría encontrada después de esperar:', categoriaLabel, '→', mapId)
+            return mapId
+          }
+        }
+      }
+    }
+    
+    // 3. Buscar si ya existe en la base de datos
     const existingId = findCategoriaIdFromLabel(categoriaLabel)
     if (existingId) {
-      console.log('✅ [Gastos] Categoría ya existe:', categoriaLabel, '→', existingId)
+      console.log('✅ [Gastos] Categoría ya existe en BD:', categoriaLabel, '→', existingId)
+      // Guardar en el mapa global para futuras referencias
+      categoriasCreadasGlobal.current.set(categoriaLabel, existingId)
       return existingId
     }
     
@@ -673,31 +714,45 @@ export default function GastosPage() {
       }
     }
     
-    // Crear automáticamente
-    console.log('🔵 [Gastos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', iconoFinal)
-    const { error } = await addCategoria({
-      nombre: categoriaLabel.trim(),
-      icono: iconoFinal,
-      color: '#6366f1' // Color por defecto para gastos
-    })
+    // 4. Marcar como en proceso de creación (evitar duplicados en paralelo)
+    categoriasEnCreacion.current.add(normalizedLabel)
     
-    if (error) {
-      console.error('❌ [Gastos] Error creando categoría automáticamente:', error)
+    try {
+      // Crear automáticamente
+      console.log('🔵 [Gastos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', iconoFinal)
+      const { error } = await addCategoria({
+        nombre: categoriaLabel.trim(),
+        icono: iconoFinal,
+        color: '#6366f1' // Color por defecto para gastos
+      })
+      
+      if (error) {
+        console.error('❌ [Gastos] Error creando categoría automáticamente:', error)
+        categoriasEnCreacion.current.delete(normalizedLabel)
+        return null
+      }
+      
+      // Esperar un momento para que se actualice la lista
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Buscar de nuevo en las categorías actualizadas
+      const newId = findCategoriaIdFromLabel(categoriaLabel)
+      if (newId) {
+        console.log('✅ [Gastos] Categoría creada y encontrada:', categoriaLabel, '→', newId)
+        // Guardar en el mapa global para futuras referencias
+        categoriasCreadasGlobal.current.set(categoriaLabel, newId)
+        categoriasEnCreacion.current.delete(normalizedLabel)
+        return newId
+      }
+      
+      console.warn('⚠️ [Gastos] Categoría creada pero no encontrada después de esperar:', categoriaLabel)
+      categoriasEnCreacion.current.delete(normalizedLabel)
+      return null
+    } catch (error) {
+      console.error('❌ [Gastos] Error inesperado creando categoría:', error)
+      categoriasEnCreacion.current.delete(normalizedLabel)
       return null
     }
-    
-    // Esperar un momento para que se actualice la lista
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Buscar de nuevo en las categorías actualizadas
-    const newId = findCategoriaIdFromLabel(categoriaLabel)
-    if (newId) {
-      console.log('✅ [Gastos] Categoría creada y encontrada:', categoriaLabel, '→', newId)
-      return newId
-    }
-    
-    console.warn('⚠️ [Gastos] Categoría creada pero no encontrada después de esperar:', categoriaLabel)
-    return null
   }
 
   const handleAddNewCategoriaAI = async () => {
@@ -1104,8 +1159,8 @@ export default function GastosPage() {
       setSavingTransactions(true)
       setGastoError('')
       
-      // Mapa para evitar crear categorías duplicadas en el mismo proceso
-      const categoriasCreadas = new Map<string, string>() // Map<categoriaLabel, categoriaId>
+      // Usar el mapa global para evitar crear categorías duplicadas
+      // El mapa global ya está inicializado arriba con useRef
       
       // Usar la tarjeta seleccionada en el modal, o la del formulario como fallback
       const tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
@@ -1122,45 +1177,10 @@ export default function GastosPage() {
           const categoriaLabel = trans.categoria.trim()
           const categoriaIcono = (trans as any).categoria_icono || undefined
           
-          // Normalizar el nombre para buscar en el mapa
-          const normalizedLabel = normalizeCategoriaName(categoriaLabel)
-          
-          // Verificar si ya creamos esta categoría (o una similar) en este proceso
-          let foundInMap = false
-          const categoriasCreadasArray = Array.from(categoriasCreadas.entries())
-          for (let i = 0; i < categoriasCreadasArray.length; i++) {
-            const [mapLabel, mapId] = categoriasCreadasArray[i]
-            const mapNormalized = normalizeCategoriaName(mapLabel)
-            // Si son iguales o similares (una contiene a la otra)
-            if (mapNormalized === normalizedLabel || 
-                mapNormalized.includes(normalizedLabel) || 
-                normalizedLabel.includes(mapNormalized)) {
-              categoriaId = mapId
-              foundInMap = true
-              console.log('✅ [Gastos] Reutilizando categoría ya creada en este proceso:', categoriaLabel, '→', categoriaId, '(similar a:', mapLabel, ')')
-              break
-            }
-          }
-          
-          if (!foundInMap) {
-            // Intentar encontrar primero en las existentes
-            categoriaId = findCategoriaIdFromLabel(categoriaLabel)
-            // Si no existe, crearla automáticamente con el icono de la IA
-            if (!categoriaId) {
-              console.log('🔵 [Gastos] Creando categoría automáticamente:', categoriaLabel, 'con icono:', categoriaIcono || 'por defecto')
-              categoriaId = (await ensureCategoriaExists(categoriaLabel, categoriaIcono)) || ''
-              if (categoriaId) {
-                // Guardar en el mapa para reutilizar (usar el label original como clave)
-                categoriasCreadas.set(categoriaLabel, categoriaId)
-                console.log('✅ [Gastos] Categoría creada y guardada en mapa:', categoriaLabel, '→', categoriaId)
-              } else {
-                console.warn('⚠️ [Gastos] No se pudo crear/obtener categoría:', categoriaLabel)
-              }
-            } else {
-              // Guardar en el mapa para reutilizar
-              categoriasCreadas.set(categoriaLabel, categoriaId)
-              console.log('✅ [Gastos] Categoría encontrada y guardada en mapa:', categoriaLabel, '→', categoriaId)
-            }
+          // ensureCategoriaExists ya maneja el mapa global y evita duplicados
+          categoriaId = (await ensureCategoriaExists(categoriaLabel, categoriaIcono)) || ''
+          if (!categoriaId) {
+            console.warn('⚠️ [Gastos] No se pudo crear/obtener categoría:', categoriaLabel)
           }
         }
         
