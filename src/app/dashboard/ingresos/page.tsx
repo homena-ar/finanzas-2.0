@@ -716,30 +716,30 @@ export default function IngresosPage() {
         // Detectar fecha general del documento desde el mes del resumen
         if (result.data?.total && result.data.total.mes_resumen) {
           const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
-          // Asegurar que sea el primer día del mes (no el último del mes anterior)
-          const fechaResumen = `${mesResumen}-01`
+          // Usar día 10 del mes para evitar problemas de timezone
+          const fechaResumen = `${mesResumen}-10`
           console.log('🔵 [Ingresos] Fecha detectada desde mes_resumen:', mesResumen, '→', fechaResumen)
           setGlobalDocumentDate(fechaResumen)
           setUseGlobalDate(true)
         } else if (result.data?.transacciones && result.data.transacciones.length > 0) {
           const firstDate = result.data.transacciones[0]?.fecha
           if (firstDate) {
-            // Si hay fecha, usar el primer día de ese mes (parsear de forma segura)
+            // Si hay fecha, usar el día 10 de ese mes (parsear de forma segura)
             const mesResumen = getMonthFromDateString(firstDate)
-            setGlobalDocumentDate(`${mesResumen}-01`)
+            setGlobalDocumentDate(`${mesResumen}-10`)
             setUseGlobalDate(true)
           } else {
-            // Si no hay fecha, usar el primer día del mes actual
+            // Si no hay fecha, usar el día 10 del mes actual
             const hoy = new Date()
             const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
-            setGlobalDocumentDate(`${mesActual}-01`)
+            setGlobalDocumentDate(`${mesActual}-10`)
             setUseGlobalDate(false)
           }
         } else {
-          // Si no hay transacciones, usar el primer día del mes actual
+          // Si no hay transacciones, usar el día 10 del mes actual
           const hoy = new Date()
           const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
-          setGlobalDocumentDate(`${mesActual}-01`)
+          setGlobalDocumentDate(`${mesActual}-10`)
           setUseGlobalDate(false)
         }
 
@@ -932,11 +932,11 @@ export default function IngresosPage() {
         // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
         let fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (edited.fecha || trans.fecha || form.fecha)
         
-        // Si se usa fecha global, asegurar que sea el primer día del mes seleccionado
+        // Si se usa fecha global, asegurar que sea el día 10 del mes seleccionado
         if (useGlobalDate && globalDocumentDate) {
-          // globalDocumentDate ya debería ser YYYY-MM-01, pero asegurémonos
+          // globalDocumentDate ya debería ser YYYY-MM-10, pero asegurémonos
           const [year, month] = globalDocumentDate.split('-')
-          fecha = `${year}-${month}-01`
+          fecha = `${year}-${month}-10`
         }
         
         // Calcular mes de forma segura sin problemas de timezone
@@ -1895,8 +1895,8 @@ export default function IngresosPage() {
                         onChange={e => {
                           const monthValue = e.target.value
                           if (monthValue) {
-                            // Usar el primer día del mes seleccionado (no el último del mes anterior)
-                            const fechaSeleccionada = `${monthValue}-01`
+                            // Usar el día 10 del mes seleccionado para evitar problemas de timezone
+                            const fechaSeleccionada = `${monthValue}-10`
                             setGlobalDocumentDate(fechaSeleccionada)
                             setUseGlobalDate(true)
                             console.log('🔵 [Ingresos] Mes seleccionado:', monthValue, '→ Fecha:', fechaSeleccionada)

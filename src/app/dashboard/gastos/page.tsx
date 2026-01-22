@@ -760,9 +760,9 @@ export default function GastosPage() {
           
           // Detectar fecha general del documento desde el mes del resumen
           if (result.data.total && result.data.total.mes_resumen) {
-            // Si la IA detectó el mes del resumen, usar el primer día de ese mes
+            // Si la IA detectó el mes del resumen, usar el día 10 de ese mes para evitar problemas de timezone
             const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
-            const fechaResumen = `${mesResumen}-01`
+            const fechaResumen = `${mesResumen}-10`
             setGlobalDocumentDate(fechaResumen)
             setUseGlobalDate(true)
           } else if (result.data.transacciones && result.data.transacciones.length > 0) {
@@ -2618,7 +2618,7 @@ export default function GastosPage() {
                           type="month"
                           value={globalDocumentDate ? globalDocumentDate.substring(0, 7) : ''}
                           onChange={(e) => {
-                            const newDate = `${e.target.value}-01`
+                            const newDate = `${e.target.value}-10`
                             setGlobalDocumentDate(newDate)
                             const newEdited = new Map(editedTransactions)
                             extractedData.transacciones.forEach((_: any, index: number) => {
