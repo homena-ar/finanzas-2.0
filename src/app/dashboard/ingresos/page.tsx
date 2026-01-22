@@ -224,7 +224,9 @@ export default function IngresosPage() {
     const normalizedLabel = normalizeCategoriaName(categoriaLabel)
     
     // 1. Verificar en el mapa global de categorías ya creadas en esta sesión
-    for (const [mapLabel, mapId] of categoriasCreadasGlobal.current.entries()) {
+    const categoriasCreadasArray = Array.from(categoriasCreadasGlobal.current.entries())
+    for (let i = 0; i < categoriasCreadasArray.length; i++) {
+      const [mapLabel, mapId] = categoriasCreadasArray[i]
       const mapNormalized = normalizeCategoriaName(mapLabel)
       if (mapNormalized === normalizedLabel || 
           mapNormalized.includes(normalizedLabel) || 
@@ -243,7 +245,9 @@ export default function IngresosPage() {
         await new Promise(resolve => setTimeout(resolve, 100))
         attempts++
         // Verificar si ya se creó mientras esperábamos
-        for (const [mapLabel, mapId] of categoriasCreadasGlobal.current.entries()) {
+        const categoriasCreadasArray2 = Array.from(categoriasCreadasGlobal.current.entries())
+        for (let j = 0; j < categoriasCreadasArray2.length; j++) {
+          const [mapLabel, mapId] = categoriasCreadasArray2[j]
           const mapNormalized = normalizeCategoriaName(mapLabel)
           if (mapNormalized === normalizedLabel || 
               mapNormalized.includes(normalizedLabel) || 
