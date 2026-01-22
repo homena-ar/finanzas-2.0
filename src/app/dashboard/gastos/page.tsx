@@ -1147,21 +1147,26 @@ export default function GastosPage() {
           
           // Detectar fecha general del documento desde el mes del resumen
           if (result.data.total && result.data.total.mes_resumen) {
-            // Si la IA detectó el mes del resumen, usar el día 10 de ese mes para evitar problemas de timezone
+          // Si la IA detectó el mes del resumen, usar el día 10 de ese mes para evitar problemas de timezone
+          if (result.data.total?.mes_resumen) {
             const mesResumen = result.data.total.mes_resumen // Formato: "YYYY-MM"
             const fechaResumen = `${mesResumen}-10`
             setGlobalDocumentDate(fechaResumen)
             setUseGlobalDate(true)
           } else if (result.data.transacciones && result.data.transacciones.length > 0) {
-            // Fallback: usar la primera fecha encontrada
+            // Fallback: usar el mes de la primera transacción
             const firstDate = result.data.transacciones[0]?.fecha
             if (firstDate) {
-              setGlobalDocumentDate(firstDate)
+              const [year, month] = firstDate.split('-')
+              const fechaResumen = `${year}-${month}-10`
+              setGlobalDocumentDate(fechaResumen)
               setUseGlobalDate(true)
             } else {
               const hoy = new Date()
-              setGlobalDocumentDate(formatDateSafe(hoy))
-              setUseGlobalDate(false)
+              const year = hoy.getFullYear()
+              const month = String(hoy.getMonth() + 1).padStart(2, '0')
+              setGlobalDocumentDate(`${year}-${month}-10`)
+              setUseGlobalDate(true)
             }
           }
           
@@ -1393,7 +1398,13 @@ export default function GastosPage() {
         }
         
         // Usar fecha global del mes del resumen si está disponible, sino usar la fecha de la transacción o del formulario
-        const fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || gastoForm.fecha)
+        // Si se usa fecha global, asegurar que sea el día 10 del mes seleccionado
+        let fecha = (useGlobalDate && globalDocumentDate) ? globalDocumentDate : (trans.fecha || gastoForm.fecha)
+        if (useGlobalDate && globalDocumentDate) {
+          // globalDocumentDate ya debería ser YYYY-MM-10, pero asegurémonos
+          const [year, month] = globalDocumentDate.split('-')
+          fecha = `${year}-${month}-10`
+        }
         const mesFacturacion = getMesFacturacion(fecha)
         
         console.log(`🔵 [GastosPage] Transacción ${index + 1} - Datos originales:`, {
@@ -2871,8 +2882,8 @@ export default function GastosPage() {
               <h3 className="font-bold text-base flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-indigo-600" />
                 <span>
-                  {extractedData.total?.tipo_documento === 'resumen_tarjeta' && extractedData.transacciones
-                    ? `${extractedData.transacciones.length} transacciones`
+                  {extractedData.transacciones && Array.isArray(extractedData.transacciones)
+                    ? `Confirmar Transacciones (${extractedData.transacciones.length} encontradas)`
                     : extractedData.total?.nombre_sugerido || 'Datos extraídos'}
                 </span>
               </h3>
@@ -2926,14 +2937,13 @@ export default function GastosPage() {
               
               {/* Si hay múltiples transacciones (resumen) */}
               {extractedData.transacciones && Array.isArray(extractedData.transacciones) ? (
-                <div className="space-y-3">
-                  {extractedData.total?.tipo_documento === 'resumen_tarjeta' && (
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
-                      <p className="text-xs text-indigo-800">
-                        <strong>{extractedData.transacciones.length} transacciones</strong> detectadas. Selecciona las que deseas agregar.
-                      </p>
-                    </div>
-                  )}
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Resumen detectado:</strong> Se encontraron {extractedData.transacciones.length} gastos individuales. 
+                      Selecciona los que deseas agregar.
+                    </p>
+                  </div>
 
                   {/* Selección de cuenta/tarjeta si fue detectada */}
                   {detectedTarjeta && (
@@ -3073,77 +3083,68 @@ export default function GastosPage() {
                     </div>
                   )}
 
-                  {/* Selector de Fecha/Mes General - Compacto */}
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-indigo-900">📅 Fecha General</label>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={useGlobalDate}
-                          onChange={(e) => {
-                            setUseGlobalDate(e.target.checked)
-                            if (e.target.checked && globalDocumentDate) {
-                              const newEdited = new Map(editedTransactions)
-                              extractedData.transacciones.forEach((_: any, index: number) => {
-                                if (!newEdited.has(index) || !newEdited.get(index)?.fecha) {
-                                  const current = newEdited.get(index) || {}
-                                  newEdited.set(index, { ...current, fecha: globalDocumentDate })
-                                }
-                              })
-                              setEditedTransactions(newEdited)
-                            }
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  {/* Selector de Fecha/Mes General */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="text-sm font-semibold text-slate-700">
+                        📅 Mes para cargar los gastos:
                       </label>
+                      <input
+                        type="month"
+                        className="input"
+                        value={globalDocumentDate ? globalDocumentDate.slice(0, 7) : new Date().toISOString().slice(0, 7)}
+                        onChange={e => {
+                          const monthValue = e.target.value
+                          if (monthValue) {
+                            // Usar el día 10 del mes seleccionado para evitar problemas de timezone
+                            const fechaSeleccionada = `${monthValue}-10`
+                            setGlobalDocumentDate(fechaSeleccionada)
+                            setUseGlobalDate(true)
+                            // Actualizar todas las transacciones seleccionadas
+                            const newEdited = new Map(editedTransactions)
+                            extractedData.transacciones.forEach((_: any, index: number) => {
+                              if (selectedTransactions.has(index)) {
+                                const current = newEdited.get(index) || {}
+                                newEdited.set(index, { ...current, fecha: fechaSeleccionada })
+                              }
+                            })
+                            setEditedTransactions(newEdited)
+                            console.log('🔵 [Gastos] Mes seleccionado:', monthValue, '→ Fecha:', fechaSeleccionada)
+                          }
+                        }}
+                      />
+                      {globalDocumentDate && (() => {
+                        // Parsear la fecha de forma segura para evitar problemas de zona horaria
+                        const [year, month, day] = globalDocumentDate.split('-').map(Number)
+                        const fechaDisplay = new Date(year, month - 1, day) // month - 1 porque Date usa 0-11
+                        return (
+                          <div className="text-xs text-slate-600">
+                            Se cargarán en: <strong>{fechaDisplay.toLocaleDateString('es-AR', { 
+                              day: 'numeric', 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}</strong>
+                          </div>
+                        )
+                      })()}
+                      <button
+                        onClick={() => setUseGlobalDate(!useGlobalDate)}
+                        className={`text-xs px-2 py-1 rounded ${
+                          useGlobalDate 
+                            ? 'bg-indigo-100 text-indigo-700' 
+                            : 'bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {useGlobalDate ? '✓ Usar fecha global' : 'Usar fechas individuales'}
+                      </button>
                     </div>
-                    
-                    {useGlobalDate ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="date"
-                          value={globalDocumentDate || ''}
-                          onChange={(e) => {
-                            const newDate = e.target.value
-                            setGlobalDocumentDate(newDate)
-                            const newEdited = new Map(editedTransactions)
-                            extractedData.transacciones.forEach((_: any, index: number) => {
-                              if (selectedTransactions.has(index)) {
-                                const current = newEdited.get(index) || {}
-                                newEdited.set(index, { ...current, fecha: newDate })
-                              }
-                            })
-                            setEditedTransactions(newEdited)
-                          }}
-                          className="input w-full text-xs h-8 border-indigo-300 focus:border-indigo-500"
-                        />
-                        <input
-                          type="month"
-                          value={globalDocumentDate ? globalDocumentDate.substring(0, 7) : ''}
-                          onChange={(e) => {
-                            const newDate = `${e.target.value}-10`
-                            setGlobalDocumentDate(newDate)
-                            const newEdited = new Map(editedTransactions)
-                            extractedData.transacciones.forEach((_: any, index: number) => {
-                              if (selectedTransactions.has(index)) {
-                                const current = newEdited.get(index) || {}
-                                newEdited.set(index, { ...current, fecha: newDate })
-                              }
-                            })
-                            setEditedTransactions(newEdited)
-                          }}
-                          className="input w-full text-xs h-8 border-indigo-300 focus:border-indigo-500"
-                        />
-                      </div>
-                    ) : globalDocumentDate && (() => {
+                    {useGlobalDate && globalDocumentDate && (() => {
                       // Parsear la fecha de forma segura para evitar problemas de zona horaria
                       const [year, month, day] = globalDocumentDate.split('-').map(Number)
-                      const fechaDisplay = new Date(year, month - 1, day)
+                      const fechaDisplay = new Date(year, month - 1, day) // month - 1 porque Date usa 0-11
                       return (
-                        <p className="text-xs text-indigo-700">
-                          Detectada: {fechaDisplay.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        <p className="text-xs text-slate-500 mt-2">
+                          Todos los gastos seleccionados se cargarán en <strong>{fechaDisplay.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</strong>.
                         </p>
                       )
                     })()}

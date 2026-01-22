@@ -2488,8 +2488,10 @@ export default function IngresosPage() {
                             const moneda = edited?.moneda ?? trans.moneda ?? 'ARS'
                             const categoriaId = edited?.categoria_id ?? findCategoriaIdFromLabel(trans.categoria) ?? ''
                             const tagIds = edited?.tag_ids ?? getTransactionTagIds(index)
+                            const cuentaId = edited?.cuenta_bancaria_id ?? (selectedCuentaId && selectedCuentaId !== '__new__' && selectedCuentaId !== '__new_suggested__' ? selectedCuentaId : null)
                             
                             const categoria = categoriasIngresos.find(c => c.id === categoriaId)
+                            const cuenta = cuentaId ? tarjetas.find(t => t.id === cuentaId) : null
                             
                             return (
                               <tr 
@@ -2552,6 +2554,21 @@ export default function IngresosPage() {
                                   <div className="text-xs text-slate-500 mt-1">
                                     {fecha ? new Date(fecha).toLocaleDateString('es-AR') : '-'}
                                   </div>
+                                  {cuenta && (
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      {cuenta.banco && <span>{cuenta.banco}</span>}
+                                      {cuenta.digitos && (
+                                        <span>{cuenta.banco ? ' • ' : ''}****{cuenta.digitos}</span>
+                                      )}
+                                      {(cuenta.cierre || cuenta.vencimiento) && (
+                                        <span className="block mt-0.5">
+                                          {cuenta.cierre && `Cierre: día ${cuenta.cierre}`}
+                                          {cuenta.cierre && cuenta.vencimiento && ' • '}
+                                          {cuenta.vencimiento && `Venc: día ${cuenta.vencimiento}`}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                   {(edited?.pendiente_cobro || false) && (
                                     <div className="mt-1">
                                       <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
