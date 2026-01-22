@@ -1127,8 +1127,9 @@ export default function GastosPage() {
           
           // Verificar si ya creamos esta categoría (o una similar) en este proceso
           let foundInMap = false
-          for (const mapLabel of categoriasCreadas.keys()) {
-            const mapId = categoriasCreadas.get(mapLabel)!
+          const categoriasCreadasArray = Array.from(categoriasCreadas.entries())
+          for (let i = 0; i < categoriasCreadasArray.length; i++) {
+            const [mapLabel, mapId] = categoriasCreadasArray[i]
             const mapNormalized = normalizeCategoriaName(mapLabel)
             // Si son iguales o similares (una contiene a la otra)
             if (mapNormalized === normalizedLabel || 
