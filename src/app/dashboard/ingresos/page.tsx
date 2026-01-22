@@ -2171,8 +2171,8 @@ export default function IngresosPage() {
                       />
                       {globalDocumentDate && (() => {
                         // Parsear la fecha de forma segura para evitar problemas de zona horaria
-                        const [year, month] = globalDocumentDate.split('-').map(Number)
-                        const fechaDisplay = new Date(year, month - 1, 1) // month - 1 porque Date usa 0-11
+                        const [year, month, day] = globalDocumentDate.split('-').map(Number)
+                        const fechaDisplay = new Date(year, month - 1, day) // month - 1 porque Date usa 0-11
                         return (
                           <div className="text-xs text-slate-600">
                             Se cargarán en: <strong>{fechaDisplay.toLocaleDateString('es-AR', { 
@@ -2196,8 +2196,8 @@ export default function IngresosPage() {
                     </div>
                     {useGlobalDate && globalDocumentDate && (() => {
                       // Parsear la fecha de forma segura para evitar problemas de zona horaria
-                      const [year, month] = globalDocumentDate.split('-').map(Number)
-                      const fechaDisplay = new Date(year, month - 1, 1) // month - 1 porque Date usa 0-11
+                      const [year, month, day] = globalDocumentDate.split('-').map(Number)
+                      const fechaDisplay = new Date(year, month - 1, day) // month - 1 porque Date usa 0-11
                       return (
                         <p className="text-xs text-slate-500 mt-2">
                           Todos los ingresos seleccionados se cargarán en <strong>{fechaDisplay.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</strong>.

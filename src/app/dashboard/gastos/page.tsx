@@ -2717,11 +2717,16 @@ export default function GastosPage() {
                           className="input w-full text-xs h-8 border-indigo-300 focus:border-indigo-500"
                         />
                       </div>
-                    ) : globalDocumentDate && (
-                      <p className="text-xs text-indigo-700">
-                        Detectada: {new Date(globalDocumentDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    )}
+                    ) : globalDocumentDate && (() => {
+                      // Parsear la fecha de forma segura para evitar problemas de zona horaria
+                      const [year, month, day] = globalDocumentDate.split('-').map(Number)
+                      const fechaDisplay = new Date(year, month - 1, day)
+                      return (
+                        <p className="text-xs text-indigo-700">
+                          Detectada: {fechaDisplay.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      )
+                    })()}
                   </div>
 
                   {/* Categorías / Tags (crear) */}
