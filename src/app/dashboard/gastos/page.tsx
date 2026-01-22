@@ -43,6 +43,10 @@ export default function GastosPage() {
   const [gastoToMarkPaid, setGastoToMarkPaid] = useState<Gasto | null>(null)
   const [filters, setFilters] = useState({ search: '', tarjeta: '', moneda: '', tag: '', colaborador: '', sort: 'monto-desc' })
   const [gastoError, setGastoError] = useState('')
+  const [deleteAllMonths, setDeleteAllMonths] = useState(false)
+  const [editingAllMonths, setEditingAllMonths] = useState(false)
+  const [deleteTargetGastoId, setDeleteTargetGastoId] = useState<string | null>(null)
+  const [showConfirmDeleteGasto, setShowConfirmDeleteGasto] = useState(false)
   const [showNewTagInput, setShowNewTagInput] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [showNewCategoriaInput, setShowNewCategoriaInput] = useState(false)
@@ -276,7 +280,31 @@ export default function GastosPage() {
 
     if (editingGasto) {
       console.log('🔵 [GastosPage] handleSaveGasto - Updating gasto:', editingGasto.id)
-      await updateGasto(editingGasto.id, data)
+      const esFijo = editingGasto.es_fijo === true
+      
+      if (esFijo && editingAllMonths) {
+        // Actualizar todos los gastos fijos relacionados
+        const mesActual = editingGasto.mes_facturacion
+        const gastosRelacionados = gastos.filter(g => {
+          if (g.id === editingGasto.id) return true
+          return g.descripcion === editingGasto.descripcion && 
+                 g.monto === editingGasto.monto && 
+                 g.moneda === editingGasto.moneda &&
+                 g.es_fijo &&
+                 g.mes_facturacion >= mesActual
+        })
+        
+        for (const gastoRel of gastosRelacionados) {
+          const dataMes = {
+            ...data,
+            fecha: gastoRel.fecha,
+            mes_facturacion: gastoRel.mes_facturacion
+          }
+          await updateGasto(gastoRel.id, dataMes)
+        }
+      } else {
+        await updateGasto(editingGasto.id, data)
+      }
     } else {
       console.log('🔵 [GastosPage] handleSaveGasto - Adding new gasto')
       const result = await addGasto(data)
@@ -286,7 +314,44 @@ export default function GastosPage() {
     console.log('🔵 [GastosPage] handleSaveGasto - Closing modal')
     setShowGastoModal(false)
     setEditingGasto(null)
+    setEditingAllMonths(false)
     resetGastoForm()
+  }
+  
+  const handleDeleteGasto = (id: string) => {
+    setDeleteTargetGastoId(id)
+    setDeleteAllMonths(false)
+    setShowConfirmDeleteGasto(true)
+  }
+  
+  const confirmDeleteGasto = async () => {
+    if (!deleteTargetGastoId) return
+    
+    const gasto = gastos.find(g => g.id === deleteTargetGastoId)
+    const esFijo = gasto && gasto.es_fijo === true
+    
+    if (esFijo && deleteAllMonths) {
+      // Eliminar todos los gastos fijos relacionados
+      const mesActual = gasto!.mes_facturacion
+      const gastosRelacionados = gastos.filter(g => {
+        if (g.id === deleteTargetGastoId) return true
+        return g.descripcion === gasto!.descripcion && 
+               g.monto === gasto!.monto && 
+               g.moneda === gasto!.moneda &&
+               g.es_fijo &&
+               g.mes_facturacion >= mesActual
+      })
+      
+      for (const gastoRel of gastosRelacionados) {
+        await deleteGasto(gastoRel.id)
+      }
+    } else {
+      await deleteGasto(deleteTargetGastoId)
+    }
+    
+    setShowConfirmDeleteGasto(false)
+    setDeleteTargetGastoId(null)
+    setDeleteAllMonths(false)
   }
 
   const handleSaveImp = async () => {
@@ -1568,7 +1633,7 @@ export default function GastosPage() {
                         <button onClick={() => openEditGasto(g)} className="p-2 hover:bg-slate-100 rounded-lg">
                           <Edit2 className="w-4 h-4 text-slate-500" />
                         </button>
-                        <button onClick={() => deleteGasto(g.id)} className="p-2 hover:bg-red-50 rounded-lg">
+                        <button onClick={() => handleDeleteGasto(g.id)} className="p-2 hover:bg-red-50 rounded-lg">
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </button>
                       </div>
@@ -2102,6 +2167,26 @@ export default function GastosPage() {
               {gastoError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
                   ⚠️ {gastoError}
+                </div>
+              )}
+
+              {editingGasto && editingGasto.es_fijo && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="editingAllMonthsGasto"
+                      checked={editingAllMonths}
+                      onChange={e => setEditingAllMonths(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                    />
+                    <label htmlFor="editingAllMonthsGasto" className="text-sm font-semibold text-indigo-900 cursor-pointer">
+                      Aplicar cambios a todos los meses siguientes
+                    </label>
+                  </div>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Si no marcas esta opción, solo se actualizará el gasto de este mes.
+                  </p>
                 </div>
               )}
 
@@ -3254,6 +3339,61 @@ export default function GastosPage() {
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Confirm Delete Gasto Modal */}
+      {showConfirmDeleteGasto && (
+        <div className="modal-overlay" onClick={() => { setShowConfirmDeleteGasto(false); setDeleteTargetGastoId(null); setDeleteAllMonths(false) }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-bold text-lg text-red-600">¿Eliminar gasto?</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              {deleteTargetGastoId && (() => {
+                const gasto = gastos.find(g => g.id === deleteTargetGastoId)
+                const esFijo = gasto && gasto.es_fijo === true
+                return (
+                  <>
+                    <p className="text-slate-700">Esta acción no se puede deshacer.</p>
+                    {esFijo && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="checkbox"
+                            id="deleteAllMonthsGasto"
+                            checked={deleteAllMonths}
+                            onChange={e => setDeleteAllMonths(e.target.checked)}
+                            className="w-4 h-4 text-amber-600 rounded border-slate-300"
+                          />
+                          <label htmlFor="deleteAllMonthsGasto" className="text-sm font-semibold text-amber-900 cursor-pointer">
+                            Eliminar de todos los meses siguientes
+                          </label>
+                        </div>
+                        <p className="text-xs text-amber-700">
+                          Si no marcas esta opción, solo se eliminará el gasto de este mes.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+            <div className="p-4 border-t border-slate-200 flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowConfirmDeleteGasto(false); setDeleteTargetGastoId(null); setDeleteAllMonths(false) }}
+                className="btn btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteGasto}
+                className="btn btn-danger"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Editar Transacción del Preview IA */}
       {editingAiTransaction !== null && extractedData?.transacciones && (

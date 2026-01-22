@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
@@ -35,16 +35,19 @@ export default function IngresosPage() {
     cuenta_bancaria_id: '' as string | null,
     comprobante: null as File | null,
     notificar_celular: true,
-    notificar_correo: true
+    notificar_correo: true,
+    es_fijo: false
   })
 
   // Modal states
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [deleteAllMonths, setDeleteAllMonths] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [alertData, setAlertData] = useState({ title: '', message: '', variant: 'info' as 'success' | 'error' | 'warning' | 'info' })
   const [selectedIngresos, setSelectedIngresos] = useState<Set<string>>(new Set())
   const [showDeleteMasivoModal, setShowDeleteMasivoModal] = useState(false)
+  const [editingAllMonths, setEditingAllMonths] = useState(false)
 
   // New tag/categoria creation states
   const [showNewTagInput, setShowNewTagInput] = useState(false)
@@ -253,7 +256,43 @@ export default function IngresosPage() {
   }
 
   // Función para crear automáticamente cuenta/tarjeta si no existe
-  const ensureCuentaExists = async (cuentaData: any): Promise<string | null> => {
+  // Si se pasa aiNewCuentaData, usa esos datos (modificados por el usuario) en lugar de cuentaData
+  const ensureCuentaExists = async (cuentaData: any, aiNewCuentaData?: { nombre: string; tipo: 'visa' | 'mastercard' | 'amex' | 'other'; banco: string; digitos: string }): Promise<string | null> => {
+    // Si se pasan datos modificados por el usuario, usarlos directamente
+    if (aiNewCuentaData && aiNewCuentaData.nombre) {
+      const nombreCuenta = aiNewCuentaData.nombre.trim()
+      if (!nombreCuenta) return null
+      
+      // Buscar si ya existe con ese nombre exacto
+      const existing = tarjetas.find(t => 
+        t.nombre.toLowerCase() === nombreCuenta.toLowerCase()
+      )
+      
+      if (existing) {
+        console.log('✅ [Ingresos] Cuenta existente encontrada:', existing.nombre, '→', existing.id)
+        return existing.id
+      }
+      
+      // Crear con los datos del usuario
+      console.log('🔵 [Ingresos] Creando cuenta con datos del usuario:', nombreCuenta)
+      const result = await addTarjeta({
+        nombre: nombreCuenta,
+        tipo: aiNewCuentaData.tipo,
+        banco: aiNewCuentaData.banco || null,
+        digitos: aiNewCuentaData.digitos || null,
+        cierre: null
+      })
+      
+      if (result.error) {
+        console.error('❌ [Ingresos] Error creando cuenta automáticamente:', result.error)
+        return null
+      }
+      
+      console.log('✅ [Ingresos] Cuenta creada con ID:', nombreCuenta, '→', result.id)
+      return result.id || null
+    }
+    
+    // Lógica original: usar cuentaData detectada
     if (!cuentaData) return null
     
     // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
@@ -355,6 +394,25 @@ export default function IngresosPage() {
     digitos: ''
   })
 
+  // Pre-llenar automáticamente los campos de cuenta cuando se detecta una cuenta
+  useEffect(() => {
+    if (detectedCuenta && selectedCuentaId === '__new_suggested__') {
+      const nombreSugerido = buildDetectedCuentaName(detectedCuenta)
+      const tipoStr = (detectedCuenta?.tipo || detectedCuenta?.tipo_tarjeta || '').toLowerCase()
+      let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+      if (tipoStr.includes('visa')) tipo = 'visa'
+      else if (tipoStr.includes('master')) tipo = 'mastercard'
+      else if (tipoStr.includes('amex') || tipoStr.includes('american')) tipo = 'amex'
+      
+      setAiNewCuenta({
+        nombre: nombreSugerido,
+        tipo: tipo,
+        banco: detectedCuenta?.banco || '',
+        digitos: detectedCuenta?.ultimosDigitos || detectedCuenta?.ultimos_digitos || ''
+      })
+    }
+  }, [detectedCuenta, selectedCuentaId])
+
   let ingresosMes = getIngresosMes(monthKey)
 
   // Apply filters
@@ -440,7 +498,8 @@ export default function IngresosPage() {
       cuenta_bancaria_id: null,
       comprobante: null,
       notificar_celular: true,
-      notificar_correo: true
+      notificar_correo: true,
+      es_fijo: false
     })
   }
 
@@ -470,7 +529,8 @@ export default function IngresosPage() {
       cuenta_bancaria_id: (ingreso as any).cuenta_bancaria_id || null,
       comprobante: null, // No pre-cargar archivo
       notificar_celular: (ingreso as any).notificar_celular !== undefined ? (ingreso as any).notificar_celular : true,
-      notificar_correo: (ingreso as any).notificar_correo !== undefined ? (ingreso as any).notificar_correo : true
+      notificar_correo: (ingreso as any).notificar_correo !== undefined ? (ingreso as any).notificar_correo : true,
+      es_fijo: (ingreso as any).es_fijo === true
     })
     setShowModal(true)
   }
@@ -526,7 +586,8 @@ export default function IngresosPage() {
       comprobante_url: comprobanteUrl,
       comprobante_nombre: comprobanteNombre,
       notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : (pendienteCobroBoolean ? true : false),
-      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : (pendienteCobroBoolean ? true : false)
+      notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : (pendienteCobroBoolean ? true : false),
+      es_fijo: form.es_fijo === true
     }
 
     // Manejar fecha_cobro_confirmada según el estado de pendiente_cobro
@@ -549,37 +610,104 @@ export default function IngresosPage() {
 
     try {
       if (editing) {
-        const { error } = await updateIngreso(editing.id, data)
-        if (error) {
-          console.error('Error updating:', error)
-          const message = error instanceof Error ? error.message : String(error)
-          setAlertData({
-            title: 'Error al actualizar',
-            message: message,
-            variant: 'error'
+        const esFijo = (editing as any).es_fijo === true
+        
+        if (esFijo && editingAllMonths) {
+          // Actualizar todos los ingresos fijos relacionados
+          const mesActual = getMonthFromDateString(editing.fecha)
+          const ingresosRelacionados = ingresos.filter(i => {
+            if (i.id === editing.id) return true
+            const mesI = getMonthFromDateString(i.fecha)
+            return i.descripcion === editing.descripcion && 
+                   i.monto === editing.monto && 
+                   i.moneda === editing.moneda &&
+                   mesI >= mesActual
           })
-          setShowAlert(true)
-          setSaving(false)
-          return
+          
+          for (const ingresoRel of ingresosRelacionados) {
+            const dataMes = {
+              ...data,
+              fecha: ingresoRel.fecha,
+              mes: getMonthFromDateString(ingresoRel.fecha)
+            }
+            const { error } = await updateIngreso(ingresoRel.id, dataMes)
+            if (error) {
+              console.error('Error updating related income:', error)
+              setAlertData({
+                title: 'Error al actualizar',
+                message: 'No se pudieron actualizar todos los ingresos fijos',
+                variant: 'error'
+              })
+              setShowAlert(true)
+              setSaving(false)
+              return
+            }
+          }
+        } else {
+          const { error } = await updateIngreso(editing.id, data)
+          if (error) {
+            console.error('Error updating:', error)
+            const message = error instanceof Error ? error.message : String(error)
+            setAlertData({
+              title: 'Error al actualizar',
+              message: message,
+              variant: 'error'
+            })
+            setShowAlert(true)
+            setSaving(false)
+            return
+          }
         }
       } else {
-        const { error } = await addIngreso(data)
-        if (error) {
-          console.error('Error adding:', error)
-          const message = error instanceof Error ? error.message : String(error)
-          setAlertData({
-            title: 'Error al agregar',
-            message: message,
-            variant: 'error'
-          })
-          setShowAlert(true)
-          setSaving(false)
-          return
+        // Si es fijo, crear ingresos para los próximos 12 meses
+        if (data.es_fijo) {
+          const promises = []
+          const fechaBase = new Date(form.fecha)
+          
+          for (let i = 0; i < 12; i++) {
+            const fechaMes = new Date(fechaBase.getFullYear(), fechaBase.getMonth() + i, fechaBase.getDate())
+            const mesMes = getMonthFromDateString(fechaMes.toISOString().split('T')[0])
+            const dataMes = {
+              ...data,
+              fecha: fechaMes.toISOString().split('T')[0],
+              mes: mesMes
+            }
+            promises.push(addIngreso(dataMes))
+          }
+          
+          const results = await Promise.all(promises)
+          const errors = results.filter(r => r.error)
+          if (errors.length > 0) {
+            console.error('Error adding fixed incomes:', errors)
+            setAlertData({
+              title: 'Error al agregar',
+              message: `Se crearon ${results.length - errors.length} de ${results.length} ingresos fijos. Algunos fallaron.`,
+              variant: 'warning'
+            })
+            setShowAlert(true)
+            setSaving(false)
+            return
+          }
+        } else {
+          const { error } = await addIngreso(data)
+          if (error) {
+            console.error('Error adding:', error)
+            const message = error instanceof Error ? error.message : String(error)
+            setAlertData({
+              title: 'Error al agregar',
+              message: message,
+              variant: 'error'
+            })
+            setShowAlert(true)
+            setSaving(false)
+            return
+          }
         }
       }
 
       setShowModal(false)
       setEditing(null)
+      setEditingAllMonths(false)
       resetForm()
     } catch (err) {
       console.error('Exception:', err)
@@ -592,6 +720,29 @@ export default function IngresosPage() {
     }
 
     setSaving(false)
+  }
+
+  const toggleFijo = async (ingreso: Ingreso) => {
+    const esFijo = (ingreso as any).es_fijo === true
+    await updateIngreso(ingreso.id, { es_fijo: !esFijo })
+    
+    // Si se desactiva, eliminar de los próximos meses
+    if (esFijo) {
+      const mesActual = getMonthFromDateString(ingreso.fecha)
+      const ingresosFuturos = ingresos.filter(i => {
+        if (i.id === ingreso.id) return false
+        const mesI = getMonthFromDateString(i.fecha)
+        return i.descripcion === ingreso.descripcion && 
+               i.monto === ingreso.monto && 
+               i.moneda === ingreso.moneda &&
+               mesI > mesActual
+      })
+      
+      // Eliminar ingresos futuros del mismo ingreso fijo
+      for (const ingresoFuturo of ingresosFuturos) {
+        await deleteIngreso(ingresoFuturo.id)
+      }
+    }
   }
 
   const handleDelete = (id: string) => {
@@ -778,6 +929,20 @@ export default function IngresosPage() {
           } else {
             // Si no existe, preseleccionar opción de crear nueva
             setSelectedCuentaId('__new_suggested__')
+            // Pre-llenar automáticamente los campos
+            const nombreSugerido = buildDetectedCuentaName(accountInfo)
+            const tipoStr = (accountInfo?.tipo || accountInfo?.tipo_tarjeta || '').toLowerCase()
+            let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+            if (tipoStr.includes('visa')) tipo = 'visa'
+            else if (tipoStr.includes('master')) tipo = 'mastercard'
+            else if (tipoStr.includes('amex') || tipoStr.includes('american')) tipo = 'amex'
+            
+            setAiNewCuenta({
+              nombre: nombreSugerido,
+              tipo: tipo,
+              banco: accountInfo?.banco || '',
+              digitos: accountInfo?.ultimosDigitos || accountInfo?.ultimos_digitos || ''
+            })
           }
         }
         
@@ -864,9 +1029,10 @@ export default function IngresosPage() {
       let cuentaIdToUse = selectedCuentaId || null
       
       // Si se seleccionó crear nueva sugerida, crear la cuenta automáticamente
+      // Usar los datos modificados por el usuario (aiNewCuenta) si están disponibles
       if (selectedCuentaId === '__new_suggested__' && detectedCuenta) {
-        console.log('🔵 [Ingresos] Creando cuenta sugerida automáticamente...')
-        cuentaIdToUse = await ensureCuentaExists(detectedCuenta)
+        console.log('🔵 [Ingresos] Creando cuenta sugerida automáticamente con datos del usuario...')
+        cuentaIdToUse = await ensureCuentaExists(detectedCuenta, aiNewCuenta)
         if (cuentaIdToUse) {
           console.log('✅ [Ingresos] Cuenta sugerida creada con ID:', cuentaIdToUse)
           setSelectedCuentaId(cuentaIdToUse)
@@ -1322,16 +1488,18 @@ export default function IngresosPage() {
                 </th>
                 <th className="text-left p-4 font-semibold text-slate-700">Descripción</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Categoría</th>
+                <th className="text-left p-4 font-semibold text-slate-700">Cuenta</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Fecha</th>
                 <th className="text-right p-4 font-semibold text-slate-700">Monto</th>
                 <th className="text-left p-4 font-semibold text-slate-700">Estado</th>
+                <th className="text-left p-4 font-semibold text-slate-700">Fijo</th>
                 <th className="text-right p-4 font-semibold text-slate-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {ingresosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center p-12">
+                  <td colSpan={9} className="text-center p-12">
                     <Wallet className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                     <p className="text-slate-500 mb-4">No hay ingresos registrados para este mes</p>
                     <button
@@ -1344,6 +1512,7 @@ export default function IngresosPage() {
                 </tr>
               ) : ingresosMes.map(ingreso => {
                 const categoria = categoriasIngresos.find(c => c.id === ingreso.categoria_id)
+                const cuenta = tarjetas.find(t => t.id === (ingreso as any).cuenta_bancaria_id)
                 return (
                   <tr key={ingreso.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
                     <td className="p-4">
@@ -1391,6 +1560,15 @@ export default function IngresosPage() {
                         </span>
                       )}
                     </td>
+                    <td className="p-4">
+                      {cuenta ? (
+                        <span className="inline-flex items-center gap-1 text-sm">
+                          <span className="text-slate-600">{cuenta.nombre}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-sm">-</span>
+                      )}
+                    </td>
                     <td className="p-4 text-slate-600">
                       {new Date(ingreso.fecha).toLocaleDateString('es-AR')}
                     </td>
@@ -1413,6 +1591,18 @@ export default function IngresosPage() {
                           -
                         </span>
                       )}
+                    </td>
+                    <td className="p-4">
+                      <button
+                        onClick={() => toggleFijo(ingreso)}
+                        className={`w-10 h-6 rounded-full relative transition-colors ${
+                          (ingreso as any).es_fijo ? 'bg-emerald-500' : 'bg-slate-200'
+                        }`}
+                      >
+                        <div className={`absolute w-4 h-4 bg-white rounded-full top-1 transition-transform ${
+                          (ingreso as any).es_fijo ? 'translate-x-5' : 'translate-x-1'
+                        }`} />
+                      </button>
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex gap-2 justify-end">
@@ -1674,6 +1864,23 @@ export default function IngresosPage() {
                 <div className="flex items-center gap-3 mb-3">
                   <input
                     type="checkbox"
+                    id="es_fijo"
+                    checked={form.es_fijo}
+                    onChange={e => setForm(f => ({ ...f, es_fijo: e.target.checked }))}
+                    className="w-5 h-5 text-indigo-600 rounded border-slate-300"
+                  />
+                  <label htmlFor="es_fijo" className="font-semibold text-slate-700 cursor-pointer">
+                    📌 Ingreso fijo mensual
+                  </label>
+                </div>
+                {form.es_fijo && (
+                  <p className="text-xs text-slate-500 ml-8 mb-3">
+                    Este ingreso se agregará automáticamente a los próximos 12 meses.
+                  </p>
+                )}
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
                     id="pendiente_cobro"
                     checked={form.pendiente_cobro}
                     onChange={e => setForm(f => ({ ...f, pendiente_cobro: e.target.checked }))}
@@ -1783,6 +1990,25 @@ export default function IngresosPage() {
                 )}
               </div>
 
+              {editing && (editing as any).es_fijo && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="editingAllMonths"
+                      checked={editingAllMonths}
+                      onChange={e => setEditingAllMonths(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                    />
+                    <label htmlFor="editingAllMonths" className="text-sm font-semibold text-indigo-900 cursor-pointer">
+                      Aplicar cambios a todos los meses siguientes
+                    </label>
+                  </div>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Si no marcas esta opción, solo se actualizará el ingreso de este mes.
+                  </p>
+                </div>
+              )}
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -1796,19 +2022,59 @@ export default function IngresosPage() {
       )}
 
       {/* Confirm Delete Modal */}
-      <ConfirmModal
-        isOpen={showConfirmDelete}
-        onClose={() => {
-          setShowConfirmDelete(false)
-          setDeleteTargetId(null)
-        }}
-        onConfirm={confirmDelete}
-        title="¿Eliminar ingreso?"
-        message="Esta acción no se puede deshacer."
-        confirmText="Eliminar"
-        cancelText="Cancelar"
-        variant="danger"
-      />
+      {showConfirmDelete && (
+        <div className="modal-overlay" onClick={() => { setShowConfirmDelete(false); setDeleteTargetId(null); setDeleteAllMonths(false) }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-bold text-lg text-red-600">¿Eliminar ingreso?</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              {deleteTargetId && (() => {
+                const ingreso = ingresos.find(i => i.id === deleteTargetId)
+                const esFijo = ingreso && (ingreso as any).es_fijo === true
+                return (
+                  <>
+                    <p className="text-slate-700">Esta acción no se puede deshacer.</p>
+                    {esFijo && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="checkbox"
+                            id="deleteAllMonths"
+                            checked={deleteAllMonths}
+                            onChange={e => setDeleteAllMonths(e.target.checked)}
+                            className="w-4 h-4 text-amber-600 rounded border-slate-300"
+                          />
+                          <label htmlFor="deleteAllMonths" className="text-sm font-semibold text-amber-900 cursor-pointer">
+                            Eliminar de todos los meses siguientes
+                          </label>
+                        </div>
+                        <p className="text-xs text-amber-700">
+                          Si no marcas esta opción, solo se eliminará el ingreso de este mes.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+            <div className="p-4 border-t border-slate-200 flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowConfirmDelete(false); setDeleteTargetId(null); setDeleteAllMonths(false) }}
+                className="btn btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="btn btn-danger"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Alert Modal */}
       <AlertModal

@@ -153,6 +153,7 @@ export interface Ingreso {
   comprobante_nombre?: string | null // Nombre del archivo del comprobante
   notificar_celular?: boolean // Si se debe notificar por push/celular
   notificar_correo?: boolean // Si se debe notificar por correo
+  es_fijo?: boolean // Si es un ingreso fijo mensual
 }
 
 export interface DolarAPI {
