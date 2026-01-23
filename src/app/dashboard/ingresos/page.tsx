@@ -9,6 +9,8 @@ import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loa
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { TransactionImportConfirmModal } from '@/components/TransactionImportConfirmModal'
 
 export default function IngresosPage() {
   const { user, profile } = useAuth()
@@ -488,6 +490,9 @@ export default function IngresosPage() {
     banco: '',
     digitos: ''
   })
+  
+  // Estado para modal de confirmación de importación
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState(false)
 
   // Pre-llenar automáticamente los campos de cuenta cuando se detecta una cuenta
   useEffect(() => {
@@ -1141,20 +1146,43 @@ export default function IngresosPage() {
       // Usar los datos modificados por el usuario (aiNewCuenta) si están disponibles
       if (selectedCuentaId === '__new_suggested__' && detectedCuenta) {
         console.log('🔵 [Ingresos] Creando cuenta sugerida automáticamente con datos del usuario...')
-        cuentaIdToUse = await ensureCuentaExists(detectedCuenta, aiNewCuenta)
-        if (cuentaIdToUse) {
-          console.log('✅ [Ingresos] Cuenta sugerida creada con ID:', cuentaIdToUse)
-          setSelectedCuentaId(cuentaIdToUse)
-        } else {
-          console.warn('⚠️ [Ingresos] No se pudo crear la cuenta sugerida')
-          // Si no se pudo crear, usar null (sin cuenta)
-          cuentaIdToUse = null
+        try {
+          cuentaIdToUse = await ensureCuentaExists(detectedCuenta, aiNewCuenta)
+          if (cuentaIdToUse) {
+            console.log('✅ [Ingresos] Cuenta sugerida creada con ID:', cuentaIdToUse)
+            setSelectedCuentaId(cuentaIdToUse)
+          } else {
+            console.warn('⚠️ [Ingresos] No se pudo crear la cuenta sugerida')
+            setSavingTransactions(false)
+            setAlertData({
+              title: 'Error',
+              message: 'Error al crear la cuenta sugerida. Por favor, intenta nuevamente o selecciona otra cuenta.',
+              variant: 'error'
+            })
+            setShowAlert(true)
+            return
+          }
+        } catch (error: any) {
+          console.error('❌ [Ingresos] Error creando cuenta:', error)
+          setSavingTransactions(false)
+          setAlertData({
+            title: 'Error',
+            message: `Error al crear la cuenta: ${error.message || 'Error desconocido'}`,
+            variant: 'error'
+          })
+          setShowAlert(true)
+          return
         }
       } else if (detectedCuenta && !cuentaIdToUse) {
         // Fallback: si hay cuenta detectada pero no se seleccionó nada, intentar crear automáticamente
-        cuentaIdToUse = await ensureCuentaExists(detectedCuenta)
-        if (cuentaIdToUse) {
-          setSelectedCuentaId(cuentaIdToUse)
+        try {
+          cuentaIdToUse = await ensureCuentaExists(detectedCuenta)
+          if (cuentaIdToUse) {
+            setSelectedCuentaId(cuentaIdToUse)
+          }
+        } catch (error: any) {
+          console.error('❌ [Ingresos] Error creando cuenta (fallback):', error)
+          // Continuar sin cuenta si falla el fallback
         }
       }
 
@@ -2279,19 +2307,12 @@ export default function IngresosPage() {
                       <label className="text-sm font-semibold text-slate-700">
                         📅 Mes para cargar los ingresos:
                       </label>
-                      <input
-                        type="month"
-                        className="input"
-                        value={globalDocumentDate ? globalDocumentDate.slice(0, 7) : new Date().toISOString().slice(0, 7)}
-                        onChange={e => {
-                          const monthValue = e.target.value
-                          if (monthValue) {
-                            // Usar el día 10 del mes seleccionado para evitar problemas de timezone
-                            const fechaSeleccionada = `${monthValue}-10`
-                            setGlobalDocumentDate(fechaSeleccionada)
-                            setUseGlobalDate(true)
-                            console.log('🔵 [Ingresos] Mes seleccionado:', monthValue, '→ Fecha:', fechaSeleccionada)
-                          }
+                      <MonthYearPicker
+                        value={globalDocumentDate || null}
+                        onChange={(date) => {
+                          setGlobalDocumentDate(date)
+                          setUseGlobalDate(true)
+                          console.log('🔵 [Ingresos] Mes seleccionado:', date)
                         }}
                       />
                       {globalDocumentDate && (() => {
@@ -2738,18 +2759,23 @@ export default function IngresosPage() {
               
               <div className="flex gap-2 pt-2 border-t border-slate-200">
                 <button
-                  onClick={handleConfirmExtractedData}
+                  onClick={() => {
+                    // Validar antes de mostrar el modal
+                    if (extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal) {
+                      setAlertData({
+                        title: 'Error',
+                        message: 'Por favor, selecciona al menos una transacción',
+                        variant: 'error'
+                      })
+                      setShowAlert(true)
+                      return
+                    }
+                    setShowImportConfirmModal(true)
+                  }}
                   className="btn btn-primary flex-1"
-                  disabled={(extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal) || savingTransactions}
+                  disabled={savingTransactions}
                 >
-                  {savingTransactions ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>✓ {extractedData.transacciones ? `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}</>
-                  )}
+                  ✓ {extractedData.transacciones ? `Confirmar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}` : 'Usar estos datos'}
                 </button>
                 <button
                   onClick={() => { 
@@ -3059,6 +3085,28 @@ export default function IngresosPage() {
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Modal Confirmación Importación */}
+      {extractedData && extractedData.transacciones && Array.isArray(extractedData.transacciones) && (
+        <TransactionImportConfirmModal
+          isOpen={showImportConfirmModal}
+          onClose={() => setShowImportConfirmModal(false)}
+          onConfirm={handleConfirmExtractedData}
+          transactionCount={selectedTransactions.size + (includeTotal && extractedData.total ? 1 : 0)}
+          transactionType="ingresos"
+          month={globalDocumentDate ? globalDocumentDate.slice(0, 7) : null}
+          effectiveDate={globalDocumentDate}
+          accountName={
+            selectedCuentaId && selectedCuentaId !== '__new_suggested__' && selectedCuentaId !== '__new__'
+              ? tarjetas.find(t => t.id === selectedCuentaId)?.nombre || null
+              : selectedCuentaId === '__new_suggested__' && aiNewCuenta.nombre
+              ? aiNewCuenta.nombre
+              : null
+          }
+          accountIsSuggested={selectedCuentaId === '__new_suggested__'}
+          loading={savingTransactions}
+        />
+      )}
     </div>
   )
 }

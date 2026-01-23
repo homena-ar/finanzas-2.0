@@ -10,6 +10,8 @@ import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIc
 import { Gasto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { TransactionImportConfirmModal } from '@/components/TransactionImportConfirmModal'
 
 // Función helper para calcular mes_facturacion desde una fecha en formato YYYY-MM-DD
 // Evita problemas de zona horaria al parsear directamente la cadena
@@ -86,6 +88,7 @@ export default function GastosPage() {
   const [detectedTarjeta, setDetectedTarjeta] = useState<any>(null)
   const [selectedImpuestos, setSelectedImpuestos] = useState<Set<number>>(new Set())
   const [savingTransactions, setSavingTransactions] = useState(false)
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState(false)
   const [progressPercent, setProgressPercent] = useState(0)
   const [processingComplete, setProcessingComplete] = useState(false)
   // Estado para transacciones editadas (permite modificar fecha, descripción y monto antes de confirmar)
@@ -1169,7 +1172,7 @@ export default function GastosPage() {
             }
           }
           
-          // Si hay información de tarjeta detectada, configurarla
+          // Si hay información de tarjeta detectada, configurarla (igual que Ingresos)
           if (result.data.tarjeta) {
             // Guardar toda la información incluyendo accountSuggestion si existe y fechas
             const tarjetaCompleta = {
@@ -1181,33 +1184,52 @@ export default function GastosPage() {
             }
             setDetectedTarjeta(tarjetaCompleta)
             
-            // Prellenar aiNewTarjeta con los datos detectados incluyendo fechas
-            if (tarjetaCompleta.fecha_cierre || tarjetaCompleta.fecha_vencimiento || tarjetaCompleta.ultimos_digitos) {
+            // Intentar encontrar tarjeta existente (igual que Ingresos)
+            const nombreDetectado = buildDetectedTarjetaName({ tarjeta: tarjetaCompleta, accountSuggestion: tarjetaCompleta.accountSuggestion || null })
+            const ultimosDigitos = tarjetaCompleta?.ultimos_digitos || tarjetaCompleta?.ultimosDigitos
+            const banco = tarjetaCompleta?.banco
+            
+            const existing = tarjetas.find(t => {
+              // Buscar por nombre
+              if (t.nombre.toLowerCase().includes(nombreDetectado.toLowerCase()) ||
+                  nombreDetectado.toLowerCase().includes(t.nombre.toLowerCase())) {
+                return true
+              }
+              // Buscar por banco y últimos dígitos
+              if (banco && t.banco && t.banco.toLowerCase() === banco.toLowerCase()) {
+                if (ultimosDigitos && t.digitos && t.digitos.includes(ultimosDigitos)) {
+                  return true
+                }
+                // Si no hay últimos dígitos pero el banco coincide
+                if (!ultimosDigitos && !t.digitos) {
+                  return true
+                }
+              }
+              return false
+            })
+            
+            if (existing) {
+              console.log('✅ [Gastos] Tarjeta existente encontrada y preseleccionada:', existing.nombre)
+              setSelectedTarjetaId(existing.id)
+            } else {
+              // Si no existe, preseleccionar opción de crear nueva (igual que Ingresos)
+              setSelectedTarjetaId('__new_suggested__')
+              // Pre-llenar automáticamente los campos (siempre, no condicionalmente)
+              const nombreSugerido = buildDetectedTarjetaName({ tarjeta: tarjetaCompleta, accountSuggestion: tarjetaCompleta.accountSuggestion || null })
+              const tipoStr = (tarjetaCompleta?.tipo_tarjeta || tarjetaCompleta?.tipo || '').toLowerCase()
+              let tipo: 'visa' | 'mastercard' | 'amex' | 'other' = 'other'
+              if (tipoStr.includes('visa')) tipo = 'visa'
+              else if (tipoStr.includes('master')) tipo = 'mastercard'
+              else if (tipoStr.includes('amex') || tipoStr.includes('american')) tipo = 'amex'
+              
               setAiNewTarjeta({
-                nombre: buildDetectedTarjetaName({ tarjeta: tarjetaCompleta, accountSuggestion: tarjetaCompleta.accountSuggestion || null }),
-                tipo: (() => {
-                  const tipoStr = (tarjetaCompleta.tipo_tarjeta || '').toLowerCase()
-                  if (tipoStr.includes('visa')) return 'visa'
-                  if (tipoStr.includes('master')) return 'mastercard'
-                  if (tipoStr.includes('amex') || tipoStr.includes('american')) return 'amex'
-                  return 'other'
-                })(),
-                banco: tarjetaCompleta.banco || '',
-                digitos: tarjetaCompleta.ultimos_digitos || '',
+                nombre: nombreSugerido,
+                tipo: tipo,
+                banco: tarjetaCompleta?.banco || '',
+                digitos: tarjetaCompleta?.ultimos_digitos || tarjetaCompleta?.ultimosDigitos || '',
                 cierre: tarjetaCompleta.fecha_cierre ? parseInt(String(tarjetaCompleta.fecha_cierre)) : null,
                 vencimiento: tarjetaCompleta.fecha_vencimiento ? parseInt(String(tarjetaCompleta.fecha_vencimiento)) : null
               })
-            }
-            
-            // Intentar encontrar una tarjeta existente que coincida
-            const bancoMatch = result.data.tarjeta.banco ? 
-              tarjetas.find(t => t.banco && t.banco.toLowerCase().includes(result.data.tarjeta.banco.toLowerCase())) : null
-            
-            if (bancoMatch) {
-              setSelectedTarjetaId(bancoMatch.id)
-            } else {
-              // Si no hay match, usar la tarjeta del formulario si existe, sino dejar vacío
-              setSelectedTarjetaId(gastoForm.tarjeta_id || '')
             }
           } else {
             setDetectedTarjeta(null)
@@ -1348,26 +1370,50 @@ export default function GastosPage() {
       // Usar el mapa global para evitar crear categorías duplicadas
       // El mapa global ya está inicializado arriba con useRef
       
-      // Crear cuenta/tarjeta automáticamente si fue detectada y no se seleccionó ninguna
+      // Crear cuenta/tarjeta automáticamente si fue detectada (igual que Ingresos)
       let tarjetaIdToUse = selectedTarjetaId || gastoForm.tarjeta_id || null
       
-      // Si hay tarjeta detectada pero no se seleccionó ninguna, intentar crear automáticamente
-      if (detectedTarjeta && !tarjetaIdToUse) {
-        // Pasar toda la información de la tarjeta detectada incluyendo fechas
-        // detectedTarjeta ya incluye accountSuggestion si existe
-        // Si el usuario modificó los datos en el modal (seleccionó __new_suggested__), usar esos
-        const cuentaDataCompleta = { tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null }
-        const aiNewCuentaData = (selectedTarjetaId === '__new_suggested__' && aiNewTarjeta.nombre) ? {
-          nombre: aiNewTarjeta.nombre,
-          tipo: aiNewTarjeta.tipo,
-          banco: aiNewTarjeta.banco,
-          digitos: aiNewTarjeta.digitos,
-          cierre: aiNewTarjeta.cierre,
-          vencimiento: aiNewTarjeta.vencimiento
-        } : undefined
-        tarjetaIdToUse = await ensureCuentaExists(cuentaDataCompleta, aiNewCuentaData)
-        if (tarjetaIdToUse) {
-          setSelectedTarjetaId(tarjetaIdToUse)
+      // Si se seleccionó crear nueva sugerida, crear la cuenta automáticamente
+      // Usar los datos modificados por el usuario (aiNewTarjeta) si están disponibles
+      if (selectedTarjetaId === '__new_suggested__' && detectedTarjeta) {
+        console.log('🔵 [Gastos] Creando tarjeta sugerida automáticamente con datos del usuario...')
+        try {
+          const cuentaDataCompleta = { tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null }
+          const aiNewCuentaData = aiNewTarjeta.nombre ? {
+            nombre: aiNewTarjeta.nombre,
+            tipo: aiNewTarjeta.tipo,
+            banco: aiNewTarjeta.banco,
+            digitos: aiNewTarjeta.digitos,
+            cierre: aiNewTarjeta.cierre && aiNewTarjeta.cierre >= 1 && aiNewTarjeta.cierre <= 31 ? aiNewTarjeta.cierre : null,
+            vencimiento: aiNewTarjeta.vencimiento && aiNewTarjeta.vencimiento >= 1 && aiNewTarjeta.vencimiento <= 31 ? aiNewTarjeta.vencimiento : null
+          } : undefined
+          tarjetaIdToUse = await ensureCuentaExists(cuentaDataCompleta, aiNewCuentaData)
+          if (tarjetaIdToUse) {
+            console.log('✅ [Gastos] Tarjeta sugerida creada con ID:', tarjetaIdToUse)
+            setSelectedTarjetaId(tarjetaIdToUse)
+          } else {
+            console.warn('⚠️ [Gastos] No se pudo crear la tarjeta sugerida')
+            setSavingTransactions(false)
+            setGastoError('Error al crear la tarjeta sugerida. Por favor, intenta nuevamente o selecciona otra cuenta.')
+            return
+          }
+        } catch (error: any) {
+          console.error('❌ [Gastos] Error creando tarjeta:', error)
+          setSavingTransactions(false)
+          setGastoError(`Error al crear la tarjeta: ${error.message || 'Error desconocido'}`)
+          return
+        }
+      } else if (detectedTarjeta && !tarjetaIdToUse) {
+        // Fallback: si hay tarjeta detectada pero no se seleccionó nada, intentar crear automáticamente
+        try {
+          const cuentaDataCompleta = { tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null }
+          tarjetaIdToUse = await ensureCuentaExists(cuentaDataCompleta)
+          if (tarjetaIdToUse) {
+            setSelectedTarjetaId(tarjetaIdToUse)
+          }
+        } catch (error: any) {
+          console.error('❌ [Gastos] Error creando tarjeta (fallback):', error)
+          // Continuar sin tarjeta si falla el fallback
         }
       }
       
@@ -3048,7 +3094,14 @@ export default function GastosPage() {
                                 min="1"
                                 max="31"
                                 value={aiNewTarjeta.cierre || ''}
-                                onChange={e => setAiNewTarjeta(t => ({ ...t, cierre: e.target.value ? parseInt(e.target.value) : null }))}
+                                onChange={e => {
+                                  const value = e.target.value ? parseInt(e.target.value) : null
+                                  // Validar que esté entre 1 y 31
+                                  if (value !== null && (value < 1 || value > 31)) {
+                                    return // No actualizar si está fuera del rango
+                                  }
+                                  setAiNewTarjeta(t => ({ ...t, cierre: value }))
+                                }}
                               />
                               <input
                                 type="number"
@@ -3057,7 +3110,14 @@ export default function GastosPage() {
                                 min="1"
                                 max="31"
                                 value={aiNewTarjeta.vencimiento || ''}
-                                onChange={e => setAiNewTarjeta(t => ({ ...t, vencimiento: e.target.value ? parseInt(e.target.value) : null }))}
+                                onChange={e => {
+                                  const value = e.target.value ? parseInt(e.target.value) : null
+                                  // Validar que esté entre 1 y 31
+                                  if (value !== null && (value < 1 || value > 31)) {
+                                    return // No actualizar si está fuera del rango
+                                  }
+                                  setAiNewTarjeta(t => ({ ...t, vencimiento: value }))
+                                }}
                               />
                             </div>
                             {selectedTarjetaId === '__new__' && (
@@ -3088,28 +3148,21 @@ export default function GastosPage() {
                       <label className="text-sm font-semibold text-slate-700">
                         📅 Mes para cargar los gastos:
                       </label>
-                      <input
-                        type="month"
-                        className="input"
-                        value={globalDocumentDate ? globalDocumentDate.slice(0, 7) : new Date().toISOString().slice(0, 7)}
-                        onChange={e => {
-                          const monthValue = e.target.value
-                          if (monthValue) {
-                            // Usar el día 10 del mes seleccionado para evitar problemas de timezone
-                            const fechaSeleccionada = `${monthValue}-10`
-                            setGlobalDocumentDate(fechaSeleccionada)
-                            setUseGlobalDate(true)
-                            // Actualizar todas las transacciones seleccionadas
-                            const newEdited = new Map(editedTransactions)
-                            extractedData.transacciones.forEach((_: any, index: number) => {
-                              if (selectedTransactions.has(index)) {
-                                const current = newEdited.get(index) || {}
-                                newEdited.set(index, { ...current, fecha: fechaSeleccionada })
-                              }
-                            })
-                            setEditedTransactions(newEdited)
-                            console.log('🔵 [Gastos] Mes seleccionado:', monthValue, '→ Fecha:', fechaSeleccionada)
-                          }
+                      <MonthYearPicker
+                        value={globalDocumentDate || null}
+                        onChange={(date) => {
+                          setGlobalDocumentDate(date)
+                          setUseGlobalDate(true)
+                          // Actualizar todas las transacciones seleccionadas
+                          const newEdited = new Map(editedTransactions)
+                          extractedData.transacciones.forEach((_: any, index: number) => {
+                            if (selectedTransactions.has(index)) {
+                              const current = newEdited.get(index) || {}
+                              newEdited.set(index, { ...current, fecha: date })
+                            }
+                          })
+                          setEditedTransactions(newEdited)
+                          console.log('🔵 [Gastos] Mes seleccionado:', date)
                         }}
                       />
                       {globalDocumentDate && (() => {
@@ -3634,21 +3687,21 @@ export default function GastosPage() {
             {/* Footer fijo con botón de confirmación */}
             <div className="p-3 border-t border-slate-200 bg-white sticky bottom-0 z-10 shrink-0 flex gap-2">
               <button
-                onClick={handleConfirmExtractedData}
+                onClick={() => {
+                  // Validar antes de mostrar el modal
+                  if ((extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || 
+                      (!extractedData.transacciones && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0))) {
+                    setGastoError('Por favor, selecciona al menos una transacción, impuesto o el total')
+                    return
+                  }
+                  setShowImportConfirmModal(true)
+                }}
                 className="btn btn-primary flex-1 text-sm h-9"
-                disabled={((extractedData.transacciones && selectedTransactions.size === 0 && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0)) || (!extractedData.transacciones && !includeTotal && (!extractedData.impuestos || selectedImpuestos.size === 0))) || savingTransactions}
+                disabled={savingTransactions}
               >
-                {savingTransactions ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Agregando...
-                  </>
-                ) : (
-                  <>
-                    ✓ {extractedData.transacciones ? 
-                      `Agregar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}${selectedImpuestos.size > 0 ? ` + ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}` : ''}` : 
-                      'Usar estos datos'}
-                  </>
-                )}
+                ✓ {extractedData.transacciones ? 
+                  `Confirmar ${selectedTransactions.size} transacción${selectedTransactions.size !== 1 ? 'es' : ''}${selectedImpuestos.size > 0 ? ` + ${selectedImpuestos.size} impuesto${selectedImpuestos.size !== 1 ? 's' : ''}` : ''}` : 
+                  'Usar estos datos'}
               </button>
               <button 
                 onClick={() => { 
@@ -3672,6 +3725,30 @@ export default function GastosPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Confirmación Importación */}
+      {extractedData && extractedData.transacciones && Array.isArray(extractedData.transacciones) && (
+        <TransactionImportConfirmModal
+          isOpen={showImportConfirmModal}
+          onClose={() => setShowImportConfirmModal(false)}
+          onConfirm={handleConfirmExtractedData}
+          transactionCount={selectedTransactions.size + (includeTotal && extractedData.total ? 1 : 0)}
+          transactionType="gastos"
+          month={globalDocumentDate ? globalDocumentDate.slice(0, 7) : null}
+          effectiveDate={globalDocumentDate}
+          accountName={
+            selectedTarjetaId && selectedTarjetaId !== '__new_suggested__' && selectedTarjetaId !== '__new__'
+              ? tarjetas.find(t => t.id === selectedTarjetaId)?.nombre || null
+              : selectedTarjetaId === '__new_suggested__' && aiNewTarjeta.nombre
+              ? aiNewTarjeta.nombre
+              : null
+          }
+          accountIsSuggested={selectedTarjetaId === '__new_suggested__'}
+          taxCount={selectedImpuestos.size}
+          taxMonth={globalDocumentDate ? globalDocumentDate.slice(0, 7) : null}
+          loading={savingTransactions}
+        />
       )}
 
       {/* Modal Confirmación Eliminación Masiva */}
