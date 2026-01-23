@@ -239,6 +239,8 @@ export default function GastosPage() {
 
   let gastosMes = getGastosMes(monthKey)
   const impuestosMes = getImpuestosMes(monthKey)
+  const totalImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
+  const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
 
   // Create lookup maps for categorias and tarjetas
   const categoriaMap = Object.fromEntries(categorias.map(c => [c.id, c]))
@@ -1682,8 +1684,12 @@ export default function GastosPage() {
             addImpuesto({
               descripcion: imp.descripcion,
               monto: imp.monto,
+              moneda: imp.moneda || 'ARS',
               tarjeta_id: tarjetaIdToUse,
+              categoria_id: imp.categoria_id || null,
               mes: mesFacturacion,
+              es_fijo: imp.es_fijo || false,
+              tag_ids: imp.tag_ids || [],
               pagado: false
             })
           )
@@ -1779,9 +1785,6 @@ export default function GastosPage() {
   const toggleFijo = async (g: Gasto) => {
     await updateGasto(g.id, { es_fijo: !g.es_fijo })
   }
-
-  const totalImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
-  const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
 
   return (
     <div className="space-y-6">
