@@ -434,6 +434,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
             descripcion: data.descripcion,
             monto: data.monto,
             mes: data.mes,
+            pagado: data.pagado !== undefined ? data.pagado : false,
+            fecha_pago: data.fecha_pago || null,
+            medio_pago: data.medio_pago || null,
+            comprobante_url: data.comprobante_url || null,
+            comprobante_nombre: data.comprobante_nombre || null,
             created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
           }
         }) as Impuesto[]
@@ -923,7 +928,12 @@ const addTarjeta = useCallback(async (data: any) => {
   const addImpuesto = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
+      const insertData: any = { 
+        ...data, 
+        pagado: data.pagado !== undefined ? data.pagado : false,
+        user_id: user.uid, 
+        created_at: serverTimestamp() 
+      }
       if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'impuestos'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }

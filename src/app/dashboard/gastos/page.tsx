@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identificar al usuario
 import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy yo"
-import { formatMoney, getMonthName, getTagClass, formatDateSafe } from '@/lib/utils'
+import { formatMoney, getMonthName, getTagClass, formatDateSafe, normalizeAccountName } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react'
 import { Gasto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
@@ -43,6 +43,7 @@ export default function GastosPage() {
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null)
   const [editingImp, setEditingImp] = useState<any>(null)
   const [gastoToMarkPaid, setGastoToMarkPaid] = useState<Gasto | null>(null)
+  const [impuestoToMarkPaid, setImpuestoToMarkPaid] = useState<Impuesto | null>(null)
   const [filters, setFilters] = useState({ search: '', tarjeta: '', moneda: '', tag: '', colaborador: '', sort: 'monto-desc' })
   const [gastoError, setGastoError] = useState('')
   const [deleteAllMonths, setDeleteAllMonths] = useState(false)
@@ -76,6 +77,7 @@ export default function GastosPage() {
     comprobante: null as File | null,
     medio_pago_custom: ''
   })
+  const [pagoMasivoForImpuestos, setPagoMasivoForImpuestos] = useState(false)
 
   // AI Image processing states
   const [processingImage, setProcessingImage] = useState(false)
@@ -483,7 +485,8 @@ export default function GastosPage() {
   }
 
   const handleConfirmPago = async () => {
-    if (!gastoToMarkPaid) return
+    const itemToMarkPaid = gastoToMarkPaid || impuestoToMarkPaid
+    if (!itemToMarkPaid) return
 
     // Convertir comprobante a base64 si existe
     let comprobanteUrl = null
@@ -510,22 +513,29 @@ export default function GastosPage() {
         const { error } = await addMedioPago(medioPagoFinal)
         if (error) {
           console.error('Error al guardar medio de pago:', error)
-          // Continuar de todas formas para que se guarde en el gasto
-          console.log('⚠️ Medio de pago no se guardó en la lista global, pero se usará para este gasto')
+          // Continuar de todas formas para que se guarde en el gasto/impuesto
+          console.log('⚠️ Medio de pago no se guardó en la lista global, pero se usará para este registro')
         }
       }
     }
 
-    await updateGasto(gastoToMarkPaid.id, {
+    const pagoData = {
       pagado: true,
       fecha_pago: pagoForm.fecha_pago,
       medio_pago: medioPagoFinal,
       comprobante_url: comprobanteUrl,
       comprobante_nombre: comprobanteNombre
-    })
+    }
+
+    if (gastoToMarkPaid) {
+      await updateGasto(gastoToMarkPaid.id, pagoData)
+    } else if (impuestoToMarkPaid) {
+      await updateImpuesto(impuestoToMarkPaid.id, pagoData)
+    }
 
     setShowPagoModal(false)
     setGastoToMarkPaid(null)
+    setImpuestoToMarkPaid(null)
     setPagoForm({
       fecha_pago: new Date().toISOString().split('T')[0],
       medio_pago: '',
@@ -535,7 +545,8 @@ export default function GastosPage() {
   }
 
   const handleConfirmPagoMasivo = async () => {
-    if (selectedGastos.size === 0) return
+    const selectedItems = pagoMasivoForImpuestos ? selectedImpuestosGastos : selectedGastos
+    if (selectedItems.size === 0) return
 
     // Convertir comprobante a base64 si existe (mismo comprobante para todos)
     let comprobanteUrl = null
@@ -566,22 +577,33 @@ export default function GastosPage() {
       }
     }
 
-    // Marcar todos los gastos seleccionados como pagados con el mismo comprobante
-    const gastosSeleccionados = gastosMes.filter(g => selectedGastos.has(g.id))
-    const promises = gastosSeleccionados.map(g => 
-      updateGasto(g.id, {
-        pagado: true,
-        fecha_pago: pagoMasivoForm.fecha_pago,
-        medio_pago: medioPagoFinal,
-        comprobante_url: comprobanteUrl,
-        comprobante_nombre: comprobanteNombre
-      })
-    )
+    const pagoData = {
+      pagado: true,
+      fecha_pago: pagoMasivoForm.fecha_pago,
+      medio_pago: medioPagoFinal,
+      comprobante_url: comprobanteUrl,
+      comprobante_nombre: comprobanteNombre
+    }
+
+    // Marcar todos los items seleccionados como pagados con el mismo comprobante
+    const promises: Promise<any>[] = []
+    if (pagoMasivoForImpuestos) {
+      const impuestosSeleccionados = impuestosMes.filter(i => selectedImpuestosGastos.has(i.id))
+      promises.push(...impuestosSeleccionados.map(i => updateImpuesto(i.id, pagoData)))
+    } else {
+      const gastosSeleccionados = gastosMes.filter(g => selectedGastos.has(g.id))
+      promises.push(...gastosSeleccionados.map(g => updateGasto(g.id, pagoData)))
+    }
 
     await Promise.all(promises)
 
     setShowPagoMasivoModal(false)
-    setSelectedGastos(new Set())
+    setPagoMasivoForImpuestos(false)
+    if (pagoMasivoForImpuestos) {
+      setSelectedImpuestosGastos(new Set())
+    } else {
+      setSelectedGastos(new Set())
+    }
     setPagoMasivoForm({
       fecha_pago: new Date().toISOString().split('T')[0],
       medio_pago: '',
@@ -790,9 +812,9 @@ export default function GastosPage() {
     // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
     const accountSuggestion = t?.accountSuggestion || t
     
-    // Si tiene nombre directo, usarlo
+    // Si tiene nombre directo, normalizarlo y usarlo
     if (accountSuggestion?.nombre) {
-      return String(accountSuggestion.nombre).trim()
+      return normalizeAccountName(String(accountSuggestion.nombre).trim())
     }
     
     // Construir nombre desde componentes
@@ -805,14 +827,17 @@ export default function GastosPage() {
     // Construir nombre inteligente
     const parts: string[] = []
     if (tipo) {
+      // Normalizar tipo (reemplazar "creditcard" por español, etc.)
+      const tipoNormalized = normalizeAccountName(tipo)
       // Capitalizar tipo
-      const tipoCapitalized = tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
+      const tipoCapitalized = tipoNormalized.charAt(0).toUpperCase() + tipoNormalized.slice(1).toLowerCase()
       parts.push(tipoCapitalized)
     }
     if (banco) parts.push(banco)
     if (ultimosDigitos) parts.push(`****${ultimosDigitos}`)
     
-    return parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
+    const builtName = parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
+    return normalizeAccountName(builtName)
   }
 
   const ensureCuentaExists = async (cuentaData: any, aiNewCuentaData?: { nombre: string; tipo: 'visa' | 'mastercard' | 'amex' | 'other'; banco: string; digitos: string; cierre?: number | null; vencimiento?: number | null }): Promise<string | null> => {
@@ -1630,7 +1655,8 @@ export default function GastosPage() {
               descripcion: imp.descripcion,
               monto: imp.monto,
               tarjeta_id: tarjetaIdToUse,
-              mes: mesFacturacion
+              mes: mesFacturacion,
+              pagado: false
             })
           )
         })
@@ -1776,7 +1802,7 @@ export default function GastosPage() {
             onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
           >
             <option value="">Cuenta</option>
-            {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
           </select>
           <select
             className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
@@ -1865,6 +1891,7 @@ export default function GastosPage() {
               <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                 <button
                   onClick={() => {
+                    setPagoMasivoForImpuestos(false)
                     setPagoMasivoForm({
                       fecha_pago: new Date().toISOString().split('T')[0],
                       medio_pago: '',
@@ -2005,7 +2032,7 @@ export default function GastosPage() {
                       {tarjetaMap[g.tarjeta_id || ''] ? (
                         <div>
                           <span className={`tag ${getTagClass(tarjetaMap[g.tarjeta_id || ''].tipo)}`}>
-                            {tarjetaMap[g.tarjeta_id || ''].nombre}
+                            {normalizeAccountName(tarjetaMap[g.tarjeta_id || ''].nombre)}
                           </span>
                           <div className="text-xs text-slate-500 mt-1">
                             {tarjetaMap[g.tarjeta_id || ''].banco && <span>{tarjetaMap[g.tarjeta_id || ''].banco}</span>}
@@ -2133,19 +2160,21 @@ export default function GastosPage() {
                     <option value="">💵 Efectivo</option>
                     {tarjetas.map(t => (
                       <option key={t.id} value={t.id}>
-                        {t.nombre} {t.banco ? `(${t.banco})` : ''}
+                        {normalizeAccountName(t.nombre)} {t.banco ? `(${t.banco})` : ''}
                       </option>
                     ))}
                   </select>
                 </div>
                 <button
                   onClick={() => {
-                    // TODO: Implementar pago masivo de impuestos
-                    console.log('🔵 [GastosPage] Pago masivo de impuestos:', Array.from(selectedImpuestosGastos))
+                    if (selectedImpuestosGastos.size > 0) {
+                      setPagoMasivoForImpuestos(true)
+                      setShowPagoMasivoModal(true)
+                    }
                   }}
                   className="btn btn-success text-sm"
                 >
-                  Pagar {selectedImpuestosGastos.size}
+                  <CheckCircle2 className="w-4 h-4" /> Registrar Pago Masivo
                 </button>
                 <button
                   onClick={() => {
@@ -2219,7 +2248,7 @@ export default function GastosPage() {
                       <td className="p-4">
                         {tarjetaMap[i.tarjeta_id || ''] ? (
                           <span className={`tag ${getTagClass(tarjetaMap[i.tarjeta_id || ''].tipo)}`}>
-                            {tarjetaMap[i.tarjeta_id || ''].nombre}
+                            {normalizeAccountName(tarjetaMap[i.tarjeta_id || ''].nombre)}
                           </span>
                         ) : (
                           <span className="tag bg-emerald-100 text-emerald-700">
@@ -2229,7 +2258,47 @@ export default function GastosPage() {
                       </td>
                       <td className="p-4 font-bold">{formatMoney(i.monto)}</td>
                       <td className="p-4">
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-2">
+                          {!i.pagado ? (
+                            <button
+                              onClick={() => {
+                                setImpuestoToMarkPaid(i)
+                                setPagoForm({
+                                  fecha_pago: new Date().toISOString().split('T')[0],
+                                  medio_pago: '',
+                                  comprobante: null,
+                                  medio_pago_custom: ''
+                                })
+                                setShowPagoModal(true)
+                              }}
+                              className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
+                            >
+                              💰 Registrar Pago
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setImpuestoToMarkPaid(i)
+                                const mediosPredefinidos = ['efectivo', 'transferencia', 'debito', 'credito', 'mercadopago']
+                                const isInCustomList = i.medio_pago && mediosPago.some(m => m.nombre === i.medio_pago)
+                                const isNewCustom = i.medio_pago && !mediosPredefinidos.includes(i.medio_pago || '') && !isInCustomList
+                                setPagoForm({
+                                  fecha_pago: i.fecha_pago || new Date().toISOString().split('T')[0],
+                                  medio_pago: isNewCustom ? 'nuevo' : (i.medio_pago || ''),
+                                  comprobante: null,
+                                  medio_pago_custom: isNewCustom ? i.medio_pago || '' : ''
+                                })
+                                setShowPagoModal(true)
+                              }}
+                              className="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1"
+                              title={i.fecha_pago ? `Pagado el ${new Date(i.fecha_pago).toLocaleDateString()}` : 'Ver detalles de pago'}
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Ver Pago
+                            </button>
+                          )}
                           <button onClick={() => { setEditingImp(i); setImpForm({ descripcion: i.descripcion, tarjeta_id: i.tarjeta_id || '', monto: String(i.monto), mes: i.mes }); setShowImpModal(true) }} className="p-2 hover:bg-slate-100 rounded-lg">
                             <Edit2 className="w-4 h-4 text-slate-500" />
                           </button>
@@ -2265,17 +2334,18 @@ export default function GastosPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
-              {/* Botón para subir imagen con IA */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-purple-600" />
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-purple-900">📸 Leer con IA</div>
-                    <p className="text-xs text-purple-700">Sube una imagen o PDF de tu comprobante o resumen</p>
+              {/* Botón para subir imagen con IA - Solo mostrar si NO está editando */}
+              {!editingGasto && (
+                <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-purple-600" />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-purple-900">📸 Leer con IA</div>
+                      <p className="text-xs text-purple-700">Sube una imagen o PDF de tu comprobante o resumen</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <label className="btn btn-primary cursor-pointer relative btn-sm">
+                  <div className="flex gap-2 flex-wrap">
+                    <label className="btn btn-primary cursor-pointer relative btn-sm">
                     {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📷 Foto / Imagen</>)}
                     <input
                       type="file"
@@ -2297,6 +2367,7 @@ export default function GastosPage() {
                   </label>
                 </div>
               </div>
+              )}
 
               <div>
                 <label className="label">
@@ -2471,7 +2542,7 @@ export default function GastosPage() {
                       onChange={e => setGastoForm(f => ({ ...f, tarjeta_id: e.target.value }))}
                     >
                       <option value="">💵 Efectivo</option>
-                      {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                      {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
                     </select>
                     <button
                       type="button"
@@ -2685,7 +2756,7 @@ export default function GastosPage() {
                     onChange={e => setImpForm(f => ({ ...f, tarjeta_id: e.target.value }))}
                   >
                     <option value="">💵 Efectivo</option>
-                    {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
                   </select>
                 </div>
                 <div>
@@ -2717,22 +2788,27 @@ export default function GastosPage() {
       )}
 
       {/* Modal de Confirmación de Pago */}
-      {showPagoModal && gastoToMarkPaid && (
+      {showPagoModal && (gastoToMarkPaid || impuestoToMarkPaid) && (
         <div className="modal-overlay" onClick={() => setShowPagoModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">
-                {gastoToMarkPaid.pagado ? 'Ver/Editar Pago' : 'Confirmar Pago'}
+                {(gastoToMarkPaid?.pagado || impuestoToMarkPaid?.pagado) ? 'Ver/Editar Pago' : 'Confirmar Pago'}
               </h3>
-              <button onClick={() => setShowPagoModal(false)} className="p-1 hover:bg-slate-100 rounded">
+              <button onClick={() => { setShowPagoModal(false); setGastoToMarkPaid(null); setImpuestoToMarkPaid(null) }} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div className="bg-indigo-50 p-3 rounded-lg">
-                <div className="font-semibold text-indigo-900">{gastoToMarkPaid.descripcion}</div>
+                <div className="font-semibold text-indigo-900">
+                  {gastoToMarkPaid?.descripcion || impuestoToMarkPaid?.descripcion}
+                </div>
                 <div className="text-indigo-700 font-bold mt-1">
-                  {formatMoney(gastoToMarkPaid.monto, gastoToMarkPaid.moneda)}
+                  {formatMoney(
+                    gastoToMarkPaid?.monto || impuestoToMarkPaid?.monto || 0,
+                    (gastoToMarkPaid as any)?.moneda || 'ARS'
+                  )}
                 </div>
               </div>
 
@@ -2782,16 +2858,16 @@ export default function GastosPage() {
 
               <div>
                 <label className="label">Comprobante (opcional)</label>
-                {gastoToMarkPaid.pagado && gastoToMarkPaid.comprobante_url && !pagoForm.comprobante && (
+                {((gastoToMarkPaid?.pagado && gastoToMarkPaid.comprobante_url) || (impuestoToMarkPaid?.pagado && impuestoToMarkPaid.comprobante_url)) && !pagoForm.comprobante && (
                   <div className="mb-3 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-xl shadow-sm">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-bold text-emerald-900 mb-1 flex items-center gap-2">
-                          📎 {gastoToMarkPaid.comprobante_nombre || 'Comprobante guardado'}
+                          📎 {(gastoToMarkPaid?.comprobante_nombre || impuestoToMarkPaid?.comprobante_nombre) || 'Comprobante guardado'}
                         </div>
-                        {gastoToMarkPaid.fecha_pago && (
+                        {(gastoToMarkPaid?.fecha_pago || impuestoToMarkPaid?.fecha_pago) && (
                           <div className="text-xs text-emerald-700">
-                            Subido el {new Date(gastoToMarkPaid.fecha_pago).toLocaleDateString('es-AR', {
+                            Subido el {new Date((gastoToMarkPaid?.fecha_pago || impuestoToMarkPaid?.fecha_pago)!).toLocaleDateString('es-AR', {
                               day: 'numeric',
                               month: 'long',
                               year: 'numeric'
@@ -2799,14 +2875,19 @@ export default function GastosPage() {
                           </div>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => downloadComprobante(gastoToMarkPaid)}
-                        className="px-4 py-2.5 bg-emerald-50 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md flex items-center gap-2"
-                      >
-                        <Download className="w-4 h-4" />
-                        Descargar
-                      </button>
+                      {(gastoToMarkPaid?.comprobante_url || impuestoToMarkPaid?.comprobante_url) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (gastoToMarkPaid) downloadComprobante(gastoToMarkPaid)
+                            // TODO: Implementar downloadComprobante para impuestos si es necesario
+                          }}
+                          className="px-4 py-2.5 bg-emerald-50 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md flex items-center gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Descargar
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2821,7 +2902,7 @@ export default function GastosPage() {
                     ✓ {pagoForm.comprobante.name}
                   </div>
                 )}
-                {gastoToMarkPaid.comprobante_url && pagoForm.comprobante && (
+                {((gastoToMarkPaid?.comprobante_url || impuestoToMarkPaid?.comprobante_url) && pagoForm.comprobante) && (
                   <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
                     ⚠️ Esto reemplazará el comprobante actual
                   </div>
@@ -2833,20 +2914,26 @@ export default function GastosPage() {
                   onClick={handleConfirmPago}
                   className="btn btn-success flex-1 justify-center"
                 >
-                  {gastoToMarkPaid.pagado ? '✓ Actualizar' : '✓ Confirmar Pago'}
+                  {(gastoToMarkPaid?.pagado || impuestoToMarkPaid?.pagado) ? '✓ Actualizar' : '✓ Confirmar Pago'}
                 </button>
-                {gastoToMarkPaid.pagado && (
+                {(gastoToMarkPaid?.pagado || impuestoToMarkPaid?.pagado) && (
                   <button
                     onClick={async () => {
-                      await updateGasto(gastoToMarkPaid.id, {
+                      const desmarcarData = {
                         pagado: false,
                         fecha_pago: null,
                         medio_pago: null,
                         comprobante_url: null,
                         comprobante_nombre: null
-                      })
+                      }
+                      if (gastoToMarkPaid) {
+                        await updateGasto(gastoToMarkPaid.id, desmarcarData)
+                      } else if (impuestoToMarkPaid) {
+                        await updateImpuesto(impuestoToMarkPaid.id, desmarcarData)
+                      }
                       setShowPagoModal(false)
                       setGastoToMarkPaid(null)
+                      setImpuestoToMarkPaid(null)
                     }}
                     className="btn btn-danger flex-1 justify-center"
                   >
@@ -2854,7 +2941,7 @@ export default function GastosPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => setShowPagoModal(false)}
+                  onClick={() => { setShowPagoModal(false); setGastoToMarkPaid(null); setImpuestoToMarkPaid(null) }}
                   className="btn btn-secondary flex-1 justify-center"
                 >
                   Cancelar
@@ -3025,7 +3112,7 @@ export default function GastosPage() {
                           <option value="">Sin cuenta específica</option>
                           {tarjetas.map(t => (
                             <option key={t.id} value={t.id}>
-                              {t.nombre}
+                              {normalizeAccountName(t.nombre)}
                             </option>
                           ))}
                           {selectedTarjetaId === '__new_suggested__' || !tarjetas.find(t => {
@@ -3311,7 +3398,7 @@ export default function GastosPage() {
                                     tarjetaMap[tarjetaId] ? (
                                       <div>
                                         <span className={`tag ${getTagClass(tarjetaMap[tarjetaId].tipo)}`}>
-                                          {tarjetaMap[tarjetaId].nombre}
+                                          {normalizeAccountName(tarjetaMap[tarjetaId].nombre)}
                                         </span>
                                         <div className="text-xs text-slate-500 mt-1">
                                           {tarjetaMap[tarjetaId].banco && <span>{tarjetaMap[tarjetaId].banco}</span>}
@@ -3383,109 +3470,129 @@ export default function GastosPage() {
                     </div>
                   </div>
 
-                  {/* Impuestos detectados */}
+                  {/* Impuestos detectados - Mismo diseño que Gastos */}
                   {extractedData.impuestos && Array.isArray(extractedData.impuestos) && extractedData.impuestos.length > 0 && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-orange-900 text-xs flex items-center gap-2">
-                          📝 Impuestos ({extractedData.impuestos.length})
+                    <div className="card overflow-hidden">
+                      <div className="p-3 bg-slate-50 border-b border-slate-200">
+                        <h4 className="font-semibold text-sm">
+                          Impuestos ({extractedData.impuestos.length})
                         </h4>
                       </div>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {extractedData.impuestos.map((imp: any, index: number) => {
-                          const descripcion = getImpuestoValue(index, 'descripcion', imp.descripcion)
-                          const monto = getImpuestoValue(index, 'monto', imp.monto)
-                          const fecha = getImpuestoValue(index, 'fecha', imp.fecha)
-                          const moneda = getImpuestoValue(index, 'moneda', imp.moneda || 'ARS')
-                          
-                          return (
-                            <div 
-                              key={index}
-                              className={`border rounded-lg p-2 transition-colors ${
-                                selectedImpuestos.has(index) 
-                                  ? 'border-orange-500 bg-orange-100' 
-                                  : 'border-orange-200 hover:border-orange-300 bg-white'
-                              }`}
-                            >
-                              <div className="flex items-start gap-2">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase w-12">
                                 <input
                                   type="checkbox"
-                                  checked={selectedImpuestos.has(index)}
+                                  checked={selectedImpuestos.size === extractedData.impuestos.length && extractedData.impuestos.length > 0}
                                   onChange={(e) => {
-                                    e.stopPropagation()
-                                    const newSelected = new Set(selectedImpuestos)
-                                    if (newSelected.has(index)) {
-                                      newSelected.delete(index)
+                                    if (e.target.checked) {
+                                      const all = new Set<number>(extractedData.impuestos.map((_: any, i: number) => i))
+                                      setSelectedImpuestos(all)
                                     } else {
-                                      newSelected.add(index)
+                                      setSelectedImpuestos(new Set())
                                     }
-                                    setSelectedImpuestos(newSelected)
                                   }}
-                                  className="mt-0.5 w-4 h-4 text-orange-600 rounded border-slate-300"
+                                  className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
                                 />
-                                <div className="flex-1 space-y-1.5 min-w-0">
-                                  <input
-                                    type="text"
-                                    value={descripcion || ''}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      updateEditedImpuesto(index, 'descripcion', e.target.value)
-                                    }}
-                                    className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
-                                    placeholder="Descripción"
-                                  />
-                                  <div className="grid grid-cols-2 gap-2">
+                              </th>
+                              <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
+                              <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
+                              <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Monto</th>
+                              <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {extractedData.impuestos.map((imp: any, index: number) => {
+                              const edited = editedImpuestos.get(index)
+                              const descripcion = edited?.descripcion ?? imp.descripcion ?? ''
+                              const monto = edited?.monto ?? imp.monto ?? 0
+                              const moneda = edited?.moneda ?? imp.moneda ?? 'ARS'
+                              const tarjetaId = selectedTarjetaId ?? ''
+                              
+                              return (
+                                <tr 
+                                  key={index}
+                                  className={`border-b border-slate-100 hover:bg-slate-50 transition ${
+                                    selectedImpuestos.has(index) ? 'bg-indigo-50' : ''
+                                  }`}
+                                >
+                                  <td className="p-3">
                                     <input
-                                      type="date"
-                                      value={fecha || ''}
+                                      type="checkbox"
+                                      checked={selectedImpuestos.has(index)}
                                       onChange={(e) => {
-                                        e.stopPropagation()
-                                        updateEditedImpuesto(index, 'fecha', e.target.value)
+                                        const newSelected = new Set(selectedImpuestos)
+                                        if (e.target.checked) {
+                                          newSelected.add(index)
+                                        } else {
+                                          newSelected.delete(index)
+                                        }
+                                        setSelectedImpuestos(newSelected)
                                       }}
-                                      className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
+                                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
                                     />
-                                    <div className="flex gap-1">
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        value={monto || ''}
-                                        onChange={(e) => {
-                                          e.stopPropagation()
-                                          updateEditedImpuesto(index, 'monto', parseFloat(e.target.value) || 0)
-                                        }}
-                                        className="input w-full text-xs h-7 border-slate-300 focus:border-orange-500"
-                                        placeholder="0.00"
-                                      />
-                                      <div className="relative">
-                                        <select
-                                          value={moneda}
-                                          onChange={(e) => {
-                                            e.stopPropagation()
-                                            updateEditedImpuesto(index, 'moneda', e.target.value)
-                                          }}
-                                          className="w-16 h-7 text-xs font-bold text-center rounded-lg border-2 cursor-pointer pr-6"
-                                          style={{ 
-                                            color: 'rgb(15, 23, 42) !important',
-                                            backgroundColor: 'rgb(255, 237, 213) !important',
-                                            borderColor: 'rgb(251, 146, 60) !important',
-                                            WebkitAppearance: 'none',
-                                            MozAppearance: 'none',
-                                            appearance: 'none',
-                                            fontWeight: '700'
-                                          }}
-                                        >
-                                          <option value="ARS" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>ARS</option>
-                                          <option value="USD" style={{ color: 'rgb(15, 23, 42)', backgroundColor: 'white', fontWeight: '700' }}>USD</option>
-                                        </select>
-                                        <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-orange-600">▼</div>
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
+                                        📝
+                                      </div>
+                                      <div>
+                                        <div className="font-semibold">{descripcion || 'Sin descripción'}</div>
                                       </div>
                                     </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
+                                  </td>
+                                  <td className="p-3">
+                                    {tarjetaId ? (
+                                      tarjetaMap[tarjetaId] ? (
+                                        <div>
+                                          <span className={`tag ${getTagClass(tarjetaMap[tarjetaId].tipo)}`}>
+                                            {normalizeAccountName(tarjetaMap[tarjetaId].nombre)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-slate-400">ID: {tarjetaId.slice(0, 8)}...</span>
+                                      )
+                                    ) : (
+                                      <span className="tag bg-emerald-100 text-emerald-700">💵 Efectivo</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3">
+                                    <span className={`font-bold ${moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                                      {formatMoney(monto, moneda)}
+                                    </span>
+                                  </td>
+                                  <td className="p-3">
+                                    <button
+                                      onClick={() => {
+                                        const edited = editedImpuestos.get(index) || {}
+                                        setAiTransactionForm({
+                                          descripcion: edited.descripcion ?? imp.descripcion ?? '',
+                                          categoria_id: '',
+                                          monto: edited.monto !== undefined ? String(edited.monto) : String(imp.monto ?? ''),
+                                          moneda: edited.moneda ?? imp.moneda ?? 'ARS',
+                                          fecha: edited.fecha ?? imp.fecha ?? new Date().toISOString().split('T')[0],
+                                          tag_ids: [],
+                                          tarjeta_id: edited.tarjeta_id ?? selectedTarjetaId ?? '',
+                                          cuotas: '1',
+                                          cuotas_custom: '',
+                                          es_fijo: false
+                                        })
+                                        setEditingAiTransaction(index)
+                                      }}
+                                      className="p-2 hover:bg-slate-100 rounded-lg transition"
+                                      title="Editar"
+                                    >
+                                      <Edit2 className="w-4 h-4 text-slate-600" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
@@ -3739,9 +3846,9 @@ export default function GastosPage() {
           effectiveDate={globalDocumentDate}
           accountName={
             selectedTarjetaId && selectedTarjetaId !== '__new_suggested__' && selectedTarjetaId !== '__new__'
-              ? tarjetas.find(t => t.id === selectedTarjetaId)?.nombre || null
+              ? normalizeAccountName(tarjetas.find(t => t.id === selectedTarjetaId)?.nombre || '')
               : selectedTarjetaId === '__new_suggested__' && aiNewTarjeta.nombre
-              ? aiNewTarjeta.nombre
+              ? normalizeAccountName(aiNewTarjeta.nombre)
               : null
           }
           accountIsSuggested={selectedTarjetaId === '__new_suggested__'}
@@ -3997,7 +4104,7 @@ export default function GastosPage() {
                   onChange={e => setAiTransactionForm(f => ({ ...f, tarjeta_id: e.target.value }))}
                 >
                   <option value="">💵 Efectivo</option>
-                  {tarjetas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
                 </select>
               </div>
 
@@ -4115,29 +4222,46 @@ export default function GastosPage() {
       )}
 
       {/* Modal Pago Masivo */}
-      {showPagoMasivoModal && selectedGastos.size > 0 && (
-        <div className="modal-overlay" onClick={() => setShowPagoMasivoModal(false)}>
+      {showPagoMasivoModal && ((pagoMasivoForImpuestos && selectedImpuestosGastos.size > 0) || (!pagoMasivoForImpuestos && selectedGastos.size > 0)) && (
+        <div className="modal-overlay" onClick={() => { setShowPagoMasivoModal(false); setPagoMasivoForImpuestos(false) }}>
           <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-emerald-50">
               <h3 className="font-bold text-lg text-emerald-800">
                 💳 Registrar Pago Masivo
               </h3>
-              <button onClick={() => setShowPagoMasivoModal(false)} className="p-1 hover:bg-emerald-100 rounded">
+              <button onClick={() => { setShowPagoMasivoModal(false); setPagoMasivoForImpuestos(false) }} className="p-1 hover:bg-emerald-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div className="bg-slate-50 rounded-lg p-3">
-                <p className="text-sm text-slate-600 mb-2">
-                  Se marcarán como pagados <strong>{selectedGastos.size} gastos</strong> con la misma información de pago.
-                </p>
-                <div className="text-xs text-slate-500">
-                  Total: {formatMoney(
-                    gastosMes
-                      .filter(g => selectedGastos.has(g.id))
-                      .reduce((sum, g) => sum + (g.cuotas > 1 ? g.monto / g.cuotas : g.monto), 0)
-                  )}
-                </div>
+                {pagoMasivoForImpuestos ? (
+                  <>
+                    <p className="text-sm text-slate-600 mb-2">
+                      Se marcarán como pagados <strong>{selectedImpuestosGastos.size} {selectedImpuestosGastos.size === 1 ? 'impuesto' : 'impuestos'}</strong> con la misma información de pago.
+                    </p>
+                    <div className="text-xs text-slate-500">
+                      Total: {formatMoney(
+                        impuestosMes
+                          .filter(i => selectedImpuestosGastos.has(i.id))
+                          .reduce((sum, i) => sum + i.monto, 0)
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-600 mb-2">
+                      Se marcarán como pagados <strong>{selectedGastos.size} {selectedGastos.size === 1 ? 'gasto' : 'gastos'}</strong> con la misma información de pago.
+                    </p>
+                    <div className="text-xs text-slate-500">
+                      Total: {formatMoney(
+                        gastosMes
+                          .filter(g => selectedGastos.has(g.id))
+                          .reduce((sum, g) => sum + (g.cuotas > 1 ? g.monto / g.cuotas : g.monto), 0)
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>
@@ -4185,7 +4309,7 @@ export default function GastosPage() {
               </div>
 
               <div>
-                <label className="label">Comprobante (opcional - se usará para todos los gastos)</label>
+                <label className="label">Comprobante (opcional - se usará para todos los {pagoMasivoForImpuestos ? 'impuestos' : 'gastos'})</label>
                 <input
                   type="file"
                   accept="image/*,.pdf"
@@ -4198,7 +4322,7 @@ export default function GastosPage() {
                   </div>
                 )}
                 <p className="text-xs text-slate-500 mt-1">
-                  El mismo comprobante se asociará a todos los gastos seleccionados.
+                  El mismo comprobante se asociará a todos los {pagoMasivoForImpuestos ? 'impuestos' : 'gastos'} seleccionados.
                 </p>
               </div>
 
@@ -4212,6 +4336,7 @@ export default function GastosPage() {
                 <button
                   onClick={() => {
                     setShowPagoMasivoModal(false)
+                    setPagoMasivoForImpuestos(false)
                     setPagoMasivoForm({
                       fecha_pago: new Date().toISOString().split('T')[0],
                       medio_pago: '',

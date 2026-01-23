@@ -79,6 +79,11 @@ export interface Impuesto {
   monto: number
   mes: string
   created_at: string
+  pagado: boolean
+  fecha_pago?: string
+  medio_pago?: string
+  comprobante_url?: string
+  comprobante_nombre?: string
   tarjeta?: Tarjeta
 }
 

@@ -70,79 +70,51 @@ export function TransactionImportConfirmModal({
         </div>
         
         <div className="p-6 space-y-4">
-          {/* Transaction Count */}
-          <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <FileText className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <div className="font-semibold text-blue-900">
-                Se agregarán {transactionCount} {transactionCount === 1 ? transactionLabelSingular : transactionLabel}
-              </div>
-            </div>
+          {/* Encabezado: Cantidad de transacciones */}
+          <div className="text-lg font-semibold text-slate-900">
+            {transactionCount > 0 && taxCount > 0 ? (
+              <>Se agregarán {transactionCount} {transactionCount === 1 ? transactionLabelSingular : transactionLabel} y {taxCount} {taxCount === 1 ? 'impuesto' : 'impuestos'}</>
+            ) : transactionCount > 0 ? (
+              <>Se agregarán {transactionCount} {transactionCount === 1 ? transactionLabelSingular : transactionLabel}</>
+            ) : taxCount > 0 ? (
+              <>Se agregarán {taxCount} {taxCount === 1 ? 'impuesto' : 'impuestos'}</>
+            ) : null}
           </div>
 
-          {/* Month/Year and Effective Date */}
+          {/* Mes y año destino */}
           {month && (
-            <div className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <Calendar className="w-5 h-5 text-slate-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-semibold text-slate-900 mb-1">
-                  Mes y año destino
-                </div>
-                <div className="text-sm text-slate-600">
-                  {formatMonth(month)}
-                </div>
-                {effectiveDate && (
-                  <div className="text-xs text-slate-500 mt-1">
-                    Fecha efectiva: <strong>{formatDate(effectiveDate)}</strong>
-                  </div>
-                )}
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-700">
+                Mes y año destino: <span className="font-normal">{formatMonth(month)}</span>
               </div>
-            </div>
-          )}
-
-          {/* Account/Card */}
-          <div className="flex items-start gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-            <CreditCard className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="font-semibold text-indigo-900 mb-1">
-                Cuenta/Tarjeta vinculada
-              </div>
-              {accountName ? (
-                <div className="text-sm text-indigo-700">
-                  {accountName}
-                  {accountIsSuggested && (
-                    <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">
-                      (sugerida)
-                    </span>
-                  )}
-                </div>
-              ) : (
+              {effectiveDate && (
                 <div className="text-sm text-slate-600">
-                  Sin cuenta específica
+                  Fecha efectiva: <strong>{formatDate(effectiveDate)}</strong>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Taxes (only for Gastos) */}
-          {transactionType === 'gastos' && taxCount > 0 && (
-            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <FileText className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-semibold text-amber-900 mb-1">
-                  Impuestos detectados
-                </div>
-                <div className="text-sm text-amber-700">
-                  Se agregarán {taxCount} {taxCount === 1 ? 'impuesto' : 'impuestos'}
-                  {taxMonth && (
-                    <span className="block mt-1 text-xs text-amber-600">
-                      Mes: {formatMonth(taxMonth)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
           )}
+
+          {/* Cuenta/Tarjeta vinculada */}
+          <div className="space-y-1">
+            <div className="text-sm font-semibold text-slate-700">
+              Cuenta/Tarjeta vinculada:
+            </div>
+            {accountName ? (
+              <div className="text-sm text-slate-900">
+                {accountName}
+                {accountIsSuggested && (
+                  <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">
+                    (sugerida)
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-600">
+                Sin cuenta específica
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="p-4 border-t border-slate-200 flex gap-3 justify-end">

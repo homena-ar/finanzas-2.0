@@ -43,6 +43,52 @@ export function parseDateSafe(dateStr: string): Date {
  * @param dateStr - Fecha en formato YYYY-MM-DD
  * @returns Mes en formato YYYY-MM
  */
+/**
+ * Normaliza nombres de cuenta/tarjeta detectados por IA, reemplazando términos en inglés por español
+ * y limpiando el texto para que sea consistente.
+ * 
+ * @param name - Nombre de cuenta/tarjeta a normalizar
+ * @returns Nombre normalizado en español
+ */
+export function normalizeAccountName(name: string): string {
+  if (!name) return name
+  
+  let normalized = String(name).trim()
+  
+  // Reemplazos de términos en inglés a español (case-insensitive)
+  const replacements: Array<[RegExp, string]> = [
+    [/\bcreditcard\b/gi, ''],
+    [/\bcredit card\b/gi, ''],
+    [/\bdebitcard\b/gi, ''],
+    [/\bdebit card\b/gi, ''],
+    [/\bcredit\b/gi, 'tarjeta de crédito'],
+    [/\bdebit\b/gi, 'tarjeta de débito'],
+    [/\bcard\b/gi, 'tarjeta'],
+  ]
+  
+  // Aplicar reemplazos
+  replacements.forEach(([pattern, replacement]) => {
+    normalized = normalized.replace(pattern, replacement)
+  })
+  
+  // Limpiar espacios múltiples y espacios alrededor
+  normalized = normalized.replace(/\s+/g, ' ').trim()
+  
+  // Capitalizar primera letra de cada palabra (excepto preposiciones comunes)
+  const words = normalized.split(' ')
+  const prepositions = ['de', 'del', 'la', 'el', 'y', 'o']
+  normalized = words
+    .map((word, index) => {
+      if (index === 0 || !prepositions.includes(word.toLowerCase())) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      }
+      return word.toLowerCase()
+    })
+    .join(' ')
+  
+  return normalized
+}
+
 export function getMonthFromDateString(dateStr: string): string {
   // Si ya está en formato YYYY-MM-DD, extraer directamente
   if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {

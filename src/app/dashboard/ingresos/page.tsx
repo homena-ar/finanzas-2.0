@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
-import { formatMoney, getMonthName, getMonthFromDateString, parseDateSafe } from '@/lib/utils'
+import { formatMoney, getMonthName, getMonthFromDateString, parseDateSafe, normalizeAccountName } from '@/lib/utils'
 import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2, CheckCircle2, Download } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
@@ -178,9 +178,9 @@ export default function IngresosPage() {
     // Priorizar accountSuggestion (nuevo formato) sobre tarjeta (formato antiguo)
     const accountSuggestion = t?.accountSuggestion || t
     
-    // Si tiene nombre directo, usarlo
+    // Si tiene nombre directo, normalizarlo y usarlo
     if (accountSuggestion?.nombre) {
-      return String(accountSuggestion.nombre).trim()
+      return normalizeAccountName(String(accountSuggestion.nombre).trim())
     }
     
     // Construir nombre desde componentes
@@ -193,14 +193,17 @@ export default function IngresosPage() {
     // Construir nombre inteligente
     const parts: string[] = []
     if (tipo) {
+      // Normalizar tipo (reemplazar "creditcard" por español, etc.)
+      const tipoNormalized = normalizeAccountName(tipo)
       // Capitalizar tipo
-      const tipoCapitalized = tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
+      const tipoCapitalized = tipoNormalized.charAt(0).toUpperCase() + tipoNormalized.slice(1).toLowerCase()
       parts.push(tipoCapitalized)
     }
     if (banco) parts.push(banco)
     if (ultimosDigitos) parts.push(`****${ultimosDigitos}`)
     
-    return parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
+    const builtName = parts.length > 0 ? parts.join(' ') : 'Nueva cuenta/tarjeta'
+    return normalizeAccountName(builtName)
   }
 
   const handleAddNewCuentaAI = async () => {
@@ -1702,7 +1705,7 @@ export default function IngresosPage() {
                       {cuenta ? (
                         <div>
                           <span className="inline-flex items-center gap-1 text-sm text-slate-600 font-medium">
-                            {cuenta.nombre}
+                            {normalizeAccountName(cuenta.nombre)}
                           </span>
                           <div className="text-xs text-slate-500 mt-1">
                             {cuenta.banco && <span>{cuenta.banco}</span>}
@@ -1817,26 +1820,28 @@ export default function IngresosPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
-              {/* Botón para subir imagen con IA */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-purple-600" />
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-purple-900">📸 Leer con IA</div>
-                    <p className="text-xs text-purple-700">Sube una imagen o PDF de tu resumen bancario o comprobante</p>
+              {/* Botón para subir imagen con IA - Solo mostrar si NO está editando */}
+              {!editing && (
+                <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-purple-600" />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-purple-900">📸 Leer con IA</div>
+                      <p className="text-xs text-purple-700">Sube una imagen o PDF de tu resumen bancario o comprobante</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <label className="btn btn-primary cursor-pointer relative btn-sm">
+                      {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📷 Foto / Imagen</>)}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={processingImage} />
+                    </label>
+                    <label className="btn btn-secondary cursor-pointer relative btn-sm border-2 border-purple-300 text-purple-700 hover:bg-purple-50">
+                      {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📄 PDF / Documento</>)}
+                      <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handleImageUpload} disabled={processingImage} />
+                    </label>
                   </div>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <label className="btn btn-primary cursor-pointer relative btn-sm">
-                    {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📷 Foto / Imagen</>)}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={processingImage} />
-                  </label>
-                  <label className="btn btn-secondary cursor-pointer relative btn-sm border-2 border-purple-300 text-purple-700 hover:bg-purple-50">
-                    {processingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>📄 PDF / Documento</>)}
-                    <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handleImageUpload} disabled={processingImage} />
-                  </label>
-                </div>
-              </div>
+              )}
 
               <div>
                 <label className="label">Descripción *</label>
@@ -2385,7 +2390,7 @@ export default function IngresosPage() {
                           <option value="">Sin cuenta específica</option>
                           {tarjetas.map(t => (
                             <option key={t.id} value={t.id}>
-                              {t.nombre}
+                              {normalizeAccountName(t.nombre)}
                             </option>
                           ))}
                           {selectedCuentaId === '__new_suggested__' || !tarjetas.find(t => {
@@ -3098,9 +3103,9 @@ export default function IngresosPage() {
           effectiveDate={globalDocumentDate}
           accountName={
             selectedCuentaId && selectedCuentaId !== '__new_suggested__' && selectedCuentaId !== '__new__'
-              ? tarjetas.find(t => t.id === selectedCuentaId)?.nombre || null
+              ? normalizeAccountName(tarjetas.find(t => t.id === selectedCuentaId)?.nombre || '')
               : selectedCuentaId === '__new_suggested__' && aiNewCuenta.nombre
-              ? aiNewCuenta.nombre
+              ? normalizeAccountName(aiNewCuenta.nombre)
               : null
           }
           accountIsSuggested={selectedCuentaId === '__new_suggested__'}
