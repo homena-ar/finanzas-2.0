@@ -239,10 +239,6 @@ export default function GastosPage() {
 
   let gastosMes = getGastosMes(monthKey)
   const impuestosMes = getImpuestosMes(monthKey)
-  
-  // Calcular totales y nombres (se usan en el JSX)
-  const totalImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
-  const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
 
   // Create lookup maps for categorias and tarjetas
   const categoriaMap = Object.fromEntries(categorias.map(c => [c.id, c]))
@@ -1788,6 +1784,10 @@ export default function GastosPage() {
     await updateGasto(g.id, { es_fijo: !g.es_fijo })
   }
 
+  // Calcular totales y nombres (se usan en el JSX)
+  const totalImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
+  const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -2999,7 +2999,7 @@ export default function GastosPage() {
                       onChange={e => setImpForm(f => ({ ...f, tarjeta_id: e.target.value }))}
                     >
                       <option value="">💵 Efectivo</option>
-                      {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>))}
+                      {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
                     </select>
                     <button
                       type="button"
