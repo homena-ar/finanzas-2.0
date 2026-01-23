@@ -239,6 +239,8 @@ export default function GastosPage() {
 
   let gastosMes = getGastosMes(monthKey)
   const impuestosMes = getImpuestosMes(monthKey)
+  
+  // Calcular totales y nombres (se usan en el JSX)
   const totalImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
   const personalWorkspaceName = profile?.personal_workspace_name || 'Espacio Personal'
 
