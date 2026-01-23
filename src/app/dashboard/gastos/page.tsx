@@ -7,7 +7,7 @@ import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identific
 import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy yo"
 import { formatMoney, getMonthName, getTagClass, formatDateSafe, normalizeAccountName } from '@/lib/utils'
 import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react'
-import { Gasto } from '@/types'
+import { Gasto, Impuesto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
