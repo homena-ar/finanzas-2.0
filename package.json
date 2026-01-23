@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "generate-images": "node scripts/generate-images.js"
+    "generate-images": "node scripts/generate-images.js",
+    "check": "npm run check:types && npm run check:build",
+    "check:types": "tsc --noEmit",
+    "check:build": "next build --no-lint",
+    "precommit": "node scripts/check-before-commit.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

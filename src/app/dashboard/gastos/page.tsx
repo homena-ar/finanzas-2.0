@@ -2999,7 +2999,7 @@ export default function GastosPage() {
                       onChange={e => setImpForm(f => ({ ...f, tarjeta_id: e.target.value }))}
                     >
                       <option value="">💵 Efectivo</option>
-                      {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>))}
+                      {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
                     </select>
                     <button
                       type="button"
