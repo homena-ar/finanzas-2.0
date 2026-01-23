@@ -47,30 +47,34 @@ export async function GET(request: NextRequest) {
     const firestore = admin.firestore()
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString().split('T')[0]
+    
+    // Calcular fecha objetivo (1 día desde hoy) - maneja correctamente cambio de mes
+    const targetDate = new Date(today)
+    targetDate.setDate(targetDate.getDate() + 1)
+    const targetDateStr = targetDate.toISOString().split('T')[0]
 
-    console.log('📧 [Ingresos Pendientes] Verificando ingresos pendientes para hoy:', todayStr)
+    console.log('📧 [Ingresos Pendientes] Verificando ingresos pendientes para mañana (1 día antes):', targetDateStr)
 
-    // Buscar todos los ingresos pendientes con fecha_cobro_esperada = hoy
+    // Buscar todos los ingresos pendientes con fecha_cobro_esperada = mañana (1 día antes)
     const ingresosQuery = firestore
       .collection('ingresos')
       .where('pendiente_cobro', '==', true)
-      .where('fecha_cobro_esperada', '==', todayStr)
+      .where('fecha_cobro_esperada', '==', targetDateStr)
       .where('fecha_cobro_confirmada', '==', null)
 
     const ingresosSnap = await ingresosQuery.get()
 
     if (ingresosSnap.empty) {
-      console.log('📧 [Ingresos Pendientes] No hay ingresos pendientes para hoy')
+      console.log('📧 [Ingresos Pendientes] No hay ingresos pendientes para mañana (1 día antes)')
       return NextResponse.json({
         success: true,
         checked: 0,
         sent: 0,
-        message: 'No hay ingresos pendientes para hoy'
+        message: 'No hay ingresos pendientes para mañana (1 día antes)'
       })
     }
 
-    console.log(`📧 [Ingresos Pendientes] Encontrados ${ingresosSnap.size} ingresos pendientes para hoy`)
+    console.log(`📧 [Ingresos Pendientes] Encontrados ${ingresosSnap.size} ingresos pendientes para mañana (1 día antes)`)
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}` 
@@ -96,10 +100,9 @@ export async function GET(request: NextRequest) {
         const profileName = userData?.display_name || userData?.name || profileEmail?.split('@')[0] || 'Usuario'
 
         // Verificar si debe notificar
-        const notificarCelular = ingreso.notificar_celular !== false // Por defecto true
         const notificarCorreo = ingreso.notificar_correo !== false // Por defecto true
 
-        if (!notificarCelular && !notificarCorreo) {
+        if (!notificarCorreo) {
           console.log(`⏭️ [Ingresos Pendientes] Notificaciones deshabilitadas para ingreso ${ingresoId}`)
           continue
         }
@@ -109,33 +112,6 @@ export async function GET(request: NextRequest) {
           currency: ingreso.moneda || 'ARS',
           minimumFractionDigits: 2
         }).format(ingreso.monto)
-
-        // Enviar notificación push si está habilitada
-        if (notificarCelular) {
-          try {
-            const pushUrl = `${baseUrl}/api/send-push-notification`
-            const pushResponse = await fetch(pushUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: ingreso.user_id,
-                title: '💰 Recordatorio: Ingreso pendiente de cobro',
-                body: `${ingreso.descripcion} - ${montoFormateado}. ¿Ya cobraste este ingreso?`,
-                url: '/dashboard/ingresos',
-                tag: 'ingreso-pendiente',
-                workspaceId: ingreso.workspace_id || null
-              })
-            })
-
-            if (pushResponse.ok) {
-              console.log(`✅ [Ingresos Pendientes] Push enviado para ingreso ${ingresoId}`)
-            } else {
-              console.error(`❌ [Ingresos Pendientes] Error enviando push para ingreso ${ingresoId}`)
-            }
-          } catch (pushError: any) {
-            console.error(`❌ [Ingresos Pendientes] Error en push para ingreso ${ingresoId}:`, pushError?.message)
-          }
-        }
 
         // Enviar correo si está habilitado
         if (notificarCorreo && profileEmail) {
@@ -166,6 +142,34 @@ export async function GET(request: NextRequest) {
             console.error(`❌ [Ingresos Pendientes] Error en fetch de email para ingreso ${ingresoId}:`, emailError?.message)
             errors.push(`Email para ${ingresoId}: ${emailError?.message}`)
           }
+        }
+
+        // Enviar notificación push si el usuario tiene la app instalada (automático, no requiere configuración)
+        try {
+          const pushUrl = `${baseUrl}/api/send-push-notification`
+          const pushResponse = await fetch(pushUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: ingreso.user_id,
+              title: '💰 Recordatorio: Ingreso pendiente de cobro',
+              body: `${ingreso.descripcion} - ${montoFormateado}. ¿Ya cobraste este ingreso?`,
+              url: '/dashboard/ingresos',
+              tag: 'ingreso-pendiente',
+              workspaceId: ingreso.workspace_id || null
+            })
+          })
+
+          if (pushResponse.ok) {
+            const pushResult = await pushResponse.json()
+            console.log(`✅ [Ingresos Pendientes] Push enviado para ingreso ${ingresoId}: ${pushResult.sent}/${pushResult.total}`)
+          } else {
+            // No es un error crítico si no hay tokens registrados
+            console.log(`ℹ️ [Ingresos Pendientes] No se pudo enviar push para ingreso ${ingresoId} (puede que el usuario no tenga la app instalada)`)
+          }
+        } catch (pushError: any) {
+          // No es un error crítico si falla el push
+          console.log(`ℹ️ [Ingresos Pendientes] Error en push para ingreso ${ingresoId}:`, pushError?.message)
         }
 
         // Crear notificación en Firestore (campanita)

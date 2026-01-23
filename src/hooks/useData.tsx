@@ -604,7 +604,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
             cuenta_bancaria_id: data.cuenta_bancaria_id || null,
             comprobante_url: data.comprobante_url || null,
             comprobante_nombre: data.comprobante_nombre || null,
-            notificar_celular: data.notificar_celular !== undefined ? (data.notificar_celular === true || data.notificar_celular === 'true' || data.notificar_celular === 1) : false,
             notificar_correo: data.notificar_correo !== undefined ? (data.notificar_correo === true || data.notificar_correo === 'true' || data.notificar_correo === 1) : false
           }
         }) as Ingreso[]
@@ -991,7 +990,6 @@ const addTarjeta = useCallback(async (data: any) => {
         fecha_cobro_esperada: insertData.fecha_cobro_esperada,
         fecha_cobro_confirmada: insertData.fecha_cobro_confirmada,
         cuenta_bancaria_id: insertData.cuenta_bancaria_id,
-        notificar_celular: insertData.notificar_celular,
         notificar_correo: insertData.notificar_correo
       })
       
@@ -1029,7 +1027,6 @@ const addTarjeta = useCallback(async (data: any) => {
         fecha_cobro_esperada: updateData.fecha_cobro_esperada,
         fecha_cobro_confirmada: updateData.fecha_cobro_confirmada,
         cuenta_bancaria_id: updateData.cuenta_bancaria_id,
-        notificar_celular: updateData.notificar_celular,
         notificar_correo: updateData.notificar_correo
       })
       

@@ -10,6 +10,7 @@ import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { DatePicker } from '@/components/DatePicker'
 import { TransactionImportConfirmModal } from '@/components/TransactionImportConfirmModal'
 
 export default function IngresosPage() {
@@ -36,7 +37,6 @@ export default function IngresosPage() {
     fecha_cobro_esperada: '' as string | null,
     cuenta_bancaria_id: '' as string | null,
     comprobante: null as File | null,
-    notificar_celular: true,
     notificar_correo: true,
     es_fijo: false
   })
@@ -90,7 +90,6 @@ export default function IngresosPage() {
     pendiente_cobro: false,
     fecha_cobro_esperada: '' as string | null,
     cuenta_bancaria_id: '' as string | null,
-    notificar_celular: true,
     notificar_correo: true
   })
 
@@ -614,7 +613,6 @@ export default function IngresosPage() {
       fecha_cobro_esperada: null,
       cuenta_bancaria_id: null,
       comprobante: null,
-      notificar_celular: true,
       notificar_correo: true,
       es_fijo: false
     })
@@ -645,7 +643,6 @@ export default function IngresosPage() {
       fecha_cobro_esperada: (ingreso as any).fecha_cobro_esperada || null,
       cuenta_bancaria_id: (ingreso as any).cuenta_bancaria_id || null,
       comprobante: null, // No pre-cargar archivo
-      notificar_celular: (ingreso as any).notificar_celular !== undefined ? (ingreso as any).notificar_celular : true,
       notificar_correo: (ingreso as any).notificar_correo !== undefined ? (ingreso as any).notificar_correo : true,
       es_fijo: (ingreso as any).es_fijo === true
     })
@@ -702,7 +699,6 @@ export default function IngresosPage() {
       cuenta_bancaria_id: form.cuenta_bancaria_id || null,
       comprobante_url: comprobanteUrl,
       comprobante_nombre: comprobanteNombre,
-      notificar_celular: form.notificar_celular !== undefined ? form.notificar_celular : (pendienteCobroBoolean ? true : false),
       notificar_correo: form.notificar_correo !== undefined ? form.notificar_correo : (pendienteCobroBoolean ? true : false),
       es_fijo: form.es_fijo === true
     }
@@ -1241,7 +1237,6 @@ export default function IngresosPage() {
           edited_pendiente_cobro_type: typeof edited.pendiente_cobro,
           pendienteCobro_result: pendienteCobro,
           fecha_cobro_esperada: edited.fecha_cobro_esperada,
-          notificar_celular: edited.notificar_celular,
           notificar_correo: edited.notificar_correo
         })
         const fechaCobroEsperada = edited.fecha_cobro_esperada || null
@@ -1281,7 +1276,6 @@ export default function IngresosPage() {
           // Ingresos creados por IA deben ser normales sin estado visible (sin fecha_cobro_confirmada)
           // Solo se establece fecha_cobro_confirmada cuando el usuario explícitamente confirma un pendiente
           fecha_cobro_confirmada: null,
-          notificar_celular: edited.notificar_celular !== undefined ? edited.notificar_celular : (pendienteCobro ? true : false), // Notificar solo si está pendiente
           notificar_correo: edited.notificar_correo !== undefined ? edited.notificar_correo : (pendienteCobro ? true : false) // Notificar solo si está pendiente
         }
         
@@ -2052,11 +2046,10 @@ export default function IngresosPage() {
                   <div className="ml-8 space-y-2">
                     <div>
                       <label className="label text-sm">Fecha esperada de cobro (opcional)</label>
-                      <input
-                        type="date"
-                        className="input"
-                        value={form.fecha_cobro_esperada || ''}
-                        onChange={e => setForm(f => ({ ...f, fecha_cobro_esperada: e.target.value || null }))}
+                      <DatePicker
+                        value={form.fecha_cobro_esperada}
+                        onChange={(date) => setForm(f => ({ ...f, fecha_cobro_esperada: date || null }))}
+                        placeholder="dd/mm/aaaa"
                       />
                     </div>
                     <p className="text-xs text-slate-500">
@@ -2065,39 +2058,30 @@ export default function IngresosPage() {
                     {form.fecha_cobro_esperada && (
                       <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-xs text-blue-800">
-                          <strong>📅 Notificación:</strong> Se te avisará el día {new Date(form.fecha_cobro_esperada).toLocaleDateString('es-AR', { 
+                          <strong>📅 Notificación:</strong> Se te avisará 1 día antes ({new Date(new Date(form.fecha_cobro_esperada).getTime() - 24 * 60 * 60 * 1000).toLocaleDateString('es-AR', { 
                             day: 'numeric', 
                             month: 'long', 
                             year: 'numeric' 
-                          })} para recordarte confirmar el cobro.
+                          })}) para recordarte confirmar el cobro.
                         </p>
                       </div>
                     )}
-                    <div className="space-y-2 mt-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="notificar_celular"
-                          checked={form.notificar_celular !== undefined ? form.notificar_celular : true}
-                          onChange={e => setForm(f => ({ ...f, notificar_celular: e.target.checked }))}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
-                        />
-                        <label htmlFor="notificar_celular" className="text-sm text-slate-700 cursor-pointer">
-                          📱 Notificar por celular (push)
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
+                    <div className="mt-3">
+                      <label className="flex items-start gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           id="notificar_correo"
                           checked={form.notificar_correo !== undefined ? form.notificar_correo : true}
                           onChange={e => setForm(f => ({ ...f, notificar_correo: e.target.checked }))}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 mt-0.5"
                         />
-                        <label htmlFor="notificar_correo" className="text-sm text-slate-700 cursor-pointer">
-                          📧 Notificar por correo
-                        </label>
-                      </div>
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Generar un recordatorio</span>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Te notificaremos por correo 1 día antes de la fecha esperada de cobro.
+                          </p>
+                        </div>
+                      </label>
                     </div>
                     {editing && (editing as any).pendiente_cobro && !(editing as any).fecha_cobro_confirmada && (
                       <button
@@ -2617,7 +2601,6 @@ export default function IngresosPage() {
                                         pendiente_cobro: edited.pendiente_cobro ?? false,
                                         fecha_cobro_esperada: edited.fecha_cobro_esperada ?? null,
                                         cuenta_bancaria_id: edited.cuenta_bancaria_id ?? (selectedCuentaId || null),
-                                        notificar_celular: edited.notificar_celular !== undefined ? edited.notificar_celular : true,
                                         notificar_correo: edited.notificar_correo !== undefined ? edited.notificar_correo : true
                                       })
                                       setEditingAiTransaction(index)
@@ -2808,11 +2791,11 @@ export default function IngresosPage() {
 
       {/* Modal Editar Transacción del Preview IA */}
       {editingAiTransaction !== null && extractedData?.transacciones && (
-        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true }) }}>
+        <div className="modal-overlay" onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_correo: true }) }}>
           <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-lg">Editar Transacción</h3>
-              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true }) }} className="p-1 hover:bg-slate-100 rounded">
+              <button onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_correo: true }) }} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2983,11 +2966,10 @@ export default function IngresosPage() {
                   <div className="ml-8 space-y-3">
                     <div>
                       <label className="label text-sm">Fecha esperada de cobro (opcional)</label>
-                      <input
-                        type="date"
-                        className="input"
-                        value={aiTransactionForm.fecha_cobro_esperada || ''}
-                        onChange={e => setAiTransactionForm(f => ({ ...f, fecha_cobro_esperada: e.target.value || null }))}
+                      <DatePicker
+                        value={aiTransactionForm.fecha_cobro_esperada}
+                        onChange={(date) => setAiTransactionForm(f => ({ ...f, fecha_cobro_esperada: date || null }))}
+                        placeholder="dd/mm/aaaa"
                       />
                     </div>
                     <p className="text-xs text-slate-500">
@@ -2996,39 +2978,30 @@ export default function IngresosPage() {
                     {aiTransactionForm.fecha_cobro_esperada && (
                       <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-xs text-blue-800">
-                          <strong>📅 Notificación:</strong> Se te avisará el día {new Date(aiTransactionForm.fecha_cobro_esperada).toLocaleDateString('es-AR', { 
+                          <strong>📅 Notificación:</strong> Se te avisará 1 día antes ({new Date(new Date(aiTransactionForm.fecha_cobro_esperada).getTime() - 24 * 60 * 60 * 1000).toLocaleDateString('es-AR', { 
                             day: 'numeric', 
                             month: 'long', 
                             year: 'numeric' 
-                          })} para recordarte confirmar el cobro.
+                          })}) para recordarte confirmar el cobro.
                         </p>
                       </div>
                     )}
-                    <div className="space-y-2 mt-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="ai_notificar_celular"
-                          checked={aiTransactionForm.notificar_celular}
-                          onChange={e => setAiTransactionForm(f => ({ ...f, notificar_celular: e.target.checked }))}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
-                        />
-                        <label htmlFor="ai_notificar_celular" className="text-sm text-slate-700 cursor-pointer">
-                          📱 Notificar por celular (push)
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
+                    <div className="mt-3">
+                      <label className="flex items-start gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           id="ai_notificar_correo"
                           checked={aiTransactionForm.notificar_correo}
                           onChange={e => setAiTransactionForm(f => ({ ...f, notificar_correo: e.target.checked }))}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 mt-0.5"
                         />
-                        <label htmlFor="ai_notificar_correo" className="text-sm text-slate-700 cursor-pointer">
-                          📧 Notificar por correo
-                        </label>
-                      </div>
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Generar un recordatorio</span>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Te notificaremos por correo 1 día antes de la fecha esperada de cobro.
+                          </p>
+                        </div>
+                      </label>
                     </div>
                   </div>
                 )}
@@ -3051,19 +3024,18 @@ export default function IngresosPage() {
                       pendiente_cobro: aiTransactionForm.pendiente_cobro,
                       fecha_cobro_esperada: aiTransactionForm.fecha_cobro_esperada || undefined,
                       cuenta_bancaria_id: aiTransactionForm.cuenta_bancaria_id || undefined,
-                      notificar_celular: aiTransactionForm.notificar_celular,
                       notificar_correo: aiTransactionForm.notificar_correo
                     })
                     setEditedTransactions(updated)
                     setEditingAiTransaction(null)
-                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true })
+                    setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_correo: true })
                   }}
                   className="btn btn-primary flex-1"
                 >
                   Guardar Cambios
                 </button>
                 <button
-                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_celular: true, notificar_correo: true }) }}
+                  onClick={() => { setEditingAiTransaction(null); setAiTransactionForm({ descripcion: '', categoria_id: '', monto: '', moneda: 'ARS', fecha: new Date().toISOString().split('T')[0], tag_ids: [], pendiente_cobro: false, fecha_cobro_esperada: null, cuenta_bancaria_id: null, notificar_correo: true }) }}
                   className="btn btn-secondary"
                 >
                   Cancelar

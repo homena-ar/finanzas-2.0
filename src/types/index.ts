@@ -164,8 +164,7 @@ export interface Ingreso {
   cuenta_bancaria_id?: string | null // ID de la cuenta bancaria o tarjeta de origen
   comprobante_url?: string | null // URL del comprobante (base64)
   comprobante_nombre?: string | null // Nombre del archivo del comprobante
-  notificar_celular?: boolean // Si se debe notificar por push/celular
-  notificar_correo?: boolean // Si se debe notificar por correo
+  notificar_correo?: boolean // Si se debe notificar por correo (1 día antes de la fecha esperada)
   es_fijo?: boolean // Si es un ingreso fijo mensual
 }
 
