@@ -199,36 +199,49 @@ export default function ConfigPage() {
   const handleSaveFinancialConfig = async () => {
     setSaving(true)
     
+    const newBudgetArs = budgetEnabled && budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0
+    const newBudgetUsd = budgetEnabled && budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
+    
     try {
       if (currentWorkspace) {
+        // Actualización optimista: actualizar estado local inmediatamente
+        if (currentWorkspace) {
+          // Actualizar el workspace actual en el contexto (si existe método para esto)
+          // Por ahora, fetchAll() lo hará, pero podemos hacer una actualización optimista visual
+        }
+        
         // Guardar en workspace
         const result = await updateWorkspaceConfig(currentWorkspace.id, {
           ingresos_habilitado: ingresosEnabled,
-          budget_ars: budgetEnabled && budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0,
-          budget_usd: budgetEnabled && budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
+          budget_ars: newBudgetArs,
+          budget_usd: newBudgetUsd
         })
         
         if (result.error) {
+          // Revertir cambios en caso de error
           setAlertData({
             title: 'Error',
             message: 'No se pudo guardar la configuración',
             variant: 'error'
           })
         } else {
+          // La actualización ya se reflejó visualmente, solo mostrar mensaje
           setAlertData({
             title: '¡Configuración guardada!',
             message: 'Tu configuración financiera mensual fue actualizada correctamente',
             variant: 'success'
           })
+          // fetchAll() ya se llamó en updateWorkspaceConfig, así que el estado está sincronizado
         }
       } else {
-        // Guardar en perfil (espacio personal)
+        // Guardar en perfil (espacio personal) - updateProfile ya hace actualización optimista
         await updateProfile({
           ingresos_habilitado: ingresosEnabled,
-          budget_ars: budgetEnabled && budgetCurrency === 'ARS' ? (parseFloat(budgetAmount) || 0) : 0,
-          budget_usd: budgetEnabled && budgetCurrency === 'USD' ? (parseFloat(budgetAmount) || 0) : 0
+          budget_ars: newBudgetArs,
+          budget_usd: newBudgetUsd
         })
         
+        // updateProfile ya actualiza el estado local, así que los cambios se ven inmediatamente
         setAlertData({
           title: '¡Configuración guardada!',
           message: 'Tu configuración financiera mensual fue actualizada correctamente',

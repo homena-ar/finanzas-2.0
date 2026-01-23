@@ -564,6 +564,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const updateWorkspaceConfig = useCallback(async (id: string, config: { ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number }) => {
     try {
+      // Actualización optimista: actualizar estado local inmediatamente
+      if (currentWorkspace && currentWorkspace.id === id) {
+        setCurrentWorkspace(prev => prev ? {
+          ...prev,
+          ingresos_habilitado: config.ingresos_habilitado !== undefined ? config.ingresos_habilitado : prev.ingresos_habilitado,
+          budget_ars: config.budget_ars !== undefined ? config.budget_ars : prev.budget_ars,
+          budget_usd: config.budget_usd !== undefined ? config.budget_usd : prev.budget_usd
+        } : null)
+      }
+      
+      // Actualizar también en la lista de workspaces
+      setWorkspaces(prev => prev.map(w => 
+        w.id === id ? {
+          ...w,
+          ingresos_habilitado: config.ingresos_habilitado !== undefined ? config.ingresos_habilitado : w.ingresos_habilitado,
+          budget_ars: config.budget_ars !== undefined ? config.budget_ars : w.budget_ars,
+          budget_usd: config.budget_usd !== undefined ? config.budget_usd : w.budget_usd
+        } : w
+      ))
+      
       const updateData: any = {}
       if (config.ingresos_habilitado !== undefined) {
         updateData.ingresos_habilitado = config.ingresos_habilitado
@@ -575,12 +595,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         updateData.budget_usd = config.budget_usd
       }
       await updateDoc(doc(db, 'workspaces', id), updateData)
-      await fetchAll()
+      await fetchAll() // Sincronizar con Firebase
       return { error: null }
     } catch (e) {
+      // En caso de error, revertir haciendo fetchAll
+      await fetchAll()
       return { error: e }
     }
-  }, [fetchAll])
+  }, [fetchAll, currentWorkspace])
 
   const deleteWorkspace = useCallback(async (id: string) => {
     try { 

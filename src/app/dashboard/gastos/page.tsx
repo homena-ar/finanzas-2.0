@@ -233,7 +233,8 @@ export default function GastosPage() {
     es_fijo: false, tag_ids: [] as string[], pagado: false
   })
   const [impForm, setImpForm] = useState({
-    descripcion: '', tarjeta_id: '', monto: '', mes: monthKey
+    descripcion: '', tarjeta_id: '', categoria_id: '', monto: '', moneda: 'ARS' as 'ARS' | 'USD',
+    mes: monthKey, es_fijo: false, tag_ids: [] as string[]
   })
 
   let gastosMes = getGastosMes(monthKey)
@@ -402,11 +403,18 @@ export default function GastosPage() {
   const handleSaveImp = async () => {
     if (!impForm.descripcion || !impForm.monto) return
     
+    // Convertir fecha (YYYY-MM-DD) a mes (YYYY-MM) para almacenar
+    const mesKey = impForm.mes ? getMesFacturacion(impForm.mes) : monthKey
+    
     const data = {
       descripcion: impForm.descripcion,
       tarjeta_id: impForm.tarjeta_id || null,
+      categoria_id: impForm.categoria_id || null,
       monto: parseFloat(impForm.monto),
-      mes: impForm.mes
+      moneda: impForm.moneda,
+      mes: mesKey,
+      es_fijo: impForm.es_fijo,
+      tag_ids: impForm.tag_ids
     }
 
     if (editingImp) {
@@ -430,7 +438,27 @@ export default function GastosPage() {
   }
 
   const resetImpForm = () => {
-    setImpForm({ descripcion: '', tarjeta_id: tarjetas[0]?.id || '', monto: '', mes: monthKey })
+    setImpForm({ 
+      descripcion: '', tarjeta_id: tarjetas[0]?.id || '', categoria_id: '', monto: '', 
+      moneda: 'ARS', mes: monthKey, es_fijo: false, tag_ids: [] 
+    })
+  }
+
+  const openEditImp = (i: Impuesto) => {
+    setEditingImp(i)
+    // Convertir mes (YYYY-MM) a fecha (YYYY-MM-DD) para MonthYearPicker
+    const mesDate = i.mes ? `${i.mes}-10` : new Date().toISOString().split('T')[0]
+    setImpForm({
+      descripcion: i.descripcion,
+      tarjeta_id: i.tarjeta_id || '',
+      categoria_id: i.categoria_id || '',
+      monto: String(i.monto),
+      moneda: i.moneda || 'ARS',
+      mes: mesDate,
+      es_fijo: i.es_fijo || false,
+      tag_ids: i.tag_ids || []
+    })
+    setShowImpModal(true)
   }
 
   const openEditGasto = (g: Gasto) => {
@@ -2198,7 +2226,7 @@ export default function GastosPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50">
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase w-12">
                   <input
                     type="checkbox"
                     checked={impuestosMes.length > 0 && selectedImpuestosGastos.size === impuestosMes.length}
@@ -2212,108 +2240,212 @@ export default function GastosPage() {
                     className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
                   />
                 </th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Concepto</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Descripción</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Monto</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Fijo</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Pagado</th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase"></th>
               </tr>
             </thead>
             <tbody>
               {impuestosMes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400">Sin impuestos</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">Sin impuestos</td>
                 </tr>
               ) : (
                 <>
-                  {impuestosMes.map(i => (
-                    <tr key={i.id} className={`border-b border-slate-100 hover:bg-slate-50 ${selectedImpuestosGastos.has(i.id) ? 'bg-indigo-50' : ''}`}>
-                      <td className="p-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedImpuestosGastos.has(i.id)}
-                          onChange={(e) => {
-                            const newSelected = new Set(selectedImpuestosGastos)
-                            if (e.target.checked) {
-                              newSelected.add(i.id)
-                            } else {
-                              newSelected.delete(i.id)
-                            }
-                            setSelectedImpuestosGastos(newSelected)
-                          }}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td className="p-4 font-semibold">{i.descripcion}</td>
-                      <td className="p-4">
-                        {tarjetaMap[i.tarjeta_id || ''] ? (
-                          <span className={`tag ${getTagClass(tarjetaMap[i.tarjeta_id || ''].tipo)}`}>
-                            {normalizeAccountName(tarjetaMap[i.tarjeta_id || ''].nombre)}
-                          </span>
-                        ) : (
-                          <span className="tag bg-emerald-100 text-emerald-700">
-                            💵 Efectivo
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 font-bold">{formatMoney(i.monto)}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          {!i.pagado ? (
-                            <button
-                              onClick={() => {
-                                setImpuestoToMarkPaid(i)
-                                setPagoForm({
-                                  fecha_pago: new Date().toISOString().split('T')[0],
-                                  medio_pago: '',
-                                  comprobante: null,
-                                  medio_pago_custom: ''
-                                })
-                                setShowPagoModal(true)
-                              }}
-                              className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
-                            >
-                              💰 Registrar Pago
-                            </button>
+                  {impuestosMes.map(i => {
+                    const authorLabel = getUserLabel((i as any).created_by || i.user_id)
+                    return (
+                      <tr key={i.id} className={`border-b border-slate-100 hover:bg-slate-50 transition ${i.pagado ? 'opacity-50' : ''} ${selectedImpuestosGastos.has(i.id) ? 'bg-indigo-50' : ''}`}>
+                        <td className="p-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedImpuestosGastos.has(i.id)}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedImpuestosGastos)
+                              if (e.target.checked) {
+                                newSelected.add(i.id)
+                              } else {
+                                newSelected.delete(i.id)
+                              }
+                              setSelectedImpuestosGastos(newSelected)
+                            }}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
+                              {categoriaMap[i.categoria_id || '']?.icono || '💰'}
+                            </div>
+                            <div>
+                              <div className={`font-semibold ${i.pagado ? 'line-through' : ''}`}>{i.descripcion}</div>
+                              
+                              {/* Etiqueta de autor */}
+                              {currentWorkspace && authorLabel && (
+                                <div className="mb-1">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${
+                                    authorLabel === 'Tú' 
+                                      ? 'bg-slate-100 text-slate-500 border-slate-200' 
+                                      : 'bg-purple-100 text-purple-700 border-purple-200'
+                                  }`}>
+                                    {authorLabel === 'Tú' ? '👤 Tú' : `👤 ${authorLabel}`}
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="text-xs text-slate-500">
+                                {categoriaMap[i.categoria_id || '']?.nombre || 'Sin categoría'}
+                                {i.es_fijo && ' 📌'}
+                              </div>
+                              {i.pagado && (i.fecha_pago || i.medio_pago || i.comprobante_url) && (
+                                <div className="mt-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded inline-block">
+                                  {i.fecha_pago && `📅 ${new Date(i.fecha_pago).toLocaleDateString('es-AR')}`}
+                                  {i.medio_pago && ` · ${i.medio_pago}`}
+                                  {i.comprobante_url && ' · 📎'}
+                                </div>
+                              )}
+                              {i.tag_ids && i.tag_ids.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {i.tag_ids.map(tagId => {
+                                    const tag = tags.find(t => t.id === tagId)
+                                    return tag ? (
+                                      <span key={tagId} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                        {tag.nombre}
+                                      </span>
+                                    ) : null
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {tarjetaMap[i.tarjeta_id || ''] ? (
+                            <div>
+                              <span className={`tag ${getTagClass(tarjetaMap[i.tarjeta_id || ''].tipo)}`}>
+                                {normalizeAccountName(tarjetaMap[i.tarjeta_id || ''].nombre)}
+                              </span>
+                              <div className="text-xs text-slate-500 mt-1">
+                                {tarjetaMap[i.tarjeta_id || ''].banco && <span>{tarjetaMap[i.tarjeta_id || ''].banco}</span>}
+                                {tarjetaMap[i.tarjeta_id || ''].digitos && (
+                                  <span>{tarjetaMap[i.tarjeta_id || ''].banco ? ' • ' : ''}****{tarjetaMap[i.tarjeta_id || ''].digitos}</span>
+                                )}
+                                {(tarjetaMap[i.tarjeta_id || ''].cierre || tarjetaMap[i.tarjeta_id || ''].vencimiento) && (
+                                  <span className="block mt-0.5">
+                                    {tarjetaMap[i.tarjeta_id || ''].cierre && `Cierre: día ${tarjetaMap[i.tarjeta_id || ''].cierre}`}
+                                    {tarjetaMap[i.tarjeta_id || ''].cierre && tarjetaMap[i.tarjeta_id || ''].vencimiento && ' • '}
+                                    {tarjetaMap[i.tarjeta_id || ''].vencimiento && `Venc: día ${tarjetaMap[i.tarjeta_id || ''].vencimiento}`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           ) : (
-                            <button
-                              onClick={() => {
-                                setImpuestoToMarkPaid(i)
-                                const mediosPredefinidos = ['efectivo', 'transferencia', 'debito', 'credito', 'mercadopago']
-                                const isInCustomList = i.medio_pago && mediosPago.some(m => m.nombre === i.medio_pago)
-                                const isNewCustom = i.medio_pago && !mediosPredefinidos.includes(i.medio_pago || '') && !isInCustomList
-                                setPagoForm({
-                                  fecha_pago: i.fecha_pago || new Date().toISOString().split('T')[0],
-                                  medio_pago: isNewCustom ? 'nuevo' : (i.medio_pago || ''),
-                                  comprobante: null,
-                                  medio_pago_custom: isNewCustom ? i.medio_pago || '' : ''
-                                })
-                                setShowPagoModal(true)
-                              }}
-                              className="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1"
-                              title={i.fecha_pago ? `Pagado el ${new Date(i.fecha_pago).toLocaleDateString()}` : 'Ver detalles de pago'}
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Ver Pago
-                            </button>
+                            <span className="tag bg-emerald-100 text-emerald-700">
+                              💵 Efectivo
+                            </span>
                           )}
-                          <button onClick={() => { setEditingImp(i); setImpForm({ descripcion: i.descripcion, tarjeta_id: i.tarjeta_id || '', monto: String(i.monto), mes: i.mes }); setShowImpModal(true) }} className="p-2 hover:bg-slate-100 rounded-lg">
-                            <Edit2 className="w-4 h-4 text-slate-500" />
+                        </td>
+                        <td className={`p-4 font-bold ${i.moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                          {formatMoney(i.monto, i.moneda)}
+                        </td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => updateImpuesto(i.id, { es_fijo: !i.es_fijo })}
+                            className={`w-10 h-6 rounded-full relative transition-colors ${
+                              i.es_fijo ? 'bg-emerald-500' : 'bg-slate-200'
+                            }`}
+                          >
+                            <div className={`absolute w-4 h-4 bg-white rounded-full top-1 transition-transform ${
+                              i.es_fijo ? 'translate-x-5' : 'translate-x-1'
+                            }`} />
                           </button>
-                          <button onClick={() => deleteImpuesto(i.id)} className="p-2 hover:bg-red-50 rounded-lg">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            {!i.pagado ? (
+                              <button
+                                onClick={() => {
+                                  setImpuestoToMarkPaid(i)
+                                  setPagoForm({
+                                    fecha_pago: new Date().toISOString().split('T')[0],
+                                    medio_pago: '',
+                                    comprobante: null,
+                                    medio_pago_custom: ''
+                                  })
+                                  setShowPagoModal(true)
+                                }}
+                                className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
+                              >
+                                💰 Registrar Pago
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setImpuestoToMarkPaid(i)
+                                    const mediosPredefinidos = ['efectivo', 'transferencia', 'debito', 'credito', 'mercadopago']
+                                    const isInCustomList = i.medio_pago && mediosPago.some(m => m.nombre === i.medio_pago)
+                                    const isNewCustom = i.medio_pago && !mediosPredefinidos.includes(i.medio_pago || '') && !isInCustomList
+                                    setPagoForm({
+                                      fecha_pago: i.fecha_pago || new Date().toISOString().split('T')[0],
+                                      medio_pago: isNewCustom ? 'nuevo' : (i.medio_pago || ''),
+                                      comprobante: null,
+                                      medio_pago_custom: isNewCustom ? i.medio_pago || '' : ''
+                                    })
+                                    setShowPagoModal(true)
+                                  }}
+                                  className="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1"
+                                  title={i.fecha_pago ? `Pagado el ${new Date(i.fecha_pago).toLocaleDateString()}` : 'Ver detalles de pago'}
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Ver Pago
+                                </button>
+                                {i.comprobante_url && (
+                                  <button
+                                    onClick={() => {
+                                      if (i.comprobante_url) {
+                                        const link = document.createElement('a')
+                                        link.href = i.comprobante_url
+                                        link.download = i.comprobante_nombre || 'comprobante'
+                                        link.click()
+                                      }
+                                    }}
+                                    className="p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-600 border border-indigo-200"
+                                    title="Descargar comprobante"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-1">
+                            <button onClick={() => openEditImp(i)} className="p-2 hover:bg-slate-100 rounded-lg">
+                              <Edit2 className="w-4 h-4 text-slate-500" />
+                            </button>
+                            <button onClick={() => deleteImpuesto(i.id)} className="p-2 hover:bg-red-50 rounded-lg">
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                   <tr className="bg-slate-50">
                     <td className="p-4 font-bold"></td>
                     <td className="p-4 font-bold">TOTAL</td>
                     <td></td>
                     <td className="p-4 font-bold">{formatMoney(totalImp)}</td>
+                    <td></td>
+                    <td></td>
                     <td></td>
                   </tr>
                 </>
@@ -2730,55 +2862,295 @@ export default function GastosPage() {
       {/* Impuesto Modal */}
       {showImpModal && (
         <div className="modal-overlay" onClick={() => setShowImpModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="modal max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg">{editingImp ? 'Editar' : 'Agregar'} Impuesto</h3>
-              <button onClick={() => setShowImpModal(false)} className="p-1 hover:bg-slate-100 rounded">
+              <button onClick={() => { setShowImpModal(false); setEditingImp(null); resetImpForm() }} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="label">Concepto</label>
+                <label className="label">
+                  Descripción <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   className="input"
                   value={impForm.descripcion}
                   onChange={e => setImpForm(f => ({ ...f, descripcion: e.target.value }))}
+                  placeholder="Ej: IVA, IIBB, Impuesto de Sellos..."
                 />
               </div>
+
+              {/* Categoría */}
+              <div>
+                <label className="label">Categoría</label>
+                {!showNewCategoriaInput ? (
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={impForm.categoria_id}
+                      onChange={e => setImpForm(f => ({ ...f, categoria_id: e.target.value }))}
+                    >
+                      <option value="">Seleccionar</option>
+                      {categorias.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCategoriaInput(true)}
+                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                    >
+                      + Crear nueva categoría
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
+                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                    <div>
+                      <input
+                        type="text"
+                        className="input w-full text-base"
+                        placeholder="Ej: Impuestos, Tributos..."
+                        value={newCategoria.nombre}
+                        onChange={e => setNewCategoria(c => ({ ...c, nombre: e.target.value }))}
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <EmojiPickerField
+                        value={newCategoria.icono}
+                        onChange={v => setNewCategoria(c => ({ ...c, icono: v }))}
+                        placeholder="💰"
+                        size="sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddNewCategoria}
+                        className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-sm"
+                      >
+                        ✓ Crear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewCategoriaInput(false); setNewCategoria({ nombre: '', icono: '💰' }) }}
+                        className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Monto y Moneda */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Cuenta</label>
-                  <select
-                    className="input"
-                    value={impForm.tarjeta_id}
-                    onChange={e => setImpForm(f => ({ ...f, tarjeta_id: e.target.value }))}
-                  >
-                    <option value="">💵 Efectivo</option>
-                    {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Monto</label>
+                  <label className="label">
+                    Monto <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     className="input"
                     value={impForm.monto}
                     onChange={e => setImpForm(f => ({ ...f, monto: e.target.value }))}
+                    placeholder="0.00"
                   />
                 </div>
+                <div>
+                  <label className="label">Moneda</label>
+                  <select
+                    className="input"
+                    value={impForm.moneda || 'ARS'}
+                    onChange={e => setImpForm(f => ({ ...f, moneda: e.target.value as 'ARS' | 'USD' }))}
+                  >
+                    <option value="ARS">Pesos</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Mes/Año con MonthYearPicker */}
               <div>
                 <label className="label">Mes</label>
-                <input
-                  type="month"
-                  className="input"
+                <MonthYearPicker
                   value={impForm.mes}
-                  onChange={e => setImpForm(f => ({ ...f, mes: e.target.value }))}
+                  onChange={(date) => setImpForm(f => ({ ...f, mes: date }))}
                 />
               </div>
+
+              {/* Cuenta/Tarjeta */}
+              <div>
+                <label className="label">Cuenta/Tarjeta</label>
+                {!showNewTarjetaInput ? (
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={impForm.tarjeta_id || ''}
+                      onChange={e => setImpForm(f => ({ ...f, tarjeta_id: e.target.value }))}
+                    >
+                      <option value="">💵 Efectivo</option>
+                      {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewTarjetaInput(true)}
+                      className="w-full px-3 py-2 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-bold hover:bg-purple-100 transition"
+                    >
+                      + Crear nueva cuenta/tarjeta
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-300 shadow-sm">
+                    <div className="text-sm font-bold text-purple-900">💳 Nueva Cuenta/Tarjeta</div>
+                    <div>
+                      <input
+                        type="text"
+                        className="input w-full text-base mb-2"
+                        placeholder="Nombre (Ej: Visa BBVA, Cuenta Banco, Mercado Pago...)"
+                        value={newTarjeta.nombre}
+                        onChange={e => setNewTarjeta(t => ({ ...t, nombre: e.target.value }))}
+                        autoFocus
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          className="input text-sm"
+                          value={newTarjeta.tipo}
+                          onChange={e => setNewTarjeta(t => ({ ...t, tipo: e.target.value as any }))}
+                        >
+                          <option value="visa">💳 Visa</option>
+                          <option value="mastercard">💳 Mastercard</option>
+                          <option value="amex">💳 Amex</option>
+                          <option value="other">🏦 Otra/Cuenta</option>
+                        </select>
+                        <input
+                          type="text"
+                          className="input text-sm"
+                          placeholder="Banco (opcional)"
+                          value={newTarjeta.banco}
+                          onChange={e => setNewTarjeta(t => ({ ...t, banco: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddNewTarjeta}
+                        className="flex-1 px-4 py-2.5 bg-purple-500 text-white rounded-lg text-sm font-bold hover:bg-purple-600 transition shadow-sm"
+                      >
+                        ✓ Crear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewTarjetaInput(false)
+                          setNewTarjeta({ nombre: '', tipo: 'visa', banco: '', digitos: '' })
+                        }}
+                        className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Etiquetas */}
+              <div>
+                <label className="label">
+                  Etiquetas
+                  <span className="text-xs text-slate-500 font-normal ml-2">
+                    (Para organizar y filtrar impuestos)
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border-2 border-slate-200 min-h-[3rem]">
+                  {tags.map(t => {
+                    const isSelected = impForm.tag_ids.includes(t.id)
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setImpForm(f => ({ ...f, tag_ids: f.tag_ids.filter(id => id !== t.id) }))
+                          } else {
+                            setImpForm(f => ({ ...f, tag_ids: [...f.tag_ids, t.id] }))
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
+                          isSelected
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-white text-orange-700 border border-orange-200 hover:bg-orange-50'
+                        }`}
+                      >
+                        {t.nombre}
+                      </button>
+                    )
+                  })}
+                  {!showNewTagInput && (
+                    <button
+                      type="button"
+                      onClick={() => setShowNewTagInput(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 transition"
+                    >
+                      + Nueva etiqueta
+                    </button>
+                  )}
+                  {showNewTagInput && (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="text"
+                        className="input py-1 px-2 text-xs w-32"
+                        placeholder="Nombre"
+                        value={newTagName}
+                        onChange={e => setNewTagName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            handleAddNewTag()
+                          } else if (e.key === 'Escape') {
+                            setShowNewTagInput(false)
+                            setNewTagName('')
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewTag}
+                        className="px-2 py-1 bg-emerald-500 text-white rounded text-xs font-bold hover:bg-emerald-600"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewTagInput(false); setNewTagName('') }}
+                        className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs font-bold hover:bg-slate-300"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Impuesto Fijo */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border-2 border-slate-200">
+                <input
+                  type="checkbox"
+                  id="impEsFijo"
+                  checked={impForm.es_fijo}
+                  onChange={e => setImpForm(f => ({ ...f, es_fijo: e.target.checked }))}
+                  className="w-5 h-5 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                />
+                <label htmlFor="impEsFijo" className="text-sm font-semibold text-slate-700 cursor-pointer">
+                  Impuesto fijo (se repite mensualmente)
+                </label>
+              </div>
+
               <button onClick={handleSaveImp} className="btn btn-primary w-full justify-center">
                 Guardar
               </button>
@@ -2807,7 +3179,7 @@ export default function GastosPage() {
                 <div className="text-indigo-700 font-bold mt-1">
                   {formatMoney(
                     gastoToMarkPaid?.monto || impuestoToMarkPaid?.monto || 0,
-                    (gastoToMarkPaid as any)?.moneda || 'ARS'
+                    (gastoToMarkPaid as any)?.moneda || (impuestoToMarkPaid as any)?.moneda || 'ARS'
                   )}
                 </div>
               </div>

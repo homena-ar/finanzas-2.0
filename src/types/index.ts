@@ -75,16 +75,24 @@ export interface Impuesto {
   id: string
   user_id: string
   tarjeta_id: string | null
+  categoria_id: string | null
   descripcion: string
   monto: number
+  moneda: 'ARS' | 'USD'
   mes: string
+  es_fijo: boolean
+  tag_ids: string[]
   created_at: string
   pagado: boolean
   fecha_pago?: string
   medio_pago?: string
   comprobante_url?: string
   comprobante_nombre?: string
+  workspace_id?: string
+  created_by?: string
   tarjeta?: Tarjeta
+  categoria?: Categoria
+  tags?: Tag[]
 }
 
 export interface Meta {

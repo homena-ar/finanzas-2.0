@@ -431,14 +431,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
             id: doc.id,
             user_id: data.user_id,
             tarjeta_id: data.tarjeta_id || null,
+            categoria_id: data.categoria_id || null,
             descripcion: data.descripcion,
             monto: data.monto,
+            moneda: data.moneda || 'ARS',
             mes: data.mes,
+            es_fijo: data.es_fijo || false,
+            tag_ids: data.tag_ids || [],
             pagado: data.pagado !== undefined ? data.pagado : false,
             fecha_pago: data.fecha_pago || null,
             medio_pago: data.medio_pago || null,
             comprobante_url: data.comprobante_url || null,
             comprobante_nombre: data.comprobante_nombre || null,
+            workspace_id: data.workspace_id || null,
+            created_by: data.created_by || null,
             created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
           }
         }) as Impuesto[]
