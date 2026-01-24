@@ -77,26 +77,13 @@ export async function POST(request: NextRequest) {
     }
 
     const workspaceId = invitation.workspace_id
-    const permissions = invitation.permissions
 
     if (!workspaceId || typeof workspaceId !== 'string') {
       return NextResponse.json({ error: 'workspace_id inválido en la invitación' }, { status: 400 })
     }
 
-    const memberId = `${workspaceId}_${uid}`
-
-    await db.collection('workspace_members').doc(memberId).set(
-      {
-        workspace_id: workspaceId,
-        user_id: uid,
-        user_email: email,
-        permissions,
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    )
-
-    await invitationRef.update({ status: 'accepted' })
+    // Actualizar estado a rejected
+    await invitationRef.update({ status: 'rejected' })
 
     // Notificar al owner del workspace
     try {
@@ -128,9 +115,9 @@ export async function POST(request: NextRequest) {
             user_id: ownerId,
             workspace_id: workspaceId,
             tipo: 'sistema',
-            titulo: 'Invitación aceptada',
-            mensaje: `${invitedUserName || email} aceptó tu invitación a ${workspaceName}`,
-            icono: '✅',
+            titulo: 'Invitación rechazada',
+            mensaje: `${invitedUserName || email} rechazó tu invitación a ${workspaceName}`,
+            icono: '❌',
             leida: false,
             link: '/dashboard/config',
             created_at: admin.firestore.FieldValue.serverTimestamp()
@@ -138,8 +125,8 @@ export async function POST(request: NextRequest) {
 
           // Enviar email al owner
           try {
-            const { getInvitationAcceptedEmailTemplate } = await import('@/lib/email-templates')
-            const emailTemplate = getInvitationAcceptedEmailTemplate(
+            const { getInvitationRejectedEmailTemplate } = await import('@/lib/email-templates')
+            const emailTemplate = getInvitationRejectedEmailTemplate(
               workspaceName,
               email,
               invitedUserName
@@ -168,7 +155,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (emailError: any) {
             console.error('❌ [API] Error enviando email al owner:', emailError)
-            // No fallar la aceptación si el email falla
+            // No fallar el rechazo si el email falla
           }
 
           // Enviar push notification al owner
@@ -180,10 +167,10 @@ export async function POST(request: NextRequest) {
               },
               body: JSON.stringify({
                 userId: ownerId,
-                title: 'Invitación aceptada',
-                body: `${invitedUserName || email} aceptó tu invitación a ${workspaceName}`,
+                title: 'Invitación rechazada',
+                body: `${invitedUserName || email} rechazó tu invitación a ${workspaceName}`,
                 url: '/dashboard/config',
-                tag: 'invite-accepted',
+                tag: 'invite-rejected',
                 workspaceId: workspaceId
               })
             })
@@ -193,26 +180,25 @@ export async function POST(request: NextRequest) {
             }
           } catch (pushError: any) {
             console.error('❌ [API] Error enviando push notification:', pushError)
-            // No fallar la aceptación si el push falla
+            // No fallar el rechazo si el push falla
           }
         }
       }
     } catch (notificationError: any) {
       console.error('❌ [API] Error en notificaciones al owner:', notificationError)
-      // No fallar la aceptación si las notificaciones fallan
+      // No fallar el rechazo si las notificaciones fallan
     }
 
     return NextResponse.json({
       success: true,
-      memberId,
+      invitationId,
       workspaceId,
     })
   } catch (error: any) {
-    console.error('❌ [API] Error en accept-workspace-invitation:', error)
+    console.error('❌ [API] Error en reject-workspace-invitation:', error)
     return NextResponse.json(
       { error: 'Error interno', details: error?.message || String(error) },
       { status: 500 }
     )
   }
 }
-

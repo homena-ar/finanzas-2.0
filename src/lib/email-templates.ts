@@ -165,6 +165,234 @@ Este es un email automático de FinControl. Si no esperabas esta invitación, pu
   return { html, text, subject }
 }
 
+export function getInvitationAcceptedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ✅ Invitación Aceptada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                ¡Excelente noticia!
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ✅ Aceptada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #10b981;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Aceptada
+
+¡Excelente noticia!
+
+${invitedUserName || invitedUserEmail} ha aceptado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ✅ Aceptada
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationRejectedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ❌ Invitación Rechazada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #ef4444; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ❌ Rechazada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Invitaciones
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Rechazada
+
+Te informamos que:
+
+${invitedUserName || invitedUserEmail} ha rechazado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ❌ Rechazada
+
+Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+
+Ver invitaciones: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
 export function getWelcomeEmailTemplate(
   userName: string,
   userEmail: string
@@ -407,6 +635,234 @@ FinControl - Gestiona tus finanzas de forma inteligente`
   return { html, text, subject }
 }
 
+export function getInvitationAcceptedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ✅ Invitación Aceptada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                ¡Excelente noticia!
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ✅ Aceptada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #10b981;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Aceptada
+
+¡Excelente noticia!
+
+${invitedUserName || invitedUserEmail} ha aceptado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ✅ Aceptada
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationRejectedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ❌ Invitación Rechazada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #ef4444; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ❌ Rechazada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Invitaciones
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Rechazada
+
+Te informamos que:
+
+${invitedUserName || invitedUserEmail} ha rechazado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ❌ Rechazada
+
+Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+
+Ver invitaciones: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
 export function getEmailVerificationTemplate(
   userName: string,
   verificationLink: string
@@ -517,6 +973,234 @@ ${verificationLink}
 ⚠️ Importante: Este enlace expirará en 24 horas. Si no solicitaste esta confirmación, puedes ignorar este email de forma segura.
 
 FinControl - Gestiona tus finanzas de forma inteligente`
+
+  return { html, text, subject }
+}
+
+export function getInvitationAcceptedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ✅ Invitación Aceptada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                ¡Excelente noticia!
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ✅ Aceptada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #10b981;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Aceptada
+
+¡Excelente noticia!
+
+${invitedUserName || invitedUserEmail} ha aceptado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ✅ Aceptada
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationRejectedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ❌ Invitación Rechazada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #ef4444; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ❌ Rechazada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Invitaciones
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Rechazada
+
+Te informamos que:
+
+${invitedUserName || invitedUserEmail} ha rechazado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ❌ Rechazada
+
+Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+
+Ver invitaciones: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
 
   return { html, text, subject }
 }
@@ -633,6 +1317,234 @@ ${resetLink}
 💡 Tip: Después de restablecer tu contraseña, asegurate de usar una contraseña segura con al menos 8 caracteres, que incluya letras, números y símbolos.
 
 FinControl - Gestiona tus finanzas de forma inteligente`
+
+  return { html, text, subject }
+}
+
+export function getInvitationAcceptedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ✅ Invitación Aceptada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                ¡Excelente noticia!
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ✅ Aceptada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #10b981;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Aceptada
+
+¡Excelente noticia!
+
+${invitedUserName || invitedUserEmail} ha aceptado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ✅ Aceptada
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationRejectedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ❌ Invitación Rechazada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #ef4444; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ❌ Rechazada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Invitaciones
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Rechazada
+
+Te informamos que:
+
+${invitedUserName || invitedUserEmail} ha rechazado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ❌ Rechazada
+
+Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+
+Ver invitaciones: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
 
   return { html, text, subject }
 }
@@ -764,6 +1676,234 @@ Este es un email automático de FinControl. Podés desactivar estas notificacion
   return { html, text, subject }
 }
 
+export function getInvitationAcceptedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ✅ Invitación Aceptada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                ¡Excelente noticia!
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ✅ Aceptada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #10b981;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Aceptada
+
+¡Excelente noticia!
+
+${invitedUserName || invitedUserEmail} ha aceptado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ✅ Aceptada
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationRejectedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ❌ Invitación Rechazada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #ef4444; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ❌ Rechazada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Invitaciones
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Rechazada
+
+Te informamos que:
+
+${invitedUserName || invitedUserEmail} ha rechazado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ❌ Rechazada
+
+Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+
+Ver invitaciones: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
 export function getVencimientoNotificationTemplate(
   userName: string,
   tarjetaNombre: string,
@@ -887,6 +2027,234 @@ Te recordamos que el vencimiento de pago de ${tarjetaNombre} es en 2 días (día
 ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard
 
 Este es un email automático de FinControl. Podés desactivar estas notificaciones en la configuración de tu tarjeta.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationAcceptedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ✅ Invitación Aceptada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                ¡Excelente noticia!
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ✅ Aceptada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #10b981;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Aceptada
+
+¡Excelente noticia!
+
+${invitedUserName || invitedUserEmail} ha aceptado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ✅ Aceptada
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+export function getInvitationRejectedEmailTemplate(
+  workspaceName: string,
+  invitedUserEmail: string,
+  invitedUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ❌ Invitación Rechazada
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
+                      ${invitedUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #ef4444; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        ❌ Rechazada
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Invitaciones
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Invitación Rechazada
+
+Te informamos que:
+
+${invitedUserName || invitedUserEmail} ha rechazado tu invitación para colaborar en el workspace ${workspaceName}.
+
+Detalles:
+- Workspace: ${workspaceName}
+- Usuario: ${invitedUserEmail}
+- Estado: ❌ Rechazada
+
+Si deseas, puedes invitar a otra persona o volver a invitar a este usuario más adelante.
+
+Ver invitaciones: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
 
   return { html, text, subject }
 }

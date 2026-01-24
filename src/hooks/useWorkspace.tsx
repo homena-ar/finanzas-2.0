@@ -670,12 +670,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user, invitations, fetchAll])
 
   const rejectInvitation = useCallback(async (invitationId: string) => {
-    try { 
-        await updateDoc(doc(db, 'workspace_invitations', invitationId), { status: 'rejected' })
-        await fetchAll()
-        return { error: null } 
-    } catch (e) { return { error: e } }
-  }, [fetchAll])
+    if (!user) return { error: new Error('No user') }
+    try {
+      // IMPORTANTE: Usar API para rechazar y notificar al owner
+      const token = await user.getIdToken()
+      const resp = await fetch('/api/reject-workspace-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ invitationId }),
+      })
+
+      const text = await resp.text()
+      if (!resp.ok) {
+        let msg = text
+        try {
+          const parsed = JSON.parse(text)
+          msg = parsed.error || parsed.details || msg
+        } catch { /* ignore */ }
+        return { error: new Error(msg) }
+      }
+
+      console.log('✅ [useWorkspace] Invitación rechazada vía API:', text)
+      await fetchAll()
+      return { error: null }
+    } catch (error) { 
+      return { error } 
+    }
+  }, [user, fetchAll])
 
   const cancelInvitation = useCallback(async (invitationId: string) => {
     try {

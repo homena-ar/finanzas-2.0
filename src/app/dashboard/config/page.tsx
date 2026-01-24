@@ -489,16 +489,87 @@ export default function ConfigPage() {
       return
     }
 
-    // El Espacio Personal es básicamente un workspace especial
-    // Necesitamos crear un workspace temporal o usar el sistema de invitaciones personal
-    // Por ahora, usaremos el sistema de workspaces pero con un nombre especial
-    setAlertData({
-      title: 'Funcionalidad en desarrollo',
-      message: 'Las invitaciones al Espacio Personal estarán disponibles próximamente',
-      variant: 'info'
-    })
+    if (personalInviteEmail === user?.email) {
+      setAlertData({
+        title: 'Email inválido',
+        message: 'No podés invitarte a vos mismo',
+        variant: 'warning'
+      })
+      setShowAlert(true)
+      return
+    }
+
+    // El Espacio Personal necesita un workspace real para funcionar como colaborativo
+    // Buscar o crear el primer workspace del usuario (que será el espacio personal)
+    let personalWorkspaceId: string | null = null
+    
+    // Buscar el primer workspace del usuario
+    const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
+    if (myWorkspaces.length > 0) {
+      // Usar el primer workspace como espacio personal
+      personalWorkspaceId = myWorkspaces[0].id
+    } else {
+      // Crear un workspace para el espacio personal si no existe
+      const workspaceName = personalName || 'Espacio Personal'
+      const result = await createWorkspace(
+        workspaceName,
+        personalIcono || undefined,
+        personalLogo || null
+      )
+      
+      if (result.error) {
+        setAlertData({
+          title: 'Error',
+          message: 'No se pudo crear el workspace para el espacio personal',
+          variant: 'error'
+        })
+        setShowAlert(true)
+        setShowPersonalInviteModal(false)
+        return
+      }
+      
+      personalWorkspaceId = result.workspace?.id || null
+    }
+
+    if (!personalWorkspaceId) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo obtener el workspace del espacio personal',
+        variant: 'error'
+      })
+      setShowAlert(true)
+      setShowPersonalInviteModal(false)
+      return
+    }
+
+    // Usar el mismo sistema de invitación que los workspaces colaborativos
+    const result = await inviteUser(personalWorkspaceId, personalInviteEmail, personalInvitePermissions)
+
+    if (result.error) {
+      const errorMessage = result.error.message || 'No se pudo enviar la invitación'
+      setAlertData({
+        title: 'Error',
+        message: errorMessage,
+        variant: 'error'
+      })
+    } else {
+      setAlertData({
+        title: '¡Invitación enviada!',
+        message: `Se envió una invitación a ${personalInviteEmail} con los permisos seleccionados.`,
+        variant: 'success'
+      })
+      setPersonalInviteEmail('')
+      // Reset permissions to default
+      setPersonalInvitePermissions({
+        gastos: 'solo_lectura',
+        ingresos: 'solo_lectura',
+        ahorros: 'solo_lectura',
+        tarjetas: 'solo_lectura'
+      })
+      setShowPersonalInviteModal(false)
+    }
+
     setShowAlert(true)
-    setShowPersonalInviteModal(false)
   }
 
   // Workspace handlers
@@ -655,6 +726,22 @@ export default function ConfigPage() {
     }
 
     setShowAlert(true)
+  }
+
+  const handleSaveDisplayName = async (memberId: string, displayName: string) => {
+    const result = await updateMemberDisplayName(memberId, displayName.trim() || null)
+    
+    if (result.error) {
+      setAlertData({
+        title: 'Error',
+        message: 'No se pudo actualizar el nombre',
+        variant: 'error'
+      })
+      setShowAlert(true)
+    } else {
+      setEditingNames(prev => ({ ...prev, [memberId]: false }))
+      setDisplayNames(prev => ({ ...prev, [memberId]: displayName.trim() || '' }))
+    }
   }
 
   // --- LÓGICA DE PERMISOS CON CONFIRMACIÓN ---
@@ -1152,16 +1239,332 @@ export default function ConfigPage() {
               </div>
               <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:shrink-0">
                 {!editingPersonal && (
-                  <button
-                    onClick={() => setShowPersonalInviteModal(true)}
-                    className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
-                  >
-                    <Mail className="w-4 h-4" /> Invitar
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowPersonalInviteModal(true)}
+                      className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
+                    >
+                      <Mail className="w-4 h-4" /> Invitar
+                    </button>
+                    <button
+                      onClick={() => setExpandedWorkspaceId(expandedWorkspaceId === 'personal' ? null : 'personal')}
+                      className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap"
+                    >
+                      <Users className="w-4 h-4" /> {expandedWorkspaceId === 'personal' ? 'Ocultar' : 'Ver Miembros'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
           </div>
+
+          {/* INVITACIONES Y MIEMBROS DEL ESPACIO PERSONAL - Solo visible cuando está expandido */}
+          {expandedWorkspaceId === 'personal' && (() => {
+            // Obtener el primer workspace del usuario (espacio personal)
+            const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
+            const personalWorkspace = myWorkspaces.length > 0 ? myWorkspaces[0] : null
+            const personalWorkspaceId = personalWorkspace?.id
+            const personalWorkspaceMembers = personalWorkspaceId ? members.filter(m => m.workspace_id === personalWorkspaceId) : []
+            const personalSentInvitations = personalWorkspaceId ? sentInvitations.filter(inv => inv.workspace_id === personalWorkspaceId) : []
+
+            if (!personalWorkspaceId) {
+              return (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <p className="text-xs text-slate-400">
+                    Aún no hay un workspace creado para el espacio personal. Invitá a alguien para crearlo automáticamente.
+                  </p>
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {/* INVITACIONES ENVIADAS */}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="font-semibold text-sm">Invitaciones enviadas</h5>
+                    {personalSentInvitations.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setWorkspaceToDeleteAll(personalWorkspaceId)
+                          setShowDeleteAllConfirm(true)
+                        }}
+                        className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition flex items-center gap-1"
+                        title="Eliminar todo el historial"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Borrar todo
+                      </button>
+                    )}
+                  </div>
+                  {personalSentInvitations.length > 0 ? (
+                    <div className="space-y-2 mb-4">
+                      {personalSentInvitations.map(inv => {
+                        const statusColors = {
+                          pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                          accepted: 'bg-green-50 text-green-700 border-green-200',
+                          rejected: 'bg-red-50 text-red-700 border-red-200',
+                          cancelled: 'bg-gray-50 text-gray-700 border-gray-200'
+                        }
+                        const statusLabels = {
+                          pending: '⏳ Pendiente',
+                          accepted: '✅ Aceptada',
+                          rejected: '❌ Rechazada',
+                          cancelled: '🚫 Cancelada'
+                        }
+                        return (
+                          <div key={inv.id} className="bg-white rounded-lg p-3 border border-slate-200">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{inv.email}</p>
+                                <div className="text-xs text-slate-500 mt-1 space-y-1">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {Object.entries(inv.permissions).map(([section, perm]) => (
+                                      <div key={section} className="flex items-center gap-1 group relative">
+                                        <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 text-[10px]">
+                                          {section}: {permissionOptions.find(o => o.value === perm)?.label || perm}
+                                        </span>
+                                        {getPermissionDescription(perm) && (
+                                          <>
+                                            <HelpCircle className="w-3 h-3 text-slate-400 cursor-help hidden sm:block" />
+                                            <div className="absolute left-0 top-full mt-1 w-64 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 hidden sm:block">
+                                              <p className="font-semibold mb-1">{section}: {permissionOptions.find(o => o.value === perm)?.label}</p>
+                                              <p className="text-slate-200">{getPermissionDescription(perm)}</p>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                <span className={`text-xs px-2 py-1 rounded border font-medium whitespace-nowrap ${statusColors[inv.status as keyof typeof statusColors] || statusColors.pending}`}>
+                                  {statusLabels[inv.status as keyof typeof statusLabels] || '⏳ Pendiente'}
+                                </span>
+                                {(inv.status === 'pending' || inv.status === 'rejected') && (
+                                  <button
+                                    onClick={async () => {
+                                      const result = await cancelInvitation(inv.id)
+                                      if (result.error) {
+                                        setAlertData({
+                                          title: 'Error',
+                                          message: 'No se pudo cancelar la invitación',
+                                          variant: 'error'
+                                        })
+                                      } else {
+                                        setAlertData({
+                                          title: 'Invitación cancelada',
+                                          message: 'La invitación fue cancelada. Ahora puedes volver a invitar.',
+                                          variant: 'success'
+                                        })
+                                      }
+                                      setShowAlert(true)
+                                    }}
+                                    className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition whitespace-nowrap"
+                                    title="Cancelar invitación"
+                                  >
+                                    Cancelar
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setInvitationToDelete({ id: inv.id, email: inv.email })
+                                    setShowDeleteConfirm(true)
+                                  }}
+                                  className="text-xs px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
+                                  title="Eliminar invitación del historial"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 mb-4">No hay invitaciones enviadas</p>
+                  )}
+                </div>
+
+                {/* GESTIÓN DE MIEMBROS */}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <h5 className="font-semibold mb-3 text-sm">Gestión de Permisos</h5>
+
+                  {personalWorkspaceMembers.length > 0 ? (
+                    <div className="space-y-3">
+                      {personalWorkspaceMembers.map(member => {
+                        const isEditingName = editingNames[member.id] || false
+                        const currentDisplayName = displayNames[member.id] !== undefined 
+                          ? displayNames[member.id] 
+                          : (member.display_name || '')
+                        
+                        return (
+                          <div key={member.id} className="bg-white rounded-lg p-3 border border-slate-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <p className="font-medium text-sm">
+                                    {member.user_email}
+                                  </p>
+                                  {member.user_id === user?.uid && <span className="text-xs text-slate-400">(Tú - Owner)</span>}
+                                </div>
+                                
+                                {/* Campo de nombre personalizado */}
+                                <div className="flex items-center gap-2 mb-1">
+                                  <label className="text-xs text-slate-500 font-medium whitespace-nowrap">Nombre para etiquetas:</label>
+                                  {isEditingName ? (
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <input
+                                        type="text"
+                                        value={currentDisplayName}
+                                        onChange={(e) => setDisplayNames(prev => ({ ...prev, [member.id]: e.target.value }))}
+                                        className="input input-sm text-xs flex-1"
+                                        placeholder="Nombre personalizado"
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleSaveDisplayName(member.id, currentDisplayName)
+                                          } else if (e.key === 'Escape') {
+                                            setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                            setDisplayNames(prev => {
+                                              const newState = { ...prev }
+                                              delete newState[member.id]
+                                              return newState
+                                            })
+                                          }
+                                        }}
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleSaveDisplayName(member.id, currentDisplayName)}
+                                        className="btn btn-primary btn-xs"
+                                      >
+                                        Guardar
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingNames(prev => ({ ...prev, [member.id]: false }))
+                                          setDisplayNames(prev => {
+                                            const newState = { ...prev }
+                                            delete newState[member.id]
+                                            return newState
+                                          })
+                                        }}
+                                        className="btn btn-secondary btn-xs"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <span className="text-xs text-slate-600 flex-1">
+                                        {currentDisplayName || <span className="text-slate-400 italic">Sin nombre personalizado</span>}
+                                      </span>
+                                      {member.user_id !== user?.uid && (
+                                        <button
+                                          onClick={() => setEditingNames(prev => ({ ...prev, [member.id]: true }))}
+                                          className="text-xs px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
+                                        >
+                                          Editar
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {member.user_id !== user?.uid && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`¿Estás seguro de quitar a ${member.user_email} del espacio personal?`)) {
+                                      const result = await removeMember(member.id)
+                                      if (result.error) {
+                                        setAlertData({
+                                          title: 'Error',
+                                          message: 'No se pudo quitar al miembro',
+                                          variant: 'error'
+                                        })
+                                      } else {
+                                        setAlertData({
+                                          title: 'Miembro removido',
+                                          message: `${member.user_email} fue removido del espacio personal`,
+                                          variant: 'success'
+                                        })
+                                      }
+                                      setShowAlert(true)
+                                    }
+                                  }}
+                                  className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition"
+                                  title="Quitar miembro"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Permisos */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                              {(['gastos', 'ingresos', 'ahorros', 'tarjetas'] as const).map((section) => {
+                                const key = `${member.id}|||${section}`
+                                const pendingValue = pendingPermissions[key]
+                                const currentValue = pendingValue !== undefined ? pendingValue : member.permissions[section]
+                                const hasPendingChange = pendingValue !== undefined && pendingValue !== member.permissions[section]
+
+                                return (
+                                  <div key={section} className="relative">
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <label className="text-[10px] uppercase font-bold text-slate-500">{section}</label>
+                                      {hasPendingChange && (
+                                        <span className="text-[10px] text-blue-600 font-medium">(pendiente)</span>
+                                      )}
+                                    </div>
+                                    <select
+                                      value={currentValue}
+                                      onChange={(e) => handlePermissionChange(member.id, section, e.target.value)}
+                                      disabled={member.user_id === user?.uid}
+                                      className="input input-sm text-xs w-full"
+                                    >
+                                      {permissionOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      ))}
+                                    </select>
+                                    {hasPendingChange && (
+                                      <div className="flex gap-1 mt-1">
+                                        <button
+                                          onClick={() => savePermission(member.id, section, member)}
+                                          className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 transition"
+                                        >
+                                          Guardar
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setPendingPermissions(prev => {
+                                              const newState = { ...prev }
+                                              delete newState[key]
+                                              return newState
+                                            })
+                                          }}
+                                          className="text-[10px] px-2 py-0.5 bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100 transition"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400">No hay miembros en el espacio personal</p>
+                  )}
+                </div>
+              </>
+            )
+          })()}
         </div>
 
         {/* Workspaces Colaborativos */}
@@ -2636,73 +3039,92 @@ export default function ConfigPage() {
       {/* Modal de Invitación Espacio Personal */}
       {showPersonalInviteModal && (
         <div className="modal-overlay" onClick={() => setShowPersonalInviteModal(false)}>
-          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Invitar al Espacio Personal</h2>
+          <div className="modal max-w-md w-full mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
+            <div className="p-3 sm:p-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-base sm:text-lg">Invitar al Espacio Personal</h3>
               <button onClick={() => setShowPersonalInviteModal(false)} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="p-3 sm:p-4 sm:p-6 space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto">
               <div>
-                <label className="label">Email del invitado</label>
+                <label className="label text-sm">Email del usuario</label>
                 <input
                   type="email"
-                  className="input"
-                  placeholder="email@ejemplo.com"
+                  className="input w-full text-sm"
+                  placeholder="usuario@ejemplo.com"
                   value={personalInviteEmail}
                   onChange={e => setPersonalInviteEmail(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleInvitePersonal()}
+                  autoFocus
                 />
               </div>
-              <div>
-                <label className="label">Permisos</label>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={personalInvitePermissions.gastos === 'admin'}
-                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, gastos: e.target.checked ? 'admin' : 'solo_lectura' }))}
-                      className="w-4 h-4"
-                    />
-                    <span>Administrar gastos</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={personalInvitePermissions.ingresos === 'admin'}
-                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, ingresos: e.target.checked ? 'admin' : 'solo_lectura' }))}
-                      className="w-4 h-4"
-                    />
-                    <span>Administrar ingresos</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={personalInvitePermissions.ahorros === 'admin'}
-                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, ahorros: e.target.checked ? 'admin' : 'solo_lectura' }))}
-                      className="w-4 h-4"
-                    />
-                    <span>Administrar ahorros</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={personalInvitePermissions.tarjetas === 'admin'}
-                      onChange={e => setPersonalInvitePermissions(p => ({ ...p, tarjetas: e.target.checked ? 'admin' : 'solo_lectura' }))}
-                      className="w-4 h-4"
-                    />
-                    <span>Administrar tarjetas</span>
+
+              {/* SELECTORES DE PERMISOS */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                  <h4 className="font-semibold text-xs sm:text-sm text-slate-700">Configurar Permisos</h4>
+                  <div className="group relative">
+                    <Info className="w-4 h-4 text-slate-400 cursor-help flex-shrink-0" />
+                    <div className="hidden sm:block absolute left-0 bottom-full mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      <p className="font-semibold mb-2">Niveles de Permisos:</p>
+                      <ul className="space-y-1.5 text-slate-200">
+                        {permissionOptions.map(opt => (
+                          <li key={opt.value}>
+                            <span className="font-medium">{opt.label}:</span> {opt.description}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {['gastos', 'ingresos', 'ahorros', 'tarjetas'].map((section) => {
+                    const currentPermission = personalInvitePermissions[section as keyof WorkspacePermissions]
+                    const currentDescription = getPermissionDescription(currentPermission)
+                    return (
+                      <div key={section} className="relative w-full">
+                        <div className="flex items-center gap-1 mb-1 flex-wrap">
+                          <label className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap">{section}</label>
+                          {currentDescription && (
+                            <div className="group relative">
+                              <HelpCircle className="w-3 h-3 text-slate-400 cursor-help flex-shrink-0" />
+                              <div className="hidden sm:block absolute left-0 top-full mt-1 w-56 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                                {currentDescription}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <select
+                          value={currentPermission}
+                          onChange={(e) => setPersonalInvitePermissions(p => ({
+                            ...p,
+                            [section]: e.target.value
+                          }))}
+                          className="input input-sm text-xs w-full min-w-0"
+                        >
+                          {permissionOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                        {currentDescription && (
+                          <p className="text-[10px] text-slate-500 mt-1 italic break-words">{currentDescription}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={handleInvitePersonal} className="btn btn-primary flex-1">
-                  <Mail className="w-4 h-4" /> Enviar Invitación
-                </button>
-                <button onClick={() => setShowPersonalInviteModal(false)} className="btn btn-secondary">
-                  Cancelar
-                </button>
-              </div>
+
+            </div>
+            <div className="p-3 sm:p-4 border-t border-slate-200 flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+              <button onClick={() => setShowPersonalInviteModal(false)} className="btn btn-secondary w-full sm:w-auto order-2 sm:order-1 text-sm">
+                Cancelar
+              </button>
+              <button onClick={handleInvitePersonal} className="btn btn-primary w-full sm:w-auto order-1 sm:order-2 text-sm">
+                Enviar Invitación
+              </button>
             </div>
           </div>
         </div>
