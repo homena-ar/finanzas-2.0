@@ -139,16 +139,40 @@ export async function GET(request: NextRequest) {
       const ingresoId = ingresoDoc.id
 
       try {
-        // Obtener información del usuario
-        const userDoc = await firestore.collection('users').doc(ingreso.user_id).get()
-        if (!userDoc.exists) {
-          console.warn(`⚠️ [Ingresos Pendientes] Usuario no encontrado: ${ingreso.user_id}`)
+        // Obtener información del usuario - primero intentar en profiles
+        let profileEmail: string | null = null
+        let profileName: string | null = null
+        
+        // Intentar obtener de profiles
+        const profileDoc = await firestore.collection('profiles').doc(ingreso.user_id).get()
+        if (profileDoc.exists) {
+          const profileData = profileDoc.data()
+          profileEmail = profileData?.email || null
+          profileName = profileData?.nombre || profileData?.display_name || null
+          console.log(`📧 [Ingresos Pendientes] Perfil encontrado para ${ingreso.user_id}: ${profileEmail}`)
+        }
+        
+        // Si no hay email en profile, intentar con Firebase Auth
+        if (!profileEmail) {
+          try {
+            const authUser = await admin.auth().getUser(ingreso.user_id)
+            profileEmail = authUser.email || null
+            profileName = profileName || authUser.displayName || (authUser.email ? authUser.email.split('@')[0] : null)
+            console.log(`📧 [Ingresos Pendientes] Email obtenido de Auth para ${ingreso.user_id}: ${profileEmail}`)
+          } catch (authError: any) {
+            console.warn(`⚠️ [Ingresos Pendientes] No se pudo obtener usuario de Auth: ${ingreso.user_id}`, authError?.message)
+          }
+        }
+        
+        if (!profileEmail) {
+          console.warn(`⚠️ [Ingresos Pendientes] No se encontró email para usuario: ${ingreso.user_id}`)
           continue
         }
-
-        const userData = userDoc.data()
-        const profileEmail = userData?.email || userData?.user_email
-        const profileName = userData?.display_name || userData?.name || profileEmail?.split('@')[0] || 'Usuario'
+        
+        // Nombre por defecto si no se encontró
+        if (!profileName) {
+          profileName = profileEmail.split('@')[0]
+        }
 
         // Verificar si debe notificar
         const notificarCorreo = ingreso.notificar_correo !== false // Por defecto true
