@@ -528,7 +528,9 @@ export default function ConfigPage() {
         return
       }
       
-      personalWorkspaceId = result.workspace?.id || null
+      personalWorkspaceId = !result.error && 'workspace' in result && result.workspace
+        ? result.workspace.id
+        : null
     }
 
     if (!personalWorkspaceId) {

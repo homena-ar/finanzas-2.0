@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
             const ownerEmail = ownerRecord.email
 
             if (ownerEmail) {
-              const resend = (await import('resend')).default
-              const resendClient = new resend(process.env.RESEND_API_KEY)
+              const { Resend } = await import('resend')
+              const resendClient = new Resend(process.env.RESEND_API_KEY)
               
               const defaultFromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@fin.nexuno.com.ar'
               const emailFrom = `FinControl <${defaultFromEmail}>`
