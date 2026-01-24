@@ -106,7 +106,7 @@ Este es un recordatorio automático. Si ya cobraste este ingreso, puedes confirm
     const result = await resend.emails.send({
       from: emailFrom,
       to: [userEmail],
-      subject: `💰 Recordatorio: ${ingresoDescripcion} - ${ingresoMonto}`,
+      subject: `💰 Cobro pendiente: ${ingresoDescripcion}`,
       html: emailHtml,
       text: emailText,
     })

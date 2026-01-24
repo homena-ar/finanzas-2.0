@@ -185,7 +185,8 @@ export async function GET(request: NextRequest) {
         const montoFormateado = new Intl.NumberFormat('es-AR', {
           style: 'currency',
           currency: ingreso.moneda || 'ARS',
-          minimumFractionDigits: 2
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
         }).format(ingreso.monto)
 
         // Enviar correo si está habilitado
@@ -227,8 +228,8 @@ export async function GET(request: NextRequest) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               userId: ingreso.user_id,
-              title: '💰 Recordatorio: Ingreso pendiente de cobro',
-              body: `${ingreso.descripcion} - ${montoFormateado}. ¿Ya cobraste este ingreso?`,
+              title: '💰 Recordatorio: Cobro pendiente',
+              body: `${ingreso.descripcion} - ${montoFormateado}`,
               url: '/dashboard/ingresos',
               tag: 'ingreso-pendiente',
               workspaceId: ingreso.workspace_id || null
@@ -252,8 +253,8 @@ export async function GET(request: NextRequest) {
           const notificacionData: Record<string, any> = {
             user_id: ingreso.user_id,
             tipo: 'sistema',
-            titulo: '💰 Ingreso pendiente de cobro',
-            mensaje: `${ingreso.descripcion} - ${montoFormateado}. ¿Ya cobraste este ingreso?`,
+            titulo: '💰 Recordatorio: Cobro pendiente',
+            mensaje: `${ingreso.descripcion} - ${montoFormateado}`,
             icono: '💰',
             leida: false,
             link: '/dashboard/ingresos',
