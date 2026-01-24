@@ -1437,33 +1437,33 @@ export default function IngresosPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4 bg-slate-50 border-b border-slate-200">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative">
+      <div className="card p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+          <div className="relative col-span-2 sm:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar..."
-              className="input pl-9 w-40"
+              className="input pl-9 w-full"
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
             />
           </div>
           <select
-            className="input w-auto"
+            className="input w-full"
             value={filters.moneda}
             onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
           >
-            <option value="">Todas las monedas</option>
+            <option value="">Moneda</option>
             <option value="ARS">ARS</option>
             <option value="USD">USD</option>
           </select>
           <select
-            className="input w-auto"
+            className="input w-full"
             value={filters.categoria}
             onChange={e => setFilters(f => ({ ...f, categoria: e.target.value }))}
           >
-            <option value="">Todas las categorías</option>
+            <option value="">Categoría</option>
             {categoriasIngresos.map(c => (
               <option key={c.id} value={c.id}>
                 {c.icono} {c.nombre}
@@ -1471,11 +1471,11 @@ export default function IngresosPage() {
             ))}
           </select>
           <select
-            className="input w-auto"
+            className="input w-full"
             value={filters.tag}
             onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
           >
-            <option value="">Todos los tags</option>
+            <option value="">Tag</option>
             {tagsIngresos.map(t => (
               <option key={t.id} value={t.id}>
                 {t.nombre}
@@ -1483,11 +1483,11 @@ export default function IngresosPage() {
             ))}
           </select>
           <select
-            className="input w-auto"
+            className="input w-full"
             value={filters.cuenta}
             onChange={e => setFilters(f => ({ ...f, cuenta: e.target.value }))}
           >
-            <option value="">Todas las cuentas</option>
+            <option value="">Cuenta</option>
             {tarjetas.map(t => (
               <option key={t.id} value={t.id}>
                 {t.nombre}
@@ -1495,21 +1495,21 @@ export default function IngresosPage() {
             ))}
           </select>
           <select
-            className="input w-auto"
+            className="input w-full"
             value={filters.pendiente}
             onChange={e => setFilters(f => ({ ...f, pendiente: e.target.value }))}
           >
-            <option value="">Todos</option>
-            <option value="si">Pendientes de cobro</option>
+            <option value="">Estado</option>
+            <option value="si">Pendientes</option>
             <option value="no">Confirmados</option>
           </select>
           <select
-            className="input w-auto"
+            className="input w-full col-span-2 sm:col-span-1"
             value={filters.sort}
             onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
           >
-            <option value="monto-desc">Mayor a menor monto</option>
-            <option value="monto-asc">Menor a mayor monto</option>
+            <option value="monto-desc">Mayor a menor</option>
+            <option value="monto-asc">Menor a mayor</option>
             <option value="fecha-desc">Más recientes</option>
             <option value="fecha-asc">Más antiguos</option>
             <option value="descripcion-asc">A-Z</option>
@@ -1517,11 +1517,11 @@ export default function IngresosPage() {
           </select>
           {currentWorkspace && members.length > 0 && (
             <select
-              className="input w-auto"
+              className="input w-full"
               value={filters.colaborador}
               onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
             >
-              <option value="">Todos los colaboradores</option>
+              <option value="">Colaborador</option>
               <option value="yo">Tú</option>
               {currentWorkspace.owner_id !== user?.uid && (
                 <option value="propietario">
@@ -1590,7 +1590,7 @@ export default function IngresosPage() {
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left p-4 font-semibold text-slate-700 w-12">
+                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 w-12">
                   <input
                     type="checkbox"
                     checked={selectedIngresos.size === ingresosMes.length && ingresosMes.length > 0}
@@ -1604,13 +1604,13 @@ export default function IngresosPage() {
                     className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
                   />
                 </th>
-                <th className="text-left p-4 font-semibold text-slate-700">Descripción</th>
-                <th className="text-left p-4 font-semibold text-slate-700">Cuenta</th>
-                <th className="text-left p-4 font-semibold text-slate-700">Fecha</th>
-                <th className="text-right p-4 font-semibold text-slate-700">Monto</th>
-                <th className="text-left p-4 font-semibold text-slate-700">Estado</th>
-                <th className="text-left p-4 font-semibold text-slate-700">Fijo</th>
-                <th className="text-right p-4 font-semibold text-slate-700">Acciones</th>
+                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 min-w-[200px]">Descripción</th>
+                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden sm:table-cell min-w-[120px]">Cuenta</th>
+                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden md:table-cell">Fecha</th>
+                <th className="text-right p-3 sm:p-4 font-semibold text-slate-700 whitespace-nowrap">Monto</th>
+                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden lg:table-cell">Estado</th>
+                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden lg:table-cell">Fijo</th>
+                <th className="text-right p-3 sm:p-4 font-semibold text-slate-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -1633,7 +1633,7 @@ export default function IngresosPage() {
                 const authorLabel = getUserLabel(ingreso.user_id)
                 return (
                   <tr key={ingreso.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                    <td className="p-4">
+                    <td className="p-3 sm:p-4">
                       <input
                         type="checkbox"
                         checked={selectedIngresos.has(ingreso.id)}
@@ -1650,13 +1650,13 @@ export default function IngresosPage() {
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-lg">
+                    <td className="p-3 sm:p-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 rounded-lg flex items-center justify-center text-base sm:text-lg flex-shrink-0">
                           {categoriaMap[ingreso.categoria_id || '']?.icono || '💰'}
                         </div>
-                        <div>
-                          <div className="font-semibold">{ingreso.descripcion}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-sm sm:text-base">{ingreso.descripcion}</div>
                           
                           {/* ETIQUETA DE AUTOR */}
                           {currentWorkspace && authorLabel && (
@@ -1674,6 +1674,26 @@ export default function IngresosPage() {
                           <div className="text-xs text-slate-500">
                             {categoriaMap[ingreso.categoria_id || '']?.nombre || 'Sin categoría'}
                             {(ingreso as any).es_fijo && ' 📌'}
+                            {/* Mostrar cuenta en móvil si está oculta */}
+                            <span className="sm:hidden ml-2">
+                              {cuenta ? (
+                                <span className="text-xs">{normalizeAccountName(cuenta.nombre)}</span>
+                              ) : (
+                                <span className="text-xs">-</span>
+                              )}
+                            </span>
+                            {/* Mostrar fecha en móvil si está oculta */}
+                            <span className="md:hidden ml-2">
+                              {new Date(ingreso.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                            {/* Mostrar estado en móvil si está oculta */}
+                            <span className="lg:hidden ml-2">
+                              {(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada ? (
+                                <span className="text-xs text-amber-600">⏳ Pendiente</span>
+                              ) : (ingreso as any).fecha_cobro_confirmada ? (
+                                <span className="text-xs text-emerald-600">✓ Confirmado</span>
+                              ) : null}
+                            </span>
                           </div>
                           {ingreso.tag_ids && ingreso.tag_ids.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -1695,7 +1715,7 @@ export default function IngresosPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3 sm:p-4 hidden sm:table-cell">
                       {cuenta ? (
                         <div>
                           <span className="inline-flex items-center gap-1 text-sm text-slate-600 font-medium">
@@ -1719,15 +1739,15 @@ export default function IngresosPage() {
                         <span className="text-slate-400 text-sm">-</span>
                       )}
                     </td>
-                    <td className="p-4 text-slate-600">
+                    <td className="p-3 sm:p-4 text-slate-600 hidden md:table-cell">
                       {new Date(ingreso.fecha).toLocaleDateString('es-AR')}
                     </td>
-                    <td className="p-4 text-right">
-                      <span className={`font-bold ${(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    <td className="p-3 sm:p-4 text-right whitespace-nowrap">
+                      <span className={`font-bold inline-block text-sm sm:text-base ${(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada ? 'text-amber-600' : 'text-emerald-600'}`}>
                         {formatMoney(ingreso.monto, ingreso.moneda)}
                       </span>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3 sm:p-4 hidden lg:table-cell">
                       {(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada ? (
                         <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-semibold">
                           ⏳ Pendiente
@@ -1742,7 +1762,7 @@ export default function IngresosPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-3 sm:p-4 hidden lg:table-cell">
                       <button
                         onClick={() => toggleFijo(ingreso)}
                         className={`w-10 h-6 rounded-full relative transition-colors ${
@@ -1754,8 +1774,8 @@ export default function IngresosPage() {
                         }`} />
                       </button>
                     </td>
-                    <td className="p-4 text-right">
-                      <div className="flex gap-2 justify-end">
+                    <td className="p-3 sm:p-4 text-right">
+                      <div className="flex gap-1 sm:gap-2 justify-end">
                         {(ingreso as any).pendiente_cobro && !(ingreso as any).fecha_cobro_confirmada && (
                           <button
                             onClick={async () => {
@@ -1763,7 +1783,7 @@ export default function IngresosPage() {
                                 fecha_cobro_confirmada: new Date().toISOString().split('T')[0]
                               })
                             }}
-                            className="p-2 hover:bg-emerald-50 rounded-lg transition"
+                            className="p-1.5 sm:p-2 hover:bg-emerald-50 rounded-lg transition"
                             title="Confirmar cobro"
                           >
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -1773,7 +1793,7 @@ export default function IngresosPage() {
                           <a
                             href={(ingreso as any).comprobante_url}
                             download={(ingreso as any).comprobante_nombre}
-                            className="p-2 hover:bg-slate-100 rounded-lg transition"
+                            className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg transition"
                             title="Descargar comprobante"
                           >
                             <Download className="w-4 h-4 text-slate-600" />
@@ -1781,7 +1801,7 @@ export default function IngresosPage() {
                         )}
                         <button
                           onClick={() => openEdit(ingreso)}
-                          className="p-2 hover:bg-slate-100 rounded-lg transition"
+                          className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg transition"
                           title="Editar"
                         >
                           <Edit2 className="w-4 h-4 text-slate-600" />

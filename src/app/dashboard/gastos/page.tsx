@@ -1818,75 +1818,77 @@ export default function GastosPage() {
         </div>
 
         {/* Filters */}
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-2 items-center">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors w-32"
-              value={filters.search}
-              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-            />
-          </div>
-          <select
-            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
-            value={filters.tarjeta}
-            onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
-          >
-            <option value="">Cuenta</option>
-            {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
-          </select>
-          <select
-            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
-            value={filters.moneda}
-            onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
-          >
-            <option value="">Moneda</option>
-            <option value="ARS">ARS</option>
-            <option value="USD">USD</option>
-          </select>
-          <select
-            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
-            value={filters.tag}
-            onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
-          >
-            <option value="">Todas las etiquetas</option>
-            {tags.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-          </select>
-          {currentWorkspace && members.length > 0 && (
+        <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
+            <div className="relative col-span-2 sm:col-span-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+                value={filters.search}
+                onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+              />
+            </div>
             <select
-              className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
-              value={filters.colaborador}
-              onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              value={filters.tarjeta}
+              onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
             >
-              <option value="">Todos los colaboradores</option>
-              <option value="yo">Tú</option>
-              {currentWorkspace.owner_id !== user?.uid && (
-                <option value="propietario">
-                  {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
-                   members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
-                   'Propietario'}
-                </option>
-              )}
-              {members
-                .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
-                .map(m => (
-                  <option key={m.id} value={m.user_id}>
-                    {m.display_name || m.user_email.split('@')[0]}
-                  </option>
-                ))}
+              <option value="">Cuenta</option>
+              {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
             </select>
-          )}
-          <select
-            className="px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
-            value={filters.sort}
-            onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
-          >
-            <option value="monto-desc">Mayor $</option>
-            <option value="monto-asc">Menor $</option>
-            <option value="fecha-desc">Reciente</option>
-          </select>
+            <select
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              value={filters.moneda}
+              onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
+            >
+              <option value="">Moneda</option>
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+            <select
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              value={filters.tag}
+              onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
+            >
+              <option value="">Etiquetas</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            </select>
+            {currentWorkspace && members.length > 0 && (
+              <select
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+                value={filters.colaborador}
+                onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
+              >
+                <option value="">Colaborador</option>
+                <option value="yo">Tú</option>
+                {currentWorkspace.owner_id !== user?.uid && (
+                  <option value="propietario">
+                    {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
+                     members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
+                     'Propietario'}
+                  </option>
+                )}
+                {members
+                  .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
+                  .map(m => (
+                    <option key={m.id} value={m.user_id}>
+                      {m.display_name || m.user_email.split('@')[0]}
+                    </option>
+                  ))}
+              </select>
+            )}
+            <select
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              value={filters.sort}
+              onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
+            >
+              <option value="monto-desc">Mayor $</option>
+              <option value="monto-asc">Menor $</option>
+              <option value="fecha-desc">Reciente</option>
+            </select>
+          </div>
         </div>
 
         {/* Acciones masivas */}
@@ -1949,33 +1951,34 @@ export default function GastosPage() {
         )}
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-slate-50">
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedGastos.size === gastosMes.length && gastosMes.length > 0}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedGastos(new Set(gastosMes.map(g => g.id)))
-                      } else {
-                        setSelectedGastos(new Set())
-                      }
-                    }}
-                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
-                  />
-                </th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Descripción</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuenta</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Monto</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuotas</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Fijo</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Pagado</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase"></th>
-              </tr>
-            </thead>
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="inline-block min-w-full align-middle">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedGastos.size === gastosMes.length && gastosMes.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedGastos(new Set(gastosMes.map(g => g.id)))
+                        } else {
+                          setSelectedGastos(new Set())
+                        }
+                      }}
+                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                    />
+                  </th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase min-w-[200px]">Descripción</th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden sm:table-cell min-w-[120px]">Cuenta</th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Monto</th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden md:table-cell">Cuotas</th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden lg:table-cell">Fijo</th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden md:table-cell min-w-[140px]">Pagado</th>
+                  <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase"></th>
+                </tr>
+              </thead>
             <tbody>
               {gastosMes.length === 0 ? (
                 <tr>
@@ -2087,8 +2090,8 @@ export default function GastosPage() {
                         </span>
                       )}
                     </td>
-                    <td className={`p-4 font-bold ${g.moneda === 'USD' ? 'text-emerald-600' : ''}`}>
-                      {formatMoney(monto, g.moneda)}
+                    <td className={`p-4 font-bold ${g.moneda === 'USD' ? 'text-emerald-600' : ''} whitespace-nowrap`}>
+                      <span className="inline-block">{formatMoney(monto, g.moneda)}</span>
                     </td>
                     <td className="p-4">
                       {g.cuotas > 1 ? (
@@ -2158,6 +2161,7 @@ export default function GastosPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
