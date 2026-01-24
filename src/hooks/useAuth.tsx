@@ -225,6 +225,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Listener adicional para restaurar sesión cuando la app vuelve a estar visible
+  // Esto es especialmente importante en iOS cuando la PWA se cierra y se vuelve a abrir
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let isRestoring = false
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && !isRestoring) {
+        console.log('🔐 [Firebase useAuth] App visible - verificando sesión')
+        
+        // Si hay un usuario actual pero no está en el estado, intentar restaurar
+        if (auth.currentUser && !user) {
+          isRestoring = true
+          console.log('🔐 [Firebase useAuth] Restaurando sesión desde auth.currentUser')
+          try {
+            // Recargar el usuario para obtener el estado más reciente
+            await auth.currentUser.reload()
+            setUser(auth.currentUser)
+            
+            // Cargar el perfil si el correo está verificado
+            if (auth.currentUser.emailVerified) {
+              const profileData = await fetchProfile(auth.currentUser.uid)
+              setProfile(profileData)
+            }
+          } catch (error) {
+            console.error('🔐 [Firebase useAuth] Error restaurando sesión:', error)
+          } finally {
+            isRestoring = false
+          }
+        }
+      }
+    }
+
+    // Escuchar cambios de visibilidad
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // También escuchar cuando la página se vuelve a enfocar (útil para PWAs)
+    window.addEventListener('focus', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleVisibilityChange)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]) // fetchProfile está definido en el mismo componente, no necesita estar en dependencias
+
   const signIn = async (email: string, password: string) => {
     console.log('🔐 [Firebase useAuth] signIn called')
     setLoading(true)

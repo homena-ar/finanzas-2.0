@@ -128,6 +128,16 @@ self.addEventListener('fetch', (event) => {
     return // No procesar estos requests
   }
 
+  // NO cachear requests de Firebase Auth o Firebase APIs
+  // Esto es crítico para mantener la sesión activa en PWAs
+  if (url.hostname.includes('firebase') || 
+      url.hostname.includes('googleapis.com') ||
+      url.pathname.includes('/__/auth/') ||
+      url.pathname.includes('/identitytoolkit/') ||
+      url.pathname.includes('/securetoken/')) {
+    return // Dejar que Firebase maneje estas requests directamente
+  }
+
   // Solo cachear requests del mismo origen
   if (url.origin !== self.location.origin) {
     return

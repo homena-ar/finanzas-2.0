@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 // Validar que todas las variables de Firebase estén configuradas
@@ -37,5 +37,13 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 const auth = getAuth(app)
 const db = getFirestore(app)
+
+// Configurar persistencia explícita para PWA (especialmente importante en iOS)
+// Esto asegura que la sesión persista cuando la app se cierra y se vuelve a abrir
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.error('❌ [Firebase] Error configurando persistencia:', error)
+  })
+}
 
 export { app, auth, db }
