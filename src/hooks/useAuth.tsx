@@ -8,7 +8,8 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  sendEmailVerification as firebaseSendEmailVerification
+  sendEmailVerification as firebaseSendEmailVerification,
+  getIdToken
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -81,6 +82,42 @@ function getFirebaseErrorMessage(error: any): string {
   }
 }
 
+// Claves para almacenamiento de respaldo de sesión (iOS Safari puede perder IndexedDB)
+const SESSION_BACKUP_KEY = 'fincontrol:auth_session_backup'
+const SESSION_BACKUP_TIMESTAMP_KEY = 'fincontrol:auth_session_timestamp'
+
+// Guardar sesión en localStorage como respaldo (para iOS)
+async function backupSession(user: User) {
+  if (typeof window === 'undefined') return
+  try {
+    const token = await getIdToken(user)
+    const sessionData = {
+      uid: user.uid,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      token: token,
+      timestamp: Date.now()
+    }
+    localStorage.setItem(SESSION_BACKUP_KEY, JSON.stringify(sessionData))
+    localStorage.setItem(SESSION_BACKUP_TIMESTAMP_KEY, String(Date.now()))
+    console.log('💾 [Firebase useAuth] Sesión guardada en respaldo')
+  } catch (error) {
+    console.error('❌ [Firebase useAuth] Error guardando respaldo de sesión:', error)
+  }
+}
+
+// Limpiar respaldo de sesión
+function clearSessionBackup() {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem(SESSION_BACKUP_KEY)
+    localStorage.removeItem(SESSION_BACKUP_TIMESTAMP_KEY)
+    console.log('🗑️ [Firebase useAuth] Respaldo de sesión limpiado')
+  } catch (error) {
+    console.error('❌ [Firebase useAuth] Error limpiando respaldo:', error)
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -132,6 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         // Recargar el usuario para obtener el estado más reciente de emailVerified
         await firebaseUser.reload()
+        
+        // Guardar sesión en respaldo (especialmente importante para iOS)
+        await backupSession(firebaseUser)
         
         // Verificar si el correo se acaba de verificar (cambió de false a true)
         // previousEmailVerified === null significa primera carga, no contar como verificación nueva
@@ -214,6 +254,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setProfile(null)
         previousEmailVerified = null
+        // Limpiar respaldo cuando no hay usuario
+        clearSessionBackup()
       }
 
       setLoading(false)
@@ -236,7 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === 'visible' && !isRestoring) {
         console.log('🔐 [Firebase useAuth] App visible - verificando sesión')
         
-        // Si hay un usuario actual pero no está en el estado, intentar restaurar
+        // Primero intentar restaurar desde auth.currentUser (si Firebase mantuvo la sesión)
         if (auth.currentUser && !user) {
           isRestoring = true
           console.log('🔐 [Firebase useAuth] Restaurando sesión desde auth.currentUser')
@@ -244,6 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Recargar el usuario para obtener el estado más reciente
             await auth.currentUser.reload()
             setUser(auth.currentUser)
+            await backupSession(auth.currentUser)
             
             // Cargar el perfil si el correo está verificado
             if (auth.currentUser.emailVerified) {
@@ -251,12 +294,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setProfile(profileData)
             }
           } catch (error) {
-            console.error('🔐 [Firebase useAuth] Error restaurando sesión:', error)
+            console.error('🔐 [Firebase useAuth] Error restaurando sesión desde auth.currentUser:', error)
+            // Si falla, intentar desde el respaldo
+            tryRestoreFromBackup()
           } finally {
             isRestoring = false
           }
+        } else if (!auth.currentUser && !user) {
+          // Si no hay usuario en Firebase ni en el estado, intentar restaurar desde respaldo
+          tryRestoreFromBackup()
         }
       }
+    }
+
+    // Función para intentar restaurar desde el respaldo de localStorage
+    const tryRestoreFromBackup = async () => {
+      try {
+        const backupData = localStorage.getItem(SESSION_BACKUP_KEY)
+        const backupTimestamp = localStorage.getItem(SESSION_BACKUP_TIMESTAMP_KEY)
+        
+        if (!backupData || !backupTimestamp) {
+          return // No hay respaldo
+        }
+
+        // Verificar que el respaldo no sea muy antiguo (máximo 7 días)
+        const timestamp = Number(backupTimestamp)
+        const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 días
+        if (Date.now() - timestamp > maxAge) {
+          console.log('🔐 [Firebase useAuth] Respaldo de sesión muy antiguo, descartando')
+          clearSessionBackup()
+          return
+        }
+
+        const sessionData = JSON.parse(backupData)
+        console.log('💾 [Firebase useAuth] Respaldo de sesión encontrado, verificando...')
+        
+        // Verificar que el token aún sea válido haciendo una petición a Firebase
+        // Nota: No podemos restaurar la sesión directamente desde el token,
+        // pero podemos mostrar un mensaje al usuario o redirigir al login
+        // Firebase Auth no permite restaurar sesiones desde tokens almacenados
+        
+        // Por ahora, solo logueamos que encontramos el respaldo
+        // El usuario necesitará iniciar sesión nuevamente, pero al menos sabemos que había una sesión
+        console.log('💾 [Firebase useAuth] Respaldo encontrado para:', sessionData.email)
+        
+      } catch (error) {
+        console.error('❌ [Firebase useAuth] Error restaurando desde respaldo:', error)
+        clearSessionBackup()
+      }
+    }
+
+    // Intentar restaurar al cargar la página
+    if (!user && !auth.currentUser) {
+      tryRestoreFromBackup()
     }
 
     // Escuchar cambios de visibilidad
@@ -474,6 +564,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setProfile(null)
     setLoading(false)
+    clearSessionBackup() // Limpiar respaldo al cerrar sesión
   }
 
   const updateProfile = async (data: Partial<Profile>) => {

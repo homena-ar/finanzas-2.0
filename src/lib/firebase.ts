@@ -38,12 +38,9 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 const auth = getAuth(app)
 const db = getFirestore(app)
 
-// Configurar persistencia explícita para PWA (especialmente importante en iOS)
-// Esto asegura que la sesión persista cuando la app se cierra y se vuelve a abrir
-if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.error('❌ [Firebase] Error configurando persistencia:', error)
-  })
-}
+// NOTA: No llamamos setPersistence() aquí porque:
+// 1. browserLocalPersistence es el valor por defecto
+// 2. Llamarlo repetidamente puede borrar sesiones existentes en otras pestañas
+// 3. En iOS Safari, IndexedDB puede ser poco confiable, así que usamos un sistema de respaldo manual
 
 export { app, auth, db }
