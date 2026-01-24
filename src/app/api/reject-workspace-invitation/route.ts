@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
             // No fallar el rechazo si el email falla
           }
 
-          // Enviar push notification al owner
+          // Enviar push notification al owner (todos sus dispositivos, sin filtrar por workspace)
           try {
             const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-push-notification`, {
               method: 'POST',
@@ -170,8 +170,7 @@ export async function POST(request: NextRequest) {
                 title: 'Invitación rechazada',
                 body: `${invitedUserName || email} rechazó tu invitación a ${workspaceName}`,
                 url: '/dashboard/config',
-                tag: 'invite-rejected',
-                workspaceId: workspaceId
+                tag: 'invite-rejected'
               })
             })
             

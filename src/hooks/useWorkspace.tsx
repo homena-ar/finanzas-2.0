@@ -33,7 +33,7 @@ interface WorkspaceContextType {
   updateWorkspaceConfig: (id: string, config: { ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number }) => Promise<{ error: any }>
   deleteWorkspace: (id: string) => Promise<{ error: any }>
 
-  inviteUser: (workspaceId: string, email: string, permissions: WorkspacePermissions) => Promise<{ error: any }>
+  inviteUser: (workspaceId: string, email: string, permissions: WorkspacePermissions, options?: { workspaceDisplayName?: string }) => Promise<{ error: any }>
   updateMemberPermissions: (memberId: string, permissions: WorkspacePermissions) => Promise<{ error: any }>
   updateMemberDisplayName: (memberId: string, displayName: string | null) => Promise<{ error: any }>
   removeMember: (memberId: string) => Promise<{ error: any }>
@@ -346,7 +346,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user, workspaces, fetchAll])
 
-  const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions) => {
+  const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions, options?: { workspaceDisplayName?: string }) => {
     if (!user) return { error: new Error('No user') }
 
     try {
@@ -386,14 +386,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       const workspace = workspaces.find(w => w.id === workspaceId)
-      const workspaceName = workspace?.name || 'Workspace'
+      const workspaceName = options?.workspaceDisplayName ?? workspace?.name ?? 'Workspace'
       
       // Crear la invitación con toda la información necesaria
       await addDoc(collection(db, 'workspace_invitations'), {
         workspace_id: workspaceId,
         email,
         inviter_email: user.email, // Email de quien envía la invitación
-        workspace_name: workspaceName, // Nombre del workspace
+        workspace_name: workspaceName, // Nombre del workspace (o display name para Espacio Personal)
         permissions,
         status: 'pending',
         created_at: serverTimestamp()

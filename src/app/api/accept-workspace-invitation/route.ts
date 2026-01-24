@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
             // No fallar la aceptación si el email falla
           }
 
-          // Enviar push notification al owner
+          // Enviar push notification al owner (todos sus dispositivos, sin filtrar por workspace)
           try {
             const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-push-notification`, {
               method: 'POST',
@@ -183,8 +183,7 @@ export async function POST(request: NextRequest) {
                 title: 'Invitación aceptada',
                 body: `${invitedUserName || email} aceptó tu invitación a ${workspaceName}`,
                 url: '/dashboard/config',
-                tag: 'invite-accepted',
-                workspaceId: workspaceId
+                tag: 'invite-accepted'
               })
             })
             

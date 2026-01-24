@@ -85,6 +85,10 @@ export default function ConfigPage() {
   const [selectedTagsGastos, setSelectedTagsGastos] = useState<Set<string>>(new Set())
   const [selectedTagsIngresos, setSelectedTagsIngresos] = useState<Set<string>>(new Set())
   
+  // Loading al aceptar/rechazar invitación
+  const [acceptingInvitationId, setAcceptingInvitationId] = useState<string | null>(null)
+  const [rejectingInvitationId, setRejectingInvitationId] = useState<string | null>(null)
+
   // Estados para invitaciones del Espacio Personal
   const [showPersonalInviteModal, setShowPersonalInviteModal] = useState(false)
   const [personalInviteEmail, setPersonalInviteEmail] = useState('')
@@ -499,17 +503,35 @@ export default function ConfigPage() {
       return
     }
 
-    // El Espacio Personal necesita un workspace real para funcionar como colaborativo
-    // Buscar o crear el primer workspace del usuario (que será el espacio personal)
+    // El Espacio Personal debe usar SOLO el workspace dedicado (nombre "Espacio Personal" o personalName)
+    // para que la invitación llegue específicamente a ese espacio y no a Gravix/Homena.
     let personalWorkspaceId: string | null = null
+    const personalDisplayName = personalName ? `Espacio Personal (${personalName})` : 'Espacio Personal'
     
-    // Buscar el primer workspace del usuario
     const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
-    if (myWorkspaces.length > 0) {
-      // Usar el primer workspace como espacio personal
-      personalWorkspaceId = myWorkspaces[0].id
+    const personalCandidates = myWorkspaces.filter(
+      w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
+    )
+    
+    if (personalCandidates.length > 0) {
+      // Usar el workspace que coincide con el espacio personal (nombre personalName o "Espacio Personal")
+      personalWorkspaceId = personalCandidates[0].id
+    } else if (myWorkspaces.length > 0) {
+      // No hay workspace "Espacio Personal": intentar crear uno; si falla (ej. límite), usar el primero
+      const workspaceName = personalName || 'Espacio Personal'
+      const result = await createWorkspace(
+        workspaceName,
+        personalIcono || undefined,
+        personalLogo || null
+      )
+      
+      if (!result.error && 'workspace' in result && result.workspace) {
+        personalWorkspaceId = result.workspace.id
+      } else {
+        personalWorkspaceId = myWorkspaces[0].id
+      }
     } else {
-      // Crear un workspace para el espacio personal si no existe
+      // Sin workspaces: crear el primero como espacio personal
       const workspaceName = personalName || 'Espacio Personal'
       const result = await createWorkspace(
         workspaceName,
@@ -544,8 +566,10 @@ export default function ConfigPage() {
       return
     }
 
-    // Usar el mismo sistema de invitación que los workspaces colaborativos
-    const result = await inviteUser(personalWorkspaceId, personalInviteEmail, personalInvitePermissions)
+    // Invitar solo al espacio personal; el invitado verá "Espacio Personal (Casa)" en pendientes
+    const result = await inviteUser(personalWorkspaceId, personalInviteEmail, personalInvitePermissions, {
+      workspaceDisplayName: personalDisplayName
+    })
 
     if (result.error) {
       const errorMessage = result.error.message || 'No se pudo enviar la invitación'
@@ -691,43 +715,49 @@ export default function ConfigPage() {
   }
 
   const handleAcceptInvitation = async (id: string) => {
-    const result = await acceptInvitation(id)
-
-    if (result.error) {
-      setAlertData({
-        title: 'Error',
-        message: 'No se pudo aceptar la invitación',
-        variant: 'error'
-      })
-    } else {
-      setAlertData({
-        title: '¡Invitación aceptada!',
-        message: 'Ahora tenés acceso al workspace',
-        variant: 'success'
-      })
+    setAcceptingInvitationId(id)
+    try {
+      const result = await acceptInvitation(id)
+      if (result.error) {
+        setAlertData({
+          title: 'Error',
+          message: 'No se pudo aceptar la invitación',
+          variant: 'error'
+        })
+      } else {
+        setAlertData({
+          title: '¡Invitación aceptada!',
+          message: 'Ahora tenés acceso al workspace',
+          variant: 'success'
+        })
+      }
+      setShowAlert(true)
+    } finally {
+      setAcceptingInvitationId(null)
     }
-
-    setShowAlert(true)
   }
 
   const handleRejectInvitation = async (id: string) => {
-    const result = await rejectInvitation(id)
-
-    if (result.error) {
-      setAlertData({
-        title: 'Error',
-        message: 'No se pudo rechazar la invitación',
-        variant: 'error'
-      })
-    } else {
-      setAlertData({
-        title: 'Invitación rechazada',
-        message: 'La invitación fue rechazada',
-        variant: 'success'
-      })
+    setRejectingInvitationId(id)
+    try {
+      const result = await rejectInvitation(id)
+      if (result.error) {
+        setAlertData({
+          title: 'Error',
+          message: 'No se pudo rechazar la invitación',
+          variant: 'error'
+        })
+      } else {
+        setAlertData({
+          title: 'Invitación rechazada',
+          message: 'La invitación fue rechazada',
+          variant: 'success'
+        })
+      }
+      setShowAlert(true)
+    } finally {
+      setRejectingInvitationId(null)
     }
-
-    setShowAlert(true)
   }
 
   const handleSaveDisplayName = async (memberId: string, displayName: string) => {
@@ -1262,9 +1292,11 @@ export default function ConfigPage() {
 
           {/* INVITACIONES Y MIEMBROS DEL ESPACIO PERSONAL - Solo visible cuando está expandido */}
           {expandedWorkspaceId === 'personal' && (() => {
-            // Obtener el primer workspace del usuario (espacio personal)
             const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
-            const personalWorkspace = myWorkspaces.length > 0 ? myWorkspaces[0] : null
+            const personalCandidates = myWorkspaces.filter(
+              w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
+            )
+            const personalWorkspace = (personalCandidates[0] ?? myWorkspaces[0]) ?? null
             const personalWorkspaceId = personalWorkspace?.id
             const personalWorkspaceMembers = personalWorkspaceId ? members.filter(m => m.workspace_id === personalWorkspaceId) : []
             const personalSentInvitations = personalWorkspaceId ? sentInvitations.filter(inv => inv.workspace_id === personalWorkspaceId) : []
@@ -2052,30 +2084,41 @@ export default function ConfigPage() {
           <div className="mt-6 pt-6 border-t border-slate-200">
             <h4 className="font-semibold mb-3">📬 Invitaciones Pendientes</h4>
             <div className="space-y-2">
-              {invitations.map(inv => (
-                <div key={inv.id} className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-indigo-900">
-                      <strong>{inv.inviter_email || 'Alguien'}</strong> te invitó a unirte a:
-                    </p>
-                    <p className="text-lg font-bold text-indigo-700">{inv.workspace_name || 'Un Workspace'}</p>
+              {invitations.map(inv => {
+                const isAccepting = acceptingInvitationId === inv.id
+                const isRejecting = rejectingInvitationId === inv.id
+                const isBusy = isAccepting || isRejecting
+                return (
+                  <div key={inv.id} className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-indigo-900">
+                        <strong>{inv.inviter_email || 'Alguien'}</strong> te invitó a unirte a:
+                      </p>
+                      <p className="text-lg font-bold text-indigo-700">{inv.workspace_name || 'Un Workspace'}</p>
+                    </div>
+                    <div className="flex gap-2 items-center min-w-[140px] justify-end">
+                      {isBusy ? (
+                        <span className="text-sm text-indigo-600 font-medium animate-pulse">Procesando…</span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleAcceptInvitation(inv.id)}
+                            className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700"
+                          >
+                            Aceptar
+                          </button>
+                          <button
+                            onClick={() => handleRejectInvitation(inv.id)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Rechazar
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleAcceptInvitation(inv.id)}
-                      className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      Aceptar
-                    </button>
-                    <button
-                      onClick={() => handleRejectInvitation(inv.id)}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
