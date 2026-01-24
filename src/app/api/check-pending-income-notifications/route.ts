@@ -54,6 +54,8 @@ export async function GET(request: NextRequest) {
     const targetDateStr = targetDate.toISOString().split('T')[0]
 
     console.log('📧 [Ingresos Pendientes] Verificando ingresos pendientes para mañana (1 día antes):', targetDateStr)
+    console.log('📧 [Ingresos Pendientes] Fecha actual:', today.toISOString())
+    console.log('📧 [Ingresos Pendientes] Fecha objetivo:', targetDate.toISOString())
 
     // Buscar todos los ingresos pendientes con fecha_cobro_esperada = mañana (1 día antes)
     const ingresosQuery = firestore
@@ -76,9 +78,28 @@ export async function GET(request: NextRequest) {
 
     console.log(`📧 [Ingresos Pendientes] Encontrados ${ingresosSnap.size} ingresos pendientes para mañana (1 día antes)`)
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:3000'
+    // Resolver base URL con la misma lógica que check-and-send-notifications
+    let baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+      process.env.BASE_URL ||
+      request.nextUrl.origin
+
+    // Si quedó apuntando a localhost pero el host de la petición no es localhost, usar el origin
+    const isLocalhost = baseUrl?.includes('localhost') || baseUrl?.includes('127.0.0.1')
+    const requestHost = request.headers.get('host') || ''
+    const requestIsLocal = requestHost.includes('localhost') || requestHost.includes('127.0.0.1')
+    if (isLocalhost && !requestIsLocal) {
+      console.warn('⚠️ [Ingresos Pendientes] baseUrl apunta a localhost en entorno no-local, cambiando a request origin')
+      baseUrl = request.nextUrl.origin
+    }
+
+    if (!baseUrl) {
+      console.error('❌ [Ingresos Pendientes] No se pudo resolver el baseUrl para las llamadas internas')
+      baseUrl = 'http://localhost:3000' // Fallback
+    }
+
+    console.log('📧 [Ingresos Pendientes] baseUrl resuelto:', baseUrl)
 
     let sentCount = 0
     const errors: string[] = []

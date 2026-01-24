@@ -97,6 +97,8 @@ export async function GET(request: NextRequest) {
     const firestore = admin.firestore()
     const tarjetasSnap = await firestore.collection('tarjetas').get()
     
+    console.log(`🔔 [Cron] Total de tarjetas encontradas: ${tarjetasSnap.size}`)
+    
     const notificationsToSend: Array<{
       tipo: 'cierre' | 'vencimiento'
       userId: string
@@ -110,6 +112,14 @@ export async function GET(request: NextRequest) {
     tarjetasSnap.docs.forEach(doc => {
       const data = doc.data() as Tarjeta & { workspace_id?: string }
       
+      // Log para debugging
+      const hasCierre = data.notificar_cierre && data.cierre !== null && data.cierre !== undefined
+      const hasVencimiento = data.notificar_vencimiento && data.vencimiento !== null && data.vencimiento !== undefined
+      
+      if (hasCierre || hasVencimiento) {
+        console.log(`🔔 [Cron] Tarjeta ${data.nombre}: cierre=${data.cierre}, vencimiento=${data.vencimiento}, notificar_cierre=${data.notificar_cierre}, notificar_vencimiento=${data.notificar_vencimiento}, targetDay=${targetDay}`)
+      }
+      
       // Verificar cierre (si está habilitado y el día coincide)
       if (data.notificar_cierre && data.cierre === targetDay) {
         const fechaCierre = `${targetDay}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`
@@ -122,6 +132,7 @@ export async function GET(request: NextRequest) {
           fecha: fechaCierre,
           workspaceId: data.workspace_id // Incluir workspace_id si existe
         })
+        console.log(`✅ [Cron] Agregada notificación de cierre para ${data.nombre} (día ${targetDay})`)
       }
 
       // Verificar vencimiento (si está habilitado y el día coincide)
@@ -136,6 +147,7 @@ export async function GET(request: NextRequest) {
           fecha: fechaVencimiento,
           workspaceId: data.workspace_id // Incluir workspace_id si existe
         })
+        console.log(`✅ [Cron] Agregada notificación de vencimiento para ${data.nombre} (día ${targetDay})`)
       }
     })
 
@@ -315,23 +327,46 @@ export async function GET(request: NextRequest) {
     let ingresosPendientesChecked = 0
     let ingresosPendientesSent = 0
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : 'http://localhost:3000'
+      // Usar el mismo baseUrl que se resolvió arriba
       const ingresosUrl = `${baseUrl}/api/check-pending-income-notifications`
-      const ingresosResponse = await fetch(ingresosUrl, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      })
+      console.log('🔔 [Cron] Llamando a ingresos pendientes:', ingresosUrl)
+      console.log('🔔 [Cron] baseUrl usado:', baseUrl)
       
-      if (ingresosResponse.ok) {
-        const ingresosData = await ingresosResponse.json()
-        ingresosPendientesChecked = ingresosData.checked || 0
-        ingresosPendientesSent = ingresosData.sent || 0
-        console.log(`✅ [Cron] Ingresos pendientes procesados: ${ingresosPendientesChecked} verificados, ${ingresosPendientesSent} notificaciones enviadas`)
+      // Agregar timeout para evitar que se cuelgue
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 segundos timeout
+      
+      try {
+        const ingresosResponse = await fetch(ingresosUrl, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeoutId)
+        
+        if (ingresosResponse.ok) {
+          const ingresosData = await ingresosResponse.json()
+          ingresosPendientesChecked = ingresosData.checked || 0
+          ingresosPendientesSent = ingresosData.sent || 0
+          console.log(`✅ [Cron] Ingresos pendientes procesados: ${ingresosPendientesChecked} verificados, ${ingresosPendientesSent} notificaciones enviadas`)
+        } else {
+          const errorText = await ingresosResponse.text()
+          console.error(`❌ [Cron] Error en respuesta de ingresos pendientes: ${ingresosResponse.status} - ${errorText}`)
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          console.error('❌ [Cron] Timeout al verificar ingresos pendientes (30s)')
+        } else {
+          throw fetchError
+        }
       }
     } catch (ingresosError: any) {
       console.error('❌ [Cron] Error verificando ingresos pendientes:', ingresosError?.message)
+      console.error('❌ [Cron] Tipo de error:', ingresosError?.name)
+      console.error('❌ [Cron] Stack:', ingresosError?.stack)
+      // No fallar todo el proceso si esto falla
     }
 
     return NextResponse.json({
