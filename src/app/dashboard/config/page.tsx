@@ -37,7 +37,8 @@ export default function ConfigPage() {
     deleteAllInvitations,
     updateMemberPermissions,
     updateMemberDisplayName,
-    removeMember
+    removeMember,
+    leaveWorkspace
   } = useWorkspace()
 
   const [budgetEnabled, setBudgetEnabled] = useState(false)
@@ -63,6 +64,11 @@ export default function ConfigPage() {
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
   const [invitationToDelete, setInvitationToDelete] = useState<{ id: string; email: string } | null>(null)
   const [workspaceToDeleteAll, setWorkspaceToDeleteAll] = useState<string | null>(null)
+  
+  // Modal de confirmación para salir del workspace
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [workspaceToLeave, setWorkspaceToLeave] = useState<{ id: string; name: string } | null>(null)
+  const [leavingWorkspaceId, setLeavingWorkspaceId] = useState<string | null>(null)
 
   // Categoría modal states (gastos)
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
@@ -776,6 +782,31 @@ export default function ConfigPage() {
     }
   }
 
+  const handleLeaveWorkspace = async (workspaceId: string, workspaceName: string) => {
+    setLeavingWorkspaceId(workspaceId)
+    try {
+      const result = await leaveWorkspace(workspaceId)
+      if (result.error) {
+        setAlertData({
+          title: 'Error',
+          message: result.error.message || 'No se pudo salir del espacio',
+          variant: 'error'
+        })
+      } else {
+        setAlertData({
+          title: 'Saliste del espacio',
+          message: `Ya no tenés acceso a ${workspaceName}. Para volver a colaborar, el dueño debe invitarte nuevamente.`,
+          variant: 'success'
+        })
+      }
+      setShowAlert(true)
+      setShowLeaveConfirm(false)
+      setWorkspaceToLeave(null)
+    } finally {
+      setLeavingWorkspaceId(null)
+    }
+  }
+
   // --- LÓGICA DE PERMISOS CON CONFIRMACIÓN ---
   const handlePermissionChange = (memberId: string, section: string, newValue: string) => {
     // Usar un separador único que no aparezca en los IDs
@@ -1300,6 +1331,7 @@ export default function ConfigPage() {
             const personalWorkspaceId = personalWorkspace?.id
             const personalWorkspaceMembers = personalWorkspaceId ? members.filter(m => m.workspace_id === personalWorkspaceId) : []
             const personalSentInvitations = personalWorkspaceId ? sentInvitations.filter(inv => inv.workspace_id === personalWorkspaceId) : []
+            const isPersonalOwner = personalWorkspace?.owner_id === user?.uid
 
             if (!personalWorkspaceId) {
               return (
@@ -1313,7 +1345,36 @@ export default function ConfigPage() {
 
             return (
               <>
-                {/* INVITACIONES ENVIADAS */}
+                {/* INFORMACIÓN Y ACCIÓN PARA COLABORADORES DEL ESPACIO PERSONAL */}
+                {!isPersonalOwner && (
+                  <div className="mt-4 pt-4 border-t border-indigo-200">
+                    <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                      <h5 className="font-semibold mb-2 text-sm text-indigo-900">Tu acceso a este espacio</h5>
+                      <p className="text-xs text-indigo-700 mb-4">
+                        Sos colaborador de <strong>{personalWorkspace.name}</strong>. Podés salir del espacio en cualquier momento.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setWorkspaceToLeave({ id: personalWorkspaceId, name: personalWorkspace.name })
+                          setShowLeaveConfirm(true)
+                        }}
+                        disabled={leavingWorkspaceId === personalWorkspaceId}
+                        className="btn btn-secondary btn-sm w-full sm:w-auto bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                      >
+                        {leavingWorkspaceId === personalWorkspaceId ? (
+                          <span className="animate-pulse">Saliendo...</span>
+                        ) : (
+                          <>
+                            <X className="w-4 h-4" /> Salir del espacio
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* INVITACIONES ENVIADAS - Solo visible para el owner */}
+                {isPersonalOwner && (
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <div className="flex items-center justify-between mb-3">
                     <h5 className="font-semibold text-sm">Invitaciones enviadas</h5>
@@ -1421,10 +1482,12 @@ export default function ConfigPage() {
                     <p className="text-xs text-slate-400 mb-4">No hay invitaciones enviadas</p>
                   )}
                 </div>
+                )}
 
-                {/* GESTIÓN DE MIEMBROS */}
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <h5 className="font-semibold mb-3 text-sm">Gestión de Permisos</h5>
+                {/* GESTIÓN DE MIEMBROS - Solo visible para el owner */}
+                {isPersonalOwner && (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <h5 className="font-semibold mb-3 text-sm">Gestión de Permisos</h5>
 
                   {personalWorkspaceMembers.length > 0 ? (
                     <div className="space-y-3">
@@ -1595,7 +1658,8 @@ export default function ConfigPage() {
                   ) : (
                     <p className="text-xs text-slate-400">No hay miembros en el espacio personal</p>
                   )}
-                </div>
+                  </div>
+                )}
               </>
             )
           })()}
@@ -1783,11 +1847,24 @@ export default function ConfigPage() {
                         </>
                       )}
                       
-                      {/* SI SOY COLABORADOR SOLO PUEDO VER, PERO NO GESTIONAR */}
+                      {/* SI SOY COLABORADOR PUEDO VER Y SALIR DEL ESPACIO */}
                       {!isOwner && (
-                        <div className="text-xs text-indigo-600 font-medium self-center px-3 whitespace-nowrap">
-                          Acceso Compartido
-                        </div>
+                        <button
+                          onClick={() => {
+                            setWorkspaceToLeave({ id: ws.id, name: ws.name })
+                            setShowLeaveConfirm(true)
+                          }}
+                          disabled={leavingWorkspaceId === ws.id}
+                          className="btn btn-secondary btn-sm flex-1 sm:flex-none whitespace-nowrap bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                        >
+                          {leavingWorkspaceId === ws.id ? (
+                            <span className="animate-pulse">Saliendo...</span>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4" /> Salir del espacio
+                            </>
+                          )}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1902,6 +1979,34 @@ export default function ConfigPage() {
                       ) : (
                         <p className="text-xs text-slate-400 mb-4">No hay invitaciones enviadas</p>
                       )}
+                    </div>
+                  )}
+
+                  {/* INFORMACIÓN Y ACCIÓN PARA COLABORADORES - Solo visible para no-owners */}
+                  {!isOwner && isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-indigo-200">
+                      <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                        <h5 className="font-semibold mb-2 text-sm text-indigo-900">Tu acceso a este espacio</h5>
+                        <p className="text-xs text-indigo-700 mb-4">
+                          Sos colaborador de <strong>{ws.name}</strong>. Podés salir del espacio en cualquier momento.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setWorkspaceToLeave({ id: ws.id, name: ws.name })
+                            setShowLeaveConfirm(true)
+                          }}
+                          disabled={leavingWorkspaceId === ws.id}
+                          className="btn btn-secondary btn-sm w-full sm:w-auto bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                        >
+                          {leavingWorkspaceId === ws.id ? (
+                            <span className="animate-pulse">Saliendo...</span>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4" /> Salir del espacio
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -3077,6 +3182,25 @@ export default function ConfigPage() {
             : '¿Estás seguro de que deseas eliminar todo el historial de invitaciones de este workspace?\n\nEsta acción eliminará permanentemente todas las invitaciones (pendientes, aceptadas, rechazadas y canceladas) y no se puede deshacer.'
         }
         confirmText={workspaceToDeleteAll === 'categorias_gastos' || workspaceToDeleteAll === 'categorias_ingresos' ? 'Eliminar' : 'Eliminar Todo'}
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirm Modal - Salir del Workspace */}
+      <ConfirmModal
+        isOpen={showLeaveConfirm}
+        onClose={() => {
+          setShowLeaveConfirm(false)
+          setWorkspaceToLeave(null)
+        }}
+        onConfirm={async () => {
+          if (workspaceToLeave) {
+            await handleLeaveWorkspace(workspaceToLeave.id, workspaceToLeave.name)
+          }
+        }}
+        title="Salir del espacio"
+        message={workspaceToLeave ? `¿Estás seguro de que querés salir de "${workspaceToLeave.name}"?\n\nVas a perder el acceso inmediatamente. Para volver a colaborar, el dueño debe invitarte nuevamente.` : '¿Estás seguro de que querés salir de este espacio?'}
+        confirmText="Salir"
         cancelText="Cancelar"
         variant="danger"
       />

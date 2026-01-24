@@ -11,6 +11,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   query,
   where,
   getDocs,
@@ -43,6 +44,8 @@ interface WorkspaceContextType {
   cancelInvitation: (invitationId: string) => Promise<{ error: any }>
   deleteInvitation: (invitationId: string) => Promise<{ error: any }>
   deleteAllInvitations: (workspaceId: string) => Promise<{ error: any }>
+
+  leaveWorkspace: (workspaceId: string) => Promise<{ error: any }>
 
   fetchAll: () => Promise<void>
 }
@@ -96,22 +99,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (ownedWorkspaces.find(w => w.id === wsId)) continue; // Evitar duplicados
 
         try {
-            // Usamos getDocs con query por ID para evitar error si el doc no existe
-            const wsSnap = await getDocs(query(collection(db, 'workspaces'), where('__name__', '==', wsId)))
-            if (!wsSnap.empty) {
-                const d = wsSnap.docs[0]
+            // Obtener el workspace directamente por ID
+            const wsDoc = await getDoc(doc(db, 'workspaces', wsId))
+            if (wsDoc.exists()) {
+                const data = wsDoc.data()
                 memberWorkspaces.push({
-                    id: d.id,
-                    name: d.data().name,
-                    owner_id: d.data().owner_id,
-                    icono: d.data().icono || null,
-                    logo: d.data().logo || null,
-                    ingresos_habilitado: d.data().ingresos_habilitado || false,
-                    budget_ars: d.data().budget_ars || 0,
-                    budget_usd: d.data().budget_usd || 0,
-                    created_at: d.data().created_at instanceof Timestamp 
-                      ? d.data().created_at.toDate().toISOString() 
-                      : d.data().created_at
+                    id: wsDoc.id,
+                    name: data.name,
+                    owner_id: data.owner_id,
+                    icono: data.icono || null,
+                    logo: data.logo || null,
+                    ingresos_habilitado: data.ingresos_habilitado || false,
+                    budget_ars: data.budget_ars || 0,
+                    budget_usd: data.budget_usd || 0,
+                    created_at: data.created_at instanceof Timestamp 
+                      ? data.created_at.toDate().toISOString() 
+                      : data.created_at
                 })
             }
         } catch (e) {
@@ -747,11 +750,69 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user, workspaces, fetchAll])
 
+  const leaveWorkspace = useCallback(async (workspaceId: string) => {
+    if (!user) return { error: new Error('No user') }
+    
+    try {
+      // Verificar que el usuario NO es dueño del workspace
+      const workspace = workspaces.find(w => w.id === workspaceId)
+      if (!workspace) {
+        return { error: new Error('Workspace no encontrado') }
+      }
+      
+      if (workspace.owner_id === user.uid) {
+        return { error: new Error('El dueño no puede salir de su propio workspace') }
+      }
+
+      // Verificar que el usuario es miembro
+      const memberId = `${workspaceId}_${user.uid}`
+      const memberDoc = await getDoc(doc(db, 'workspace_members', memberId))
+      if (!memberDoc.exists()) {
+        return { error: new Error('No eres miembro de este workspace') }
+      }
+
+      // Usar API para salir (elimina membership y notifica al owner)
+      const token = await user.getIdToken()
+      const resp = await fetch('/api/leave-workspace', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ workspaceId }),
+      })
+
+      const text = await resp.text()
+      if (!resp.ok) {
+        let msg = text
+        try {
+          const parsed = JSON.parse(text)
+          msg = parsed.error || parsed.details || msg
+        } catch { /* ignore */ }
+        return { error: new Error(msg) }
+      }
+
+      console.log('✅ [useWorkspace] Usuario salió del workspace vía API:', text)
+      
+      // Si el workspace actual es el que estamos abandonando, limpiarlo
+      if (currentWorkspace?.id === workspaceId) {
+        setCurrentWorkspace(null)
+      }
+      
+      await fetchAll()
+      return { error: null }
+    } catch (error) { 
+      return { error } 
+    }
+  }, [user, workspaces, currentWorkspace, fetchAll])
+
   const value = {
     workspaces, currentWorkspace, members, invitations, sentInvitations, loading,
     setCurrentWorkspace, createWorkspace, updateWorkspace, updateWorkspaceConfig, deleteWorkspace,
     inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, 
-    acceptInvitation, rejectInvitation, cancelInvitation, deleteInvitation, deleteAllInvitations, fetchAll
+    acceptInvitation, rejectInvitation, cancelInvitation, deleteInvitation, deleteAllInvitations,
+    leaveWorkspace,
+    fetchAll
   }
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>

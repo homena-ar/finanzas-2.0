@@ -1118,3 +1118,120 @@ Este es un email automático de FinControl. Podés desactivar estas notificacion
 
   return { html, text, subject }
 }
+
+export function getMemberLeftEmailTemplate(
+  workspaceName: string,
+  leavingUserEmail: string,
+  leavingUserName?: string
+): { html: string; text: string; subject: string } {
+  const subject = `Miembro salió del espacio: ${workspaceName} - FinControl`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                👋 Miembro salió del espacio
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Te informamos que:
+              </p>
+              
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>${leavingUserName || leavingUserEmail}</strong> ha salido del espacio <strong>${workspaceName}</strong>.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #f59e0b;">
+                <h2 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px; font-weight: 600;">
+                  📋 Detalles
+                </h2>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-size: 14px;">Espacio:</td>
+                    <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
+                      ${workspaceName}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-size: 14px;">Usuario:</td>
+                    <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
+                      ${leavingUserEmail}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-size: 14px;">Estado:</td>
+                    <td align="right" style="padding: 8px 0;">
+                      <span style="background-color: #f59e0b; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                        👋 Salió
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                El usuario ya no tiene acceso al espacio. Si deseas que vuelva a colaborar, podés invitarlo nuevamente.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
+                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                  Ver Miembros
+                </a>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Miembro salió del espacio
+
+Te informamos que:
+
+${leavingUserName || leavingUserEmail} ha salido del espacio ${workspaceName}.
+
+Detalles:
+- Espacio: ${workspaceName}
+- Usuario: ${leavingUserEmail}
+- Estado: 👋 Salió
+
+El usuario ya no tiene acceso al espacio. Si deseas que vuelva a colaborar, podés invitarlo nuevamente.
+
+Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
+
+Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
