@@ -45,36 +45,66 @@ export async function GET(request: NextRequest) {
     }
 
     const firestore = admin.firestore()
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
     
-    // Calcular fecha objetivo (1 día desde hoy) - maneja correctamente cambio de mes
-    const targetDate = new Date(today)
+    // Usar timezone de Argentina (UTC-3) para calcular fechas
+    const nowUtc = new Date()
+    const argentinaOffset = -3 * 60 // UTC-3 en minutos
+    const argentinaTime = new Date(nowUtc.getTime() + (argentinaOffset + nowUtc.getTimezoneOffset()) * 60 * 1000)
+    
+    const todayArgentina = new Date(argentinaTime.getFullYear(), argentinaTime.getMonth(), argentinaTime.getDate())
+    
+    // Calcular fecha objetivo (1 día desde hoy en Argentina) - maneja correctamente cambio de mes
+    const targetDate = new Date(todayArgentina)
     targetDate.setDate(targetDate.getDate() + 1)
-    const targetDateStr = targetDate.toISOString().split('T')[0]
+    const targetDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`
 
-    console.log('📧 [Ingresos Pendientes] Verificando ingresos pendientes para mañana (1 día antes):', targetDateStr)
-    console.log('📧 [Ingresos Pendientes] Fecha actual:', today.toISOString())
-    console.log('📧 [Ingresos Pendientes] Fecha objetivo:', targetDate.toISOString())
+    console.log('📧 [Ingresos Pendientes] Hora UTC:', nowUtc.toISOString())
+    console.log('📧 [Ingresos Pendientes] Hora Argentina:', `${todayArgentina.getFullYear()}-${String(todayArgentina.getMonth() + 1).padStart(2, '0')}-${String(todayArgentina.getDate()).padStart(2, '0')}`)
+    console.log('📧 [Ingresos Pendientes] Fecha objetivo (mañana en Argentina):', targetDateStr)
 
-    // Buscar todos los ingresos pendientes con fecha_cobro_esperada = mañana (1 día antes)
-    const ingresosQuery = firestore
+    // Primero, buscar TODOS los ingresos pendientes para diagnóstico
+    const allPendingQuery = firestore
       .collection('ingresos')
       .where('pendiente_cobro', '==', true)
-      .where('fecha_cobro_esperada', '==', targetDateStr)
-      .where('fecha_cobro_confirmada', '==', null)
+    
+    const allPendingSnap = await allPendingQuery.get()
+    console.log(`📧 [Ingresos Pendientes] Total ingresos pendientes de cobro: ${allPendingSnap.size}`)
+    
+    // Mostrar detalles de cada uno para diagnóstico
+    allPendingSnap.docs.forEach(doc => {
+      const data = doc.data()
+      console.log(`📧 [Ingresos Pendientes] - ${data.descripcion}: fecha_cobro_esperada=${data.fecha_cobro_esperada}, fecha_cobro_confirmada=${data.fecha_cobro_confirmada}, notificar_correo=${data.notificar_correo}`)
+    })
 
-    const ingresosSnap = await ingresosQuery.get()
+    // Filtrar manualmente los que coinciden con la fecha objetivo y no están confirmados
+    const ingresosPendientes = allPendingSnap.docs.filter(doc => {
+      const data = doc.data()
+      const fechaCoincide = data.fecha_cobro_esperada === targetDateStr
+      const noConfirmado = !data.fecha_cobro_confirmada || data.fecha_cobro_confirmada === null || data.fecha_cobro_confirmada === ''
+      
+      if (fechaCoincide) {
+        console.log(`📧 [Ingresos Pendientes] Fecha coincide para "${data.descripcion}": esperada=${data.fecha_cobro_esperada}, target=${targetDateStr}, confirmada=${data.fecha_cobro_confirmada}, noConfirmado=${noConfirmado}`)
+      }
+      
+      return fechaCoincide && noConfirmado
+    })
 
-    if (ingresosSnap.empty) {
+    if (ingresosPendientes.length === 0) {
       console.log('📧 [Ingresos Pendientes] No hay ingresos pendientes para mañana (1 día antes)')
       return NextResponse.json({
         success: true,
         checked: 0,
         sent: 0,
-        message: 'No hay ingresos pendientes para mañana (1 día antes)'
+        message: 'No hay ingresos pendientes para mañana (1 día antes)',
+        debug: {
+          totalPendientes: allPendingSnap.size,
+          fechaBuscada: targetDateStr
+        }
       })
     }
+
+    // Usar el array filtrado en lugar del snapshot original
+    const ingresosSnap = { docs: ingresosPendientes, size: ingresosPendientes.length }
 
     console.log(`📧 [Ingresos Pendientes] Encontrados ${ingresosSnap.size} ingresos pendientes para mañana (1 día antes)`)
 

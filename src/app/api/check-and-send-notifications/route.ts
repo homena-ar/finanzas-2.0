@@ -78,17 +78,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const today = new Date()
-    const day = today.getDate()
-    const month = today.getMonth()
-    const year = today.getFullYear()
+    // Usar timezone de Argentina (UTC-3) para calcular fechas
+    const nowUtc = new Date()
+    const argentinaOffset = -3 * 60 // UTC-3 en minutos
+    const argentinaTime = new Date(nowUtc.getTime() + (argentinaOffset + nowUtc.getTimezoneOffset()) * 60 * 1000)
     
-    // Calcular fecha objetivo (2 días desde hoy) - maneja correctamente cambio de mes
+    const day = argentinaTime.getDate()
+    const month = argentinaTime.getMonth()
+    const year = argentinaTime.getFullYear()
+    
+    // Calcular fecha objetivo (2 días desde hoy en Argentina) - maneja correctamente cambio de mes
     const targetDate = new Date(year, month, day + 2)
     const targetDay = targetDate.getDate()
     
-    console.log('🔔 [Cron] Fecha actual:', today.toISOString())
-    console.log('🔔 [Cron] Fecha objetivo (2 días):', targetDate.toISOString())
+    console.log('🔔 [Cron] Hora UTC:', nowUtc.toISOString())
+    console.log('🔔 [Cron] Hora Argentina:', `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(argentinaTime.getHours()).padStart(2, '0')}:${String(argentinaTime.getMinutes()).padStart(2, '0')}`)
+    console.log('🔔 [Cron] Fecha objetivo (2 días en Argentina):', `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`)
     console.log('🔔 [Cron] Día objetivo:', targetDay)
 
     console.log('🔔 [Cron] Verificando notificaciones para día:', targetDay)
