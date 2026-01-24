@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
             body: JSON.stringify({
               userId: ingreso.user_id,
               title: '💰 Recordatorio: Cobro pendiente',
-              body: `${ingreso.descripcion} - ${montoFormateado}`,
+              body: `${ingreso.descripcion} - ${montoFormateado}. ¿Ya cobraste este ingreso?`,
               url: '/dashboard/ingresos',
               tag: 'ingreso-pendiente',
               workspaceId: ingreso.workspace_id || null
@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
             user_id: ingreso.user_id,
             tipo: 'sistema',
             titulo: '💰 Recordatorio: Cobro pendiente',
-            mensaje: `${ingreso.descripcion} - ${montoFormateado}`,
+            mensaje: `${ingreso.descripcion} - ${montoFormateado}. ¿Ya cobraste este ingreso?`,
             icono: '💰',
             leida: false,
             link: '/dashboard/ingresos',
