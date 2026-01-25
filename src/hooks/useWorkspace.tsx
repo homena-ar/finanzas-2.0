@@ -306,7 +306,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: new Error('No user') }
 
     const misWorkspaces = workspaces.filter(w => w.owner_id === user.uid)
-    if (misWorkspaces.length >= 2) return { error: new Error('Límite de espacios alcanzado') }
+    if (misWorkspaces.length >= 3) return { error: new Error('Límite de espacios alcanzado') }
 
     try {
       const workspacesRef = collection(db, 'workspaces')

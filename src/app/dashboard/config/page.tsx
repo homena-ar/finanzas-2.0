@@ -549,15 +549,15 @@ export default function ConfigPage() {
         personalWorkspaceId = result.workspace.id
         console.log('✅ [Config] Workspace creado para espacio personal:', personalWorkspaceId)
       } else {
-        // Si falla la creación (ej. límite de 2 workspaces), mostrar error claro
+        // Si falla la creación (ej. límite de 3 workspaces), mostrar error claro
         const errorMessage = result.error?.message || 'Error desconocido'
         const isLimitError = errorMessage.includes('Límite') || errorMessage.includes('límite') || errorMessage.includes('limit')
         
         if (isLimitError && myWorkspaces.length > 0) {
-          const workspaceNames = myWorkspaces.map(w => w.name).join('" y "')
+          const workspaceNames = myWorkspaces.map(w => w.name).join('", "')
           setAlertData({
             title: 'Límite de workspaces alcanzado',
-            message: `Ya tenés 2 workspaces ("${workspaceNames}"). Para invitar desde tu espacio personal, necesitás renombrar uno de tus workspaces a "${workspaceName}" o eliminá uno para crear el espacio personal.`,
+            message: `Ya tenés 3 workspaces ("${workspaceNames}"). Para invitar desde tu espacio personal, necesitás renombrar uno de tus workspaces a "${workspaceName}" o eliminá uno para crear el espacio personal.`,
             variant: 'error'
           })
         } else {
@@ -629,7 +629,7 @@ export default function ConfigPage() {
     }
 
     const myWorkspacesCount = workspaces.filter(w => w.owner_id === user?.uid).length
-    if (myWorkspacesCount >= 2) {
+    if (myWorkspacesCount >= 3) {
       setAlertData({
         title: 'Límite alcanzado',
         message: 'Ya tenés 2 espacios compartidos creados (el máximo permitido).',
@@ -1683,7 +1683,7 @@ export default function ConfigPage() {
             <h4 className="font-semibold text-base">🏢 Workspaces Colaborativos</h4>
             <button
               onClick={() => setShowWorkspaceModal(true)}
-              disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 2}
+              disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 3}
               className="btn btn-primary btn-sm"
             >
               <Plus className="w-4 h-4" /> Nuevo Workspace
