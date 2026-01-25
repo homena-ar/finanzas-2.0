@@ -8,6 +8,7 @@ import {
   collection,
   addDoc,
   setDoc,
+  writeBatch,
   updateDoc,
   deleteDoc,
   doc,
@@ -16,6 +17,9 @@ import {
   where,
   getDocs,
   serverTimestamp,
+  orderBy,
+  limit,
+  startAfter,
   Timestamp
 } from 'firebase/firestore'
 import type { Workspace, WorkspaceMember, WorkspaceInvitation, WorkspacePermissions } from '@/types'
@@ -47,19 +51,24 @@ interface WorkspaceContextType {
 
   leaveWorkspace: (workspaceId: string) => Promise<{ error: any }>
 
+  /** Asegura que exista el workspace personal (type=personal) y profile.personal_workspace_id. Crea si falta. Retorna el workspaceId. */
+  ensurePersonalWorkspace: () => Promise<string>
+
   fetchAll: () => Promise<void>
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const { user, profile } = useAuth()
+  const { user, profile, updateProfile } = useAuth()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null)
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]) // Invitaciones recibidas
   const [sentInvitations, setSentInvitations] = useState<WorkspaceInvitation[]>([]) // Invitaciones enviadas
   const [loading, setLoading] = useState(true)
+  const personalMigrationRunningRef = useRef(false)
+  const initialPersonalSelectionRef = useRef(false)
 
   const fetchAll = useCallback(async () => {
     if (!user) {
@@ -73,18 +82,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const workspacesQuery = query(workspacesRef, where('owner_id', '==', user.uid))
       const workspacesSnap = await getDocs(workspacesQuery)
 
-      const ownedWorkspaces = workspacesSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name,
-        owner_id: doc.data().owner_id,
-        icono: doc.data().icono || null,
-        logo: doc.data().logo || null,
-        ingresos_habilitado: doc.data().ingresos_habilitado || false,
-        budget_ars: doc.data().budget_ars || 0,
-        budget_usd: doc.data().budget_usd || 0,
-        created_at: doc.data().created_at instanceof Timestamp 
-          ? doc.data().created_at.toDate().toISOString() 
-          : doc.data().created_at
+      const ownedWorkspaces = workspacesSnap.docs.map(d => ({
+        id: d.id,
+        name: d.data().name,
+        owner_id: d.data().owner_id,
+        type: (d.data().type === 'personal' ? 'personal' : 'collaborative') as Workspace['type'],
+        icono: d.data().icono || null,
+        logo: d.data().logo || null,
+        ingresos_habilitado: d.data().ingresos_habilitado || false,
+        budget_ars: d.data().budget_ars || 0,
+        budget_usd: d.data().budget_usd || 0,
+        created_at: d.data().created_at instanceof Timestamp 
+          ? d.data().created_at.toDate().toISOString() 
+          : d.data().created_at
       })) as Workspace[]
 
       // 2. Workspaces donde soy miembro
@@ -107,6 +117,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                     id: wsDoc.id,
                     name: data.name,
                     owner_id: data.owner_id,
+                    type: (data.type === 'personal' ? 'personal' : 'collaborative') as Workspace['type'],
                     icono: data.icono || null,
                     logo: data.logo || null,
                     ingresos_habilitado: data.ingresos_habilitado || false,
@@ -243,7 +254,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSentInvitations([])
       setLoading(false)
     }
-  }, [user, fetchAll]) // Agregamos fetchAll a las dependencias
+  }, [user, fetchAll])
 
   // Reparar workspaces viejos: asegurar membership con ID compuesto
   const fixedMembershipRef = useRef<Set<string>>(new Set())
@@ -305,14 +316,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const createWorkspace = useCallback(async (name: string, icono?: string, logo?: string | null) => {
     if (!user) return { error: new Error('No user') }
 
-    const misWorkspaces = workspaces.filter(w => w.owner_id === user.uid)
-    if (misWorkspaces.length >= 3) return { error: new Error('Límite de espacios alcanzado') }
+    // El límite es solo para workspaces colaborativos; el personal no cuenta
+    const collaborativeCount = workspaces.filter(w => w.owner_id === user.uid && w.type !== 'personal').length
+    if (collaborativeCount >= 3) return { error: new Error('Límite de espacios alcanzado') }
 
     try {
       const workspacesRef = collection(db, 'workspaces')
       const docRef = await addDoc(workspacesRef, {
         name,
         owner_id: user.uid,
+        type: 'collaborative',
         icono: icono || null,
         logo: logo || null,
         created_at: serverTimestamp()
@@ -328,10 +341,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         created_at: serverTimestamp()
       })
 
-      const newWorkspace = { 
+      const newWorkspace: Workspace = { 
         id: docRef.id, 
         name, 
         owner_id: user.uid,
+        type: 'collaborative',
         icono: icono || null,
         logo: logo || null,
         ingresos_habilitado: false,
@@ -348,6 +362,313 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return { error }
     }
   }, [user, workspaces, fetchAll])
+
+  // Crea el workspace personal real (type=personal) si no existe.
+  // - Asigna profile.personal_workspace_id (fuente de verdad; NO se resuelve por nombre)
+  // - Asegura membership admin del owner
+  // - Migra datos legacy (workspace_id null) y proxy workspaces (workspace_id legacy) → personal_workspace_id
+  const ensurePersonalWorkspace = useCallback(async (): Promise<string> => {
+    if (!user) throw new Error('No user')
+    if (!profile) throw new Error('No profile')
+
+    const ensureOwnerMembership = async (workspaceId: string) => {
+      const mid = `${workspaceId}_${user.uid}`
+      const mref = doc(db, 'workspace_members', mid)
+      const msnap = await getDoc(mref)
+      if (!msnap.exists()) {
+        await setDoc(mref, {
+          workspace_id: workspaceId,
+          user_id: user.uid,
+          user_email: user.email,
+          permissions: { gastos: 'admin', ingresos: 'admin', ahorros: 'admin', tarjetas: 'admin' },
+          created_at: serverTimestamp()
+        })
+      }
+    }
+
+    const migrateCollectionByWorkspaceId = async (col: string, fromWorkspaceId: string, toWorkspaceId: string) => {
+      let last: any = null
+      let total = 0
+      while (true) {
+        const base = [
+          where('workspace_id', '==', fromWorkspaceId),
+          orderBy('__name__'),
+          limit(200),
+        ] as any[]
+        const q = query(collection(db, col), ...(last ? [...base, startAfter(last)] : base))
+        const snap = await getDocs(q)
+        if (snap.empty) break
+        const batch = writeBatch(db)
+        snap.docs.forEach(d => batch.update(d.ref, { workspace_id: toWorkspaceId }))
+        await batch.commit()
+        total += snap.size
+        last = snap.docs[snap.docs.length - 1]
+        console.log(`[useWorkspace] migrate ${col}: ${fromWorkspaceId} -> ${toWorkspaceId} (+${snap.size}, total ${total})`)
+      }
+      return total
+    }
+
+    const migrateLegacyPersonalWithoutWorkspaceId = async (col: string, toWorkspaceId: string) => {
+      let last: any = null
+      let total = 0
+      while (true) {
+        const base = [
+          where('user_id', '==', user.uid),
+          orderBy('__name__'),
+          limit(200),
+        ] as any[]
+        const q = query(collection(db, col), ...(last ? [...base, startAfter(last)] : base))
+        const snap = await getDocs(q)
+        if (snap.empty) break
+        const batch = writeBatch(db)
+        let dirty = 0
+        snap.docs.forEach(d => {
+          const data = d.data()
+          if (data.workspace_id === undefined || data.workspace_id === null) {
+            batch.update(d.ref, { workspace_id: toWorkspaceId })
+            dirty++
+          }
+        })
+        if (dirty > 0) {
+          await batch.commit()
+          total += dirty
+          console.log(`[useWorkspace] migrate ${col}: user legacy -> ${toWorkspaceId} (+${dirty}, total ${total})`)
+        }
+        last = snap.docs[snap.docs.length - 1]
+      }
+      return total
+    }
+
+    const migrateMembers = async (fromWorkspaceId: string, toWorkspaceId: string) => {
+      let last: any = null
+      let total = 0
+      while (true) {
+        const base = [
+          where('workspace_id', '==', fromWorkspaceId),
+          orderBy('__name__'),
+          limit(200),
+        ] as any[]
+        const q = query(collection(db, 'workspace_members'), ...(last ? [...base, startAfter(last)] : base))
+        const snap = await getDocs(q)
+        if (snap.empty) break
+        const batch = writeBatch(db)
+        snap.docs.forEach(d => {
+          const data: any = d.data()
+          // Owner del personal ya se asegura aparte
+          if (data.user_id && data.user_id !== user.uid) {
+            const newRef = doc(db, 'workspace_members', `${toWorkspaceId}_${data.user_id}`)
+            batch.set(newRef, {
+              workspace_id: toWorkspaceId,
+              user_id: data.user_id,
+              user_email: data.user_email,
+              display_name: data.display_name,
+              permissions: data.permissions,
+              created_at: data.created_at || serverTimestamp(),
+            }, { merge: true } as any)
+          }
+          batch.delete(d.ref)
+        })
+        await batch.commit()
+        total += snap.size
+        last = snap.docs[snap.docs.length - 1]
+        console.log(`[useWorkspace] migrate workspace_members: ${fromWorkspaceId} -> ${toWorkspaceId} (+${snap.size}, total ${total})`)
+      }
+      return total
+    }
+
+    const migrateInvitations = async (fromWorkspaceId: string, toWorkspaceId: string, workspaceName: string) => {
+      let last: any = null
+      let total = 0
+      while (true) {
+        const base = [
+          where('workspace_id', '==', fromWorkspaceId),
+          orderBy('__name__'),
+          limit(200),
+        ] as any[]
+        const q = query(collection(db, 'workspace_invitations'), ...(last ? [...base, startAfter(last)] : base))
+        const snap = await getDocs(q)
+        if (snap.empty) break
+        const batch = writeBatch(db)
+        snap.docs.forEach(d => {
+          batch.update(d.ref, { workspace_id: toWorkspaceId, workspace_name: workspaceName })
+        })
+        await batch.commit()
+        total += snap.size
+        last = snap.docs[snap.docs.length - 1]
+        console.log(`[useWorkspace] migrate workspace_invitations: ${fromWorkspaceId} -> ${toWorkspaceId} (+${snap.size}, total ${total})`)
+      }
+      return total
+    }
+
+    const runMigrationIfNeeded = async (personalId: string, personalName: string, ownedSnap?: any) => {
+      if (profile.personal_migration_done && profile.personal_migration_version === 1) return
+      if (personalMigrationRunningRef.current) return
+      personalMigrationRunningRef.current = true
+      try {
+        // Marcar inicio (idempotente / indicador UI)
+        try {
+          await updateProfile({
+            personal_migration_running: true,
+            personal_migration_started_at: new Date().toISOString(),
+            personal_migration_needs_attention: false,
+            personal_migration_proxy_candidates: [],
+          })
+        } catch { /* ignore */ }
+
+        const dataCols = ['gastos', 'ingresos', 'impuestos', 'tarjetas', 'movimientos_ahorro', 'metas', 'categorias', 'categorias_ingresos', 'tags', 'tags_ingresos', 'medios_pago'] as const
+
+        // 1) Legacy personal (workspace_id faltante) -> personalId
+        for (const col of dataCols) {
+          try { await migrateLegacyPersonalWithoutWorkspaceId(col, personalId) } catch (e) { console.warn('[useWorkspace] migrate legacy user', col, e) }
+        }
+
+        // 2) Proxy workspaces -> personalId (detectar duplicados creados por bug)
+        const owned = ownedSnap ?? await getDocs(query(collection(db, 'workspaces'), where('owner_id', '==', user.uid)))
+        const legacyDocs = (owned.docs as any[])
+          .filter((d: any) => d.id !== personalId && d.data().type !== 'personal')
+          .filter((d: any) => d.data().name === personalName || d.data().name === 'Espacio Personal')
+        const legacyIds = legacyDocs.map((d: any) => d.id as string)
+
+        const proxyCandidatesNeedingAttention: Array<{ id: string; name: string }> = []
+
+        const isSafeProxyToAutoMigrate = async (legacyId: string) => {
+          // Heurística conservadora para evitar migrar un workspace real:
+          // - Sin datos en colecciones principales (workspace_id == legacyId)
+          // - Sin invitaciones
+          // - Sin miembros extra (<= 1 membership)
+          try {
+            const mSnap = await getDocs(query(collection(db, 'workspace_members'), where('workspace_id', '==', legacyId), limit(2)))
+            if (mSnap.size > 1) return { ok: false, reason: 'tiene miembros' }
+
+            const iSnap = await getDocs(query(collection(db, 'workspace_invitations'), where('workspace_id', '==', legacyId), limit(1)))
+            if (!iSnap.empty) return { ok: false, reason: 'tiene invitaciones' }
+
+            for (const col of dataCols) {
+              const dSnap = await getDocs(query(collection(db, col), where('workspace_id', '==', legacyId), limit(1)))
+              if (!dSnap.empty) return { ok: false, reason: `tiene datos (${col})` }
+            }
+
+            return { ok: true as const, reason: 'parece proxy vacío' }
+          } catch (e) {
+            return { ok: false, reason: 'no se pudo verificar (seguridad)' }
+          }
+        }
+
+        if (legacyIds.length > 0) {
+          console.warn('[useWorkspace] posibles workspaces proxy detectados:', legacyIds)
+        }
+
+        for (const legacyId of legacyIds) {
+          const legacyName = (legacyDocs.find((d: any) => d.id === legacyId)?.data()?.name as string) || legacyId
+          const safety = await isSafeProxyToAutoMigrate(legacyId)
+          if (!safety.ok) {
+            console.warn('[useWorkspace] proxy NO migrado automáticamente:', legacyId, legacyName, safety.reason)
+            proxyCandidatesNeedingAttention.push({ id: legacyId, name: legacyName })
+            continue
+          }
+
+          console.warn('[useWorkspace] proxy migrado automáticamente:', legacyId, legacyName, safety.reason)
+          for (const col of dataCols) {
+            try { await migrateCollectionByWorkspaceId(col, legacyId, personalId) } catch (e) { console.warn('[useWorkspace] migrate proxy', col, e) }
+          }
+          // members + invitations
+          try { await migrateMembers(legacyId, personalId) } catch (e) { console.warn('[useWorkspace] migrate members', e) }
+          try { await migrateInvitations(legacyId, personalId, personalName) } catch (e) { console.warn('[useWorkspace] migrate invitations', e) }
+        }
+
+        await updateProfile({
+          personal_migration_done: true,
+          personal_migration_done_at: new Date().toISOString(),
+          personal_migration_version: 1,
+          personal_migration_running: false,
+          personal_migration_needs_attention: proxyCandidatesNeedingAttention.length > 0,
+          personal_migration_proxy_candidates: proxyCandidatesNeedingAttention,
+        })
+      } finally {
+        personalMigrationRunningRef.current = false
+        // Si falló antes del update final, evitar dejar el flag "running" prendido
+        try { await updateProfile({ personal_migration_running: false }) } catch { /* ignore */ }
+      }
+    }
+
+    const existingId = profile.personal_workspace_id
+    if (existingId) {
+      const wsSnap = await getDoc(doc(db, 'workspaces', existingId))
+      if (wsSnap.exists()) {
+        await ensureOwnerMembership(existingId)
+        // Migrar (idempotente) si aún no se hizo
+        ;(async () => {
+          try { await runMigrationIfNeeded(existingId, wsSnap.data()?.name || (profile.personal_workspace_name || 'Espacio Personal')) } catch (e) { console.warn('[useWorkspace] migration failed', e) }
+        })()
+        return existingId
+      }
+    }
+
+    // Si no hay id o fue borrado: comprobar si ya existe un personal (p. ej. creación previa con updateProfile fallido)
+    const ownedQ = query(collection(db, 'workspaces'), where('owner_id', '==', user.uid))
+    const ownedSnap = await getDocs(ownedQ)
+    const personalDoc = ownedSnap.docs.find(d => d.data().type === 'personal')
+    if (personalDoc) {
+      const id = personalDoc.id
+      try { await updateProfile({ personal_workspace_id: id }) } catch { /* ignore */ }
+      await ensureOwnerMembership(id)
+      ;(async () => {
+        try { await runMigrationIfNeeded(id, personalDoc.data().name || (profile.personal_workspace_name || 'Espacio Personal'), ownedSnap) } catch (e) { console.warn('[useWorkspace] migration failed', e) }
+      })()
+      return id
+    }
+
+    // Crear personal real
+    const personalName = profile.personal_workspace_name || 'Espacio Personal'
+    const workspacesRef = collection(db, 'workspaces')
+    const docRef = await addDoc(workspacesRef, {
+      name: personalName,
+      owner_id: user.uid,
+      type: 'personal',
+      icono: profile.personal_workspace_icono || null,
+      logo: profile.personal_workspace_logo || null,
+      ingresos_habilitado: profile?.ingresos_habilitado ?? false,
+      created_at: serverTimestamp()
+    })
+    const newId = docRef.id
+    await ensureOwnerMembership(newId)
+    await updateProfile({ personal_workspace_id: newId })
+
+    ;(async () => {
+      try { await runMigrationIfNeeded(newId, personalName, ownedSnap) } catch (e) { console.warn('[useWorkspace] migration failed', e) }
+    })()
+
+    return newId
+  }, [user, profile, updateProfile])
+
+  // Al primer ingreso o si falta personal_workspace_id: crear workspace personal real (type=personal) y asignarlo.
+  useEffect(() => {
+    if (!user || !profile) return
+    if (profile.personal_workspace_id) return
+    ;(async () => {
+      try {
+        await ensurePersonalWorkspace()
+        await fetchAll()
+      } catch (e) {
+        console.warn('[useWorkspace] ensurePersonalWorkspace failed:', e)
+      }
+    })()
+  }, [user?.uid, profile?.personal_workspace_id, ensurePersonalWorkspace, fetchAll])
+
+  // Evitar "ítem mágico": si existe personal_workspace_id, seleccionar el workspace personal real por defecto (una sola vez)
+  useEffect(() => {
+    if (!profile?.personal_workspace_id) return
+    if (initialPersonalSelectionRef.current) return
+    if (currentWorkspace) {
+      initialPersonalSelectionRef.current = true
+      return
+    }
+    const personalWs = workspaces.find(w => w.id === profile.personal_workspace_id)
+    if (personalWs) {
+      setCurrentWorkspace(personalWs)
+      initialPersonalSelectionRef.current = true
+    }
+  }, [profile?.personal_workspace_id, workspaces, currentWorkspace?.id])
 
   const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions, options?: { workspaceDisplayName?: string }) => {
     if (!user) return { error: new Error('No user') }
@@ -823,6 +1144,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, 
     acceptInvitation, rejectInvitation, cancelInvitation, deleteInvitation, deleteAllInvitations,
     leaveWorkspace,
+    ensurePersonalWorkspace,
     fetchAll
   }
 

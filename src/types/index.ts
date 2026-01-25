@@ -12,6 +12,14 @@ export interface Profile {
   personal_workspace_logo?: string | null // data URL (PNG/JPG/WebP)
   /** ID del workspace que representa el Espacio Personal (Privado). Nunca se crea uno nuevo al invitar. */
   personal_workspace_id?: string | null
+  /** Migración de datos legacy/proxy al workspace personal real */
+  personal_migration_done?: boolean
+  personal_migration_done_at?: string
+  personal_migration_version?: number
+  personal_migration_running?: boolean
+  personal_migration_started_at?: string
+  personal_migration_needs_attention?: boolean
+  personal_migration_proxy_candidates?: Array<{ id: string; name: string }>
   // Emails
   welcome_email_sent?: boolean
   welcome_email_sent_at?: string
@@ -194,10 +202,14 @@ export interface WorkspacePermissions {
   tarjetas: PermissionLevel
 }
 
+export type WorkspaceType = 'personal' | 'collaborative'
+
 export interface Workspace {
   id: string
   name: string
   owner_id: string
+  /** 'personal' = Espacio personal (Privado). 'collaborative' o ausente = workspace colaborativo. */
+  type?: WorkspaceType
   icono: string | null // Emoji o URL de imagen para identificar el workspace
   logo?: string | null // data URL (PNG/JPG/WebP)
   ingresos_habilitado?: boolean

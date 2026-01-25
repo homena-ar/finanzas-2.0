@@ -12,13 +12,13 @@ import { usePathname } from 'next/navigation'
 import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import type { WorkspacePermissions } from '@/types'
+import type { Workspace, WorkspacePermissions } from '@/types'
 import { NotificationsBell } from '@/components/NotificationsBell'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
-  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading } = useWorkspace()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading, ensurePersonalWorkspace } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -226,12 +226,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               onClick={() => setWorkspaceDropdownOpen(!workspaceDropdownOpen)}
               className={`w-full border rounded-xl p-3 flex items-center justify-between hover:bg-slate-100 transition-colors ${
-                currentWorkspace ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'
+                (currentWorkspace && currentWorkspace.id !== profile?.personal_workspace_id) ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'
               }`}
             >
               <div className="flex items-center gap-2 overflow-hidden">
                 {/* Avatar del espacio (logo > emoji > inicial) */}
-                {currentWorkspace ? (
+                {(currentWorkspace && currentWorkspace.id !== profile?.personal_workspace_id) ? (
                   currentWorkspace.logo ? (
                     <img src={currentWorkspace.logo} alt="Logo" className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" />
                   ) : currentWorkspace.icono ? (
@@ -258,10 +258,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 <div className="text-left overflow-hidden">
                   <div className="text-[10px] uppercase font-bold text-slate-500">
-                    {currentWorkspace ? (currentWorkspace.owner_id === user.uid ? 'Propietario' : 'Colaborador') : 'Espacio Personal'}
+                    {currentWorkspace?.id === profile?.personal_workspace_id ? 'Espacio Personal' : currentWorkspace ? (currentWorkspace.owner_id === user.uid ? 'Propietario' : 'Colaborador') : 'Espacio Personal'}
                   </div>
                   <div className="text-sm font-medium text-slate-900 truncate">
-                    {currentWorkspace?.name || personalWorkspaceName}
+                    {currentWorkspace?.name ?? personalWorkspaceName}
                   </div>
                 </div>
               </div>
@@ -271,15 +271,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Dropdown Menu */}
             {workspaceDropdownOpen && (
               <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-[300px] overflow-y-auto">
-                {/* Personal Option */}
+                {/* Personal Option (workspace real type=personal) */}
                 <button
                   onClick={() => {
-                    setCurrentWorkspace(null)
-                    setWorkspaceDropdownOpen(false)
+                    ;(async () => {
+                      try {
+                        const id = await ensurePersonalWorkspace()
+                        const personalWs = workspaces.find(w => w.id === id)
+                        if (personalWs) {
+                          setCurrentWorkspace(personalWs)
+                        } else if (user) {
+                          const stub: Workspace = {
+                            id,
+                            name: personalWorkspaceName,
+                            owner_id: user.uid,
+                            type: 'personal',
+                            icono: personalWorkspaceIcono,
+                            logo: personalWorkspaceLogo,
+                            ingresos_habilitado: profile?.ingresos_habilitado ?? false,
+                            created_at: new Date().toISOString(),
+                          }
+                          setCurrentWorkspace(stub)
+                        }
+                      } finally {
+                        setWorkspaceDropdownOpen(false)
+                      }
+                    })()
                   }}
                   className={`
                     w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
-                    ${currentWorkspace === null ? 'bg-slate-100' : ''}
+                    ${currentWorkspace?.id === profile?.personal_workspace_id ? 'bg-slate-100' : ''}
                   `}
                 >
                   <div className="flex items-center gap-3">
@@ -297,15 +318,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <div className="text-[10px] text-slate-500">Privado</div>
                     </div>
                   </div>
-                  {currentWorkspace === null && (
+                  {currentWorkspace?.id === profile?.personal_workspace_id && (
                     <div className="w-2 h-2 bg-slate-500 rounded-full" />
                   )}
                 </button>
 
                 <div className="border-t border-slate-100 my-1"></div>
 
-                {/* Workspaces */}
-                {workspaces.map((workspace) => {
+                {/* Workspaces (excluir el personal, que está arriba) */}
+                {workspaces.filter(w => w.id !== profile?.personal_workspace_id).map((workspace) => {
                   const isOwner = workspace.owner_id === user?.uid
                   return (
                     <button

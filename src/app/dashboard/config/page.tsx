@@ -38,7 +38,8 @@ export default function ConfigPage() {
     updateMemberPermissions,
     updateMemberDisplayName,
     removeMember,
-    leaveWorkspace
+    leaveWorkspace,
+    ensurePersonalWorkspace
   } = useWorkspace()
 
   const [budgetEnabled, setBudgetEnabled] = useState(false)
@@ -192,11 +193,23 @@ export default function ConfigPage() {
     }
     
     if (profile) {
-      setPersonalName(profile.personal_workspace_name || '')
-      setPersonalIcono(profile.personal_workspace_icono || '')
-      setPersonalLogo(profile.personal_workspace_logo || null)
+      const personalWs = profile.personal_workspace_id
+        ? workspaces.find(w => w.id === profile.personal_workspace_id)
+        : null
+
+      if (personalWs) {
+        // Renderizar siempre desde el doc real del workspace personal
+        setPersonalName(personalWs.name || '')
+        setPersonalIcono(personalWs.icono || '')
+        setPersonalLogo(personalWs.logo || null)
+      } else {
+        // Fallback mientras se crea/carga
+        setPersonalName(profile.personal_workspace_name || '')
+        setPersonalIcono(profile.personal_workspace_icono || '')
+        setPersonalLogo(profile.personal_workspace_logo || null)
+      }
     }
-  }, [profile, currentWorkspace])
+  }, [profile, currentWorkspace, workspaces])
 
   const fileToDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -291,6 +304,9 @@ export default function ConfigPage() {
       personal_workspace_icono: personalIcono || null,
       personal_workspace_logo: personalLogo || null,
     })
+    if (profile?.personal_workspace_id) {
+      await updateWorkspace(profile.personal_workspace_id, editingPersonalName, personalIcono || undefined, personalLogo || null)
+    }
     setPersonalName(editingPersonalName)
     setEditingPersonal(false)
     setEditingPersonalName('')
@@ -306,7 +322,16 @@ export default function ConfigPage() {
   const handleCancelEditPersonal = () => {
     setEditingPersonal(false)
     setEditingPersonalName('')
-    // Restaurar valores originales del perfil
+    // Restaurar valores originales (preferir doc real del personal si existe)
+    if (profile?.personal_workspace_id) {
+      const personalWs = workspaces.find(w => w.id === profile.personal_workspace_id)
+      if (personalWs) {
+        setPersonalName(personalWs.name || '')
+        setPersonalIcono(personalWs.icono || '')
+        setPersonalLogo(personalWs.logo || null)
+        return
+      }
+    }
     if (profile) {
       setPersonalName(profile.personal_workspace_name || '')
       setPersonalIcono(profile.personal_workspace_icono || '')
@@ -488,7 +513,7 @@ export default function ConfigPage() {
   }
 
   // Handler para invitar al Espacio Personal
-  // PROHIBIDO crear workspaces al invitar. Solo se usa un workspace existente (resuelto por ID o nombre).
+  // Usa SIEMPRE profile.personal_workspace_id (workspace real type=personal). Si falta, ensurePersonalWorkspace lo crea.
   const handleInvitePersonal = async () => {
     if (!personalInviteEmail.trim()) {
       setAlertData({
@@ -510,31 +535,13 @@ export default function ConfigPage() {
       return
     }
 
-    const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
-    const personalDisplayName = personalName || 'Espacio Personal'
-
-    // Resolver el workspace del Espacio Personal: solo usar uno existente. NUNCA crear.
-    let personalWorkspaceId: string | null = null
-
-    if (profile?.personal_workspace_id && myWorkspaces.some(w => w.id === profile.personal_workspace_id)) {
-      personalWorkspaceId = profile.personal_workspace_id
-    } else {
-      const cand = myWorkspaces.find(
-        w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
-      )
-      if (cand) {
-        personalWorkspaceId = cand.id
-        if (!profile?.personal_workspace_id) {
-          try { await updateProfile({ personal_workspace_id: cand.id }) } catch { /* ignore */ }
-        }
-      }
-    }
-
-    if (!personalWorkspaceId) {
-      const nombreEjemplo = personalName || 'Casa'
+    let personalWorkspaceId: string
+    try {
+      personalWorkspaceId = await ensurePersonalWorkspace()
+    } catch (e) {
       setAlertData({
-        title: 'Espacio personal sin workspace',
-        message: `Para invitar desde tu espacio personal, necesitás un workspace que lo represente. Creá uno en "Workspaces Colaborativos" con el nombre "${nombreEjemplo}" (o el que uses) y usalo para invitar. No se crean workspaces al invitar.`,
+        title: 'Error',
+        message: (e as Error)?.message || 'No se pudo preparar el espacio personal.',
         variant: 'error'
       })
       setShowAlert(true)
@@ -542,6 +549,7 @@ export default function ConfigPage() {
       return
     }
 
+    const personalDisplayName = personalName || 'Espacio Personal'
     const result = await inviteUser(personalWorkspaceId, personalInviteEmail, personalInvitePermissions, {
       workspaceDisplayName: personalDisplayName
     })
@@ -585,11 +593,11 @@ export default function ConfigPage() {
       return
     }
 
-    const myWorkspacesCount = workspaces.filter(w => w.owner_id === user?.uid).length
+    const myWorkspacesCount = workspaces.filter(w => w.owner_id === user?.uid && w.type !== 'personal').length
     if (myWorkspacesCount >= 3) {
       setAlertData({
         title: 'Límite alcanzado',
-        message: 'Ya tenés 2 espacios compartidos creados (el máximo permitido).',
+        message: 'Ya tenés 3 espacios colaborativos (el máximo). El espacio personal no cuenta.',
         variant: 'warning'
       })
       setShowAlert(true)
@@ -1256,6 +1264,26 @@ export default function ConfigPage() {
                       <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
                         <Shield className="w-3 h-3" /> PERSONAL
                       </span>
+                      {/* Indicador de migración (opcional) */}
+                      {profile && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${
+                          profile.personal_migration_running
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : profile.personal_migration_needs_attention
+                            ? 'bg-red-100 text-red-800'
+                            : profile.personal_migration_done
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {profile.personal_migration_running
+                            ? 'Migración: en progreso'
+                            : profile.personal_migration_needs_attention
+                            ? 'Migración: revisar'
+                            : profile.personal_migration_done
+                            ? 'Migración: OK'
+                            : 'Migración: pendiente'}
+                        </span>
+                      )}
                       <div className="flex gap-1">
                         <button
                           onClick={handleEditPersonal}
@@ -1266,6 +1294,22 @@ export default function ConfigPage() {
                         </button>
                       </div>
                     </div>
+                    {profile?.personal_migration_needs_attention && (profile.personal_migration_proxy_candidates?.length || 0) > 0 && (
+                      <div className="mt-2 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                        Se detectaron workspaces con el mismo nombre que <strong>no</strong> se migraron automáticamente para evitar errores:
+                        <ul className="list-disc ml-5 mt-1">
+                          {profile.personal_migration_proxy_candidates!.slice(0, 5).map(c => (
+                            <li key={c.id} className="truncate">
+                              {c.name} <span className="text-red-500">({c.id.slice(0, 8)}…)</span>
+                            </li>
+                          ))}
+                          {profile.personal_migration_proxy_candidates!.length > 5 && (
+                            <li>y {profile.personal_migration_proxy_candidates!.length - 5} más…</li>
+                          )}
+                        </ul>
+                        Podés revisarlos y decidir si borrar o migrar manualmente.
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -1292,28 +1336,17 @@ export default function ConfigPage() {
 
           {/* INVITACIONES Y MIEMBROS DEL ESPACIO PERSONAL - Solo visible cuando está expandido */}
           {expandedWorkspaceId === 'personal' && (() => {
-            const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
-            let personalWorkspace: (typeof workspaces)[0] | null = null
-            if (profile?.personal_workspace_id) {
-              const w = myWorkspaces.find(ws => ws.id === profile.personal_workspace_id)
-              if (w) personalWorkspace = w
-            }
-            if (!personalWorkspace) {
-              const cand = myWorkspaces.find(
-                w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
-              )
-              if (cand) personalWorkspace = cand
-            }
-            const personalWorkspaceId = personalWorkspace?.id
+            const personalWorkspaceId = profile?.personal_workspace_id ?? null
+            const personalWorkspace = personalWorkspaceId ? workspaces.find(w => w.id === personalWorkspaceId) ?? null : null
             const personalWorkspaceMembers = personalWorkspaceId ? members.filter(m => m.workspace_id === personalWorkspaceId) : []
             const personalSentInvitations = personalWorkspaceId ? sentInvitations.filter(inv => inv.workspace_id === personalWorkspaceId) : []
             const isPersonalOwner = personalWorkspace?.owner_id === user?.uid
 
-            if (!personalWorkspaceId) {
+            if (!personalWorkspaceId || !personalWorkspace) {
               return (
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <p className="text-xs text-slate-400">
-                    No hay un workspace vinculado a tu espacio personal. Creá uno en &quot;Workspaces Colaborativos&quot; con el nombre &quot;{personalName || 'Espacio Personal'}&quot; para ver miembros e invitaciones aquí.
+                    Cargando espacio personal…
                   </p>
                 </div>
               )
@@ -1647,7 +1680,7 @@ export default function ConfigPage() {
             <h4 className="font-semibold text-base">🏢 Workspaces Colaborativos</h4>
             <button
               onClick={() => setShowWorkspaceModal(true)}
-              disabled={workspaces.filter(w => w.owner_id === user?.uid).length >= 3}
+              disabled={workspaces.filter(w => w.owner_id === user?.uid && w.type !== 'personal').length >= 3}
               className="btn btn-primary btn-sm"
             >
               <Plus className="w-4 h-4" /> Nuevo Workspace
