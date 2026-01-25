@@ -31,6 +31,8 @@ interface WorkspaceContextType {
   invitations: WorkspaceInvitation[] // Invitaciones recibidas (pendientes)
   sentInvitations: WorkspaceInvitation[] // Invitaciones enviadas
   loading: boolean
+  /** Falso hasta que ensurePersonalWorkspace + setCurrentWorkspace (personal) hayan terminado. Usar para "Cargando tu espacio…". */
+  initWorkspaceReady: boolean
 
   setCurrentWorkspace: (workspace: Workspace | null) => void
   createWorkspace: (name: string, icono?: string, logo?: string | null) => Promise<{ error: any } | { error: null, workspace: Workspace }>
@@ -67,6 +69,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]) // Invitaciones recibidas
   const [sentInvitations, setSentInvitations] = useState<WorkspaceInvitation[]>([]) // Invitaciones enviadas
   const [loading, setLoading] = useState(true)
+  const [initWorkspaceReady, setInitWorkspaceReady] = useState(false)
   const personalMigrationRunningRef = useRef(false)
   const initialPersonalSelectionRef = useRef(false)
 
@@ -242,7 +245,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.error('🏢 [useWorkspace] Error fetching data:', error)
       setLoading(false)
     }
-  }, [user, currentWorkspace])
+  }, [user])
 
   useEffect(() => {
     if (user) fetchAll()
@@ -253,6 +256,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setInvitations([])
       setSentInvitations([])
       setLoading(false)
+      setInitWorkspaceReady(false)
+      initialPersonalSelectionRef.current = false
     }
   }, [user, fetchAll])
 
@@ -641,34 +646,52 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return newId
   }, [user, profile, updateProfile])
 
-  // Al primer ingreso o si falta personal_workspace_id: crear workspace personal real (type=personal) y asignarlo.
+  // Init ordenado: ensurePersonalWorkspace → fetchAll → setCurrentWorkspace(personal). Así los datos se cargan con workspaceId válido.
   useEffect(() => {
     if (!user || !profile) return
-    if (profile.personal_workspace_id) return
-    ;(async () => {
-      try {
-        await ensurePersonalWorkspace()
-        await fetchAll()
-      } catch (e) {
-        console.warn('[useWorkspace] ensurePersonalWorkspace failed:', e)
-      }
-    })()
-  }, [user?.uid, profile?.personal_workspace_id, ensurePersonalWorkspace, fetchAll])
-
-  // Evitar "ítem mágico": si existe personal_workspace_id, seleccionar el workspace personal real por defecto (una sola vez)
-  useEffect(() => {
-    if (!profile?.personal_workspace_id) return
-    if (initialPersonalSelectionRef.current) return
-    if (currentWorkspace) {
-      initialPersonalSelectionRef.current = true
+    if (initialPersonalSelectionRef.current) {
+      setInitWorkspaceReady(true)
       return
     }
-    const personalWs = workspaces.find(w => w.id === profile.personal_workspace_id)
-    if (personalWs) {
-      setCurrentWorkspace(personalWs)
-      initialPersonalSelectionRef.current = true
-    }
-  }, [profile?.personal_workspace_id, workspaces, currentWorkspace?.id])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const personalId = await ensurePersonalWorkspace()
+        if (cancelled) return
+        await fetchAll()
+        if (cancelled) return
+        if (initialPersonalSelectionRef.current) {
+          setInitWorkspaceReady(true)
+          return
+        }
+        const wsSnap = await getDoc(doc(db, 'workspaces', personalId))
+        if (cancelled || !wsSnap.exists()) {
+          setInitWorkspaceReady(true)
+          return
+        }
+        const d = wsSnap.data()
+        const personalWs: Workspace = {
+          id: wsSnap.id,
+          name: d.name,
+          owner_id: d.owner_id,
+          type: (d.type === 'personal' ? 'personal' : 'collaborative') as Workspace['type'],
+          icono: d.icono || null,
+          logo: d.logo || null,
+          ingresos_habilitado: d.ingresos_habilitado || false,
+          budget_ars: d.budget_ars || 0,
+          budget_usd: d.budget_usd || 0,
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : (d.created_at || new Date().toISOString())
+        }
+        setCurrentWorkspace(personalWs)
+        initialPersonalSelectionRef.current = true
+        setInitWorkspaceReady(true)
+      } catch (e) {
+        console.warn('[useWorkspace] init ensurePersonalWorkspace failed:', e)
+        setInitWorkspaceReady(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user?.uid, profile, ensurePersonalWorkspace, fetchAll])
 
   const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions, options?: { workspaceDisplayName?: string }) => {
     if (!user) return { error: new Error('No user') }
@@ -1105,7 +1128,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user, workspaces, currentWorkspace, fetchAll])
 
   const value = {
-    workspaces, currentWorkspace, members, invitations, sentInvitations, loading,
+    workspaces, currentWorkspace, members, invitations, sentInvitations, loading, initWorkspaceReady,
     setCurrentWorkspace, createWorkspace, updateWorkspace, updateWorkspaceConfig, deleteWorkspace,
     inviteUser, updateMemberPermissions, updateMemberDisplayName, removeMember, 
     acceptInvitation, rejectInvitation, cancelInvitation, deleteInvitation, deleteAllInvitations,

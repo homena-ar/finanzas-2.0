@@ -18,7 +18,7 @@ import { NotificationsBell } from '@/components/NotificationsBell'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
-  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading, ensurePersonalWorkspace } = useWorkspace()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading, initWorkspaceReady, ensurePersonalWorkspace } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -133,6 +133,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     return null
+  }
+
+  if (user && !initWorkspaceReady) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-50">
+        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
+        <p className="text-slate-600">Cargando tu espacio…</p>
+      </div>
+    )
   }
 
   return (
@@ -326,7 +335,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="border-t border-slate-100 my-1"></div>
 
                 {/* Workspaces (excluir el personal, que está arriba) */}
-                {workspaces.filter(w => w.id !== profile?.personal_workspace_id).map((workspace) => {
+                {workspaces.filter(w => w.type !== 'personal').map((workspace) => {
                   const isOwner = workspace.owner_id === user?.uid
                   return (
                     <button
@@ -366,9 +375,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )
                 })}
                 
-                {workspaces.length === 0 && (
+                {workspaces.filter(w => w.type !== 'personal').length === 0 && (
                   <div className="px-4 py-3 text-xs text-center text-slate-400">
-                    No tienes espacios compartidos
+                    No tenés espacios colaborativos
                   </div>
                 )}
               </div>

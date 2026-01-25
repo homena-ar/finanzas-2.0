@@ -739,10 +739,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'PERSONAL')
+    console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'NULL')
 
     if (!authLoading && user) {
-      console.log('📊 [Firebase useData] User exists - Calling fetchAll')
+      if (!currentWorkspace?.id) {
+        setLoading(false)
+        return
+      }
+      console.log('📊 [Firebase useData] User and workspace ready - Calling fetchAll for', currentWorkspace.id)
       fetchAll().catch((error) => {
         if (isMountedRef.current) {
           console.error('📊 [Firebase useData] Error en fetchAll:', error)
@@ -756,7 +760,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } else {
       console.log('📊 [Firebase useData] Auth still loading - waiting...')
     }
-  }, [user, authLoading, fetchAll, currentWorkspace])
+  }, [user, authLoading, fetchAll, currentWorkspace?.id])
 
   const addMovimiento = useCallback(async (tipo: 'pesos' | 'usd', monto: number, descripcion?: string) => {
     if (!user) {

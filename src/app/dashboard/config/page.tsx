@@ -1689,8 +1689,8 @@ export default function ConfigPage() {
 
         {/* Lista de Workspaces */}
         <div className="space-y-3">
-          {workspaces.length > 0 ? (
-            workspaces.map(ws => {
+          {            workspaces.filter(w => w.type !== 'personal').length > 0 ? (
+            workspaces.filter(w => w.type !== 'personal').map(ws => {
               const isOwner = ws.owner_id === user?.uid
               const isExpanded = expandedWorkspaceId === ws.id
               const workspaceMembers = members.filter(m => m.workspace_id === ws.id)
