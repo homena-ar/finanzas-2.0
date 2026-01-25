@@ -509,24 +509,36 @@ export default function ConfigPage() {
       return
     }
 
-    // El Espacio Personal debe usar SOLO el workspace dedicado (nombre "Espacio Personal" o personalName)
-    // para que la invitación llegue específicamente a ese espacio y no a Gravix/Homena.
+    // El Espacio Personal DEBE tener su propio workspace dedicado
+    // Si no existe, lo creamos o renombramos uno existente
     let personalWorkspaceId: string | null = null
-    const personalDisplayName = personalName ? `Espacio Personal (${personalName})` : 'Espacio Personal'
+    // El nombre que verá el invitado es el nombre personalizado del espacio personal (ej: "Casa")
+    const personalDisplayName = personalName || 'Espacio Personal'
     
     const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
+    
+    // Buscar workspace que coincida con el nombre del espacio personal
     const personalCandidates = myWorkspaces.filter(
-      w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
+      w => w.name === personalName || w.name === 'Espacio Personal'
     )
     
     if (personalCandidates.length > 0) {
-      // Usar el workspace que coincide con el espacio personal (nombre personalName o "Espacio Personal")
+      // Encontramos un workspace que coincide - usarlo
       personalWorkspaceId = personalCandidates[0].id
+      // Si el nombre del workspace no coincide con personalName, renombrarlo
+      if (personalCandidates[0].name !== personalName && personalName) {
+        console.log(`🔄 [Config] Renombrando workspace "${personalCandidates[0].name}" a "${personalName}" para espacio personal`)
+        const updateResult = await updateWorkspace(personalWorkspaceId, personalName, personalIcono || undefined, personalLogo || null)
+        if (updateResult.error) {
+          console.warn('⚠️ [Config] No se pudo renombrar el workspace, pero continuamos con la invitación')
+        }
+      }
       console.log('✅ [Config] Usando workspace existente para espacio personal:', personalWorkspaceId, personalCandidates[0].name)
     } else {
-      // No hay workspace "Espacio Personal": intentar crear uno
+      // No hay workspace para el espacio personal - crear uno nuevo
       const workspaceName = personalName || 'Espacio Personal'
-      console.log('⚠️ [Config] No se encontró workspace para espacio personal, intentando crear:', workspaceName)
+      console.log('⚠️ [Config] No se encontró workspace para espacio personal, creando:', workspaceName)
+      
       const result = await createWorkspace(
         workspaceName,
         personalIcono || undefined,
@@ -539,11 +551,22 @@ export default function ConfigPage() {
       } else {
         // Si falla la creación (ej. límite de 2 workspaces), mostrar error claro
         const errorMessage = result.error?.message || 'Error desconocido'
-        setAlertData({
-          title: 'Error',
-          message: `No se pudo crear el workspace para el espacio personal. ${errorMessage.includes('Límite') ? 'Ya tenés 2 workspaces. Renombrá uno de tus workspaces existentes para usarlo como espacio personal, o eliminá uno para crear el espacio personal.' : 'Por favor, intentá nuevamente.'}`,
-          variant: 'error'
-        })
+        const isLimitError = errorMessage.includes('Límite') || errorMessage.includes('límite') || errorMessage.includes('limit')
+        
+        if (isLimitError && myWorkspaces.length > 0) {
+          const workspaceNames = myWorkspaces.map(w => w.name).join('" y "')
+          setAlertData({
+            title: 'Límite de workspaces alcanzado',
+            message: `Ya tenés 2 workspaces ("${workspaceNames}"). Para invitar desde tu espacio personal, necesitás renombrar uno de tus workspaces a "${workspaceName}" o eliminá uno para crear el espacio personal.`,
+            variant: 'error'
+          })
+        } else {
+          setAlertData({
+            title: 'Error',
+            message: `No se pudo crear el workspace para el espacio personal. ${errorMessage}`,
+            variant: 'error'
+          })
+        }
         setShowAlert(true)
         setShowPersonalInviteModal(false)
         return
@@ -561,7 +584,7 @@ export default function ConfigPage() {
       return
     }
 
-    // Invitar solo al espacio personal; el invitado verá "Espacio Personal (Casa)" en pendientes
+    // Invitar al espacio personal; el invitado verá el nombre personalizado (ej: "Casa")
     const result = await inviteUser(personalWorkspaceId, personalInviteEmail, personalInvitePermissions, {
       workspaceDisplayName: personalDisplayName
     })
