@@ -614,12 +614,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (existingId) {
       const wsSnap = await getDoc(doc(db, 'workspaces', existingId))
       if (wsSnap.exists()) {
-        await ensureOwnerMembership(existingId)
-        // Migrar (idempotente) si aún no se hizo
-        ;(async () => {
-          try { await runMigrationIfNeeded(existingId, wsSnap.data()?.name || (profile.personal_workspace_name || 'Espacio Personal')) } catch (e) { console.warn('[useWorkspace] migration failed', e) }
-        })()
-        return existingId
+        const data: any = wsSnap.data()
+        // Hardening: `personal_workspace_id` SOLO puede apuntar al personal propio
+        // (owner_id == uid y type == 'personal'). Si apunta a un workspace ajeno
+        // (p.ej. un "espacio personal compartido" donde soy colaborador),
+        // el switch a "Privado" queda roto porque ensurePersonalWorkspace devuelve el ID incorrecto.
+        const isOwnPersonal = data?.owner_id === user.uid && data?.type === 'personal'
+        if (!isOwnPersonal) {
+          console.warn('[useWorkspace] personal_workspace_id inválido (no es personal propio). Se ignora:', {
+            existingId,
+            owner_id: data?.owner_id,
+            type: data?.type,
+            uid: user.uid,
+          })
+          try { await updateProfile({ personal_workspace_id: null }) } catch { /* ignore */ }
+        } else {
+          await ensureOwnerMembership(existingId)
+          // Migrar (idempotente) si aún no se hizo
+          ;(async () => {
+            try { await runMigrationIfNeeded(existingId, data?.name || (profile.personal_workspace_name || 'Espacio Personal')) } catch (e) { console.warn('[useWorkspace] migration failed', e) }
+          })()
+          return existingId
+        }
       }
     }
 
