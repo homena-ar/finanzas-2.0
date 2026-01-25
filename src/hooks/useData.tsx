@@ -743,6 +743,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (!authLoading && user) {
       if (!currentWorkspace?.id) {
+        setMovimientos([])
+        setMetas([])
+        setTarjetas([])
+        setGastos([])
+        setImpuestos([])
+        setCategorias([])
+        setTags([])
+        setIngresos([])
+        setCategoriasIngresos([])
+        setTagsIngresos([])
+        setMediosPago([])
         setLoading(false)
         return
       }
@@ -753,8 +764,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       })
     } else if (!authLoading && !user) {
-      console.log('📊 [Firebase useData] No user and auth done loading - Setting loading to FALSE')
+      console.log('📊 [Firebase useData] No user and auth done loading - Clearing data and setting loading to FALSE')
       if (isMountedRef.current) {
+        setMovimientos([])
+        setMetas([])
+        setTarjetas([])
+        setGastos([])
+        setImpuestos([])
+        setCategorias([])
+        setTags([])
+        setIngresos([])
+        setCategoriasIngresos([])
+        setTagsIngresos([])
+        setMediosPago([])
         setLoading(false)
       }
     } else {

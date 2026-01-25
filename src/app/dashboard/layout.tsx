@@ -335,7 +335,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="border-t border-slate-100 my-1"></div>
 
                 {/* Workspaces (excluir el personal, que está arriba) */}
-                {workspaces.filter(w => w.type !== 'personal').map((workspace) => {
+                {workspaces.filter(w => w.id !== profile?.personal_workspace_id).map((workspace) => {
                   const isOwner = workspace.owner_id === user?.uid
                   return (
                     <button
@@ -375,7 +375,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )
                 })}
                 
-                {workspaces.filter(w => w.type !== 'personal').length === 0 && (
+                {workspaces.filter(w => w.id !== profile?.personal_workspace_id).length === 0 && (
                   <div className="px-4 py-3 text-xs text-center text-slate-400">
                     No tenés espacios colaborativos
                   </div>

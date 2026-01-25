@@ -72,6 +72,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [initWorkspaceReady, setInitWorkspaceReady] = useState(false)
   const personalMigrationRunningRef = useRef(false)
   const initialPersonalSelectionRef = useRef(false)
+  const previousUserIdRef = useRef<string | null>(null)
 
   const fetchAll = useCallback(async () => {
     if (!user) {
@@ -248,8 +249,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   useEffect(() => {
-    if (user) fetchAll()
-    else {
+    if (user) {
+      if (user.uid !== previousUserIdRef.current) {
+        setWorkspaces([])
+        setCurrentWorkspace(null)
+        setMembers([])
+        setInvitations([])
+        setSentInvitations([])
+        setLoading(true)
+        setInitWorkspaceReady(false)
+        initialPersonalSelectionRef.current = false
+        previousUserIdRef.current = user.uid
+      }
+      fetchAll()
+    } else {
       setWorkspaces([])
       setCurrentWorkspace(null)
       setMembers([])
@@ -258,6 +271,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       setInitWorkspaceReady(false)
       initialPersonalSelectionRef.current = false
+      previousUserIdRef.current = null
     }
   }, [user, fetchAll])
 
