@@ -674,65 +674,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: new Error('No user') }
 
     try {
-      // VALIDACIÓN: Verificar si ya existe una invitación (cualquier estado)
-      const existingInvitationQuery = query(
-        collection(db, 'workspace_invitations'),
-        where('workspace_id', '==', workspaceId),
-        where('email', '==', email)
-      )
-      const existingInvitationSnap = await getDocs(existingInvitationQuery)
-      
-      if (!existingInvitationSnap.empty) {
-        const existingInvitation = existingInvitationSnap.docs[0].data()
-        const status = existingInvitation.status
-        
-        if (status === 'pending') {
-          return { error: new Error('Ya existe una invitación pendiente para este email. Puedes cancelarla y volver a invitar.') }
-        } else if (status === 'accepted') {
-          return { error: new Error('Este usuario ya aceptó una invitación y es miembro del workspace.') }
-        } else if (status === 'rejected') {
-          return { error: new Error('Este usuario rechazó una invitación anterior. Puedes cancelarla y volver a invitar.') }
-        } else if (status === 'cancelled') {
-          // Si está cancelada, podemos crear una nueva
-        }
+      // Crear invitación vía API (evita "Missing or insufficient permissions" en Espacio personal)
+      const token = await user.getIdToken()
+      const createRes = await fetch('/api/create-workspace-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          workspaceId,
+          email,
+          permissions,
+          workspaceDisplayName: options?.workspaceDisplayName,
+        }),
+      })
+
+      if (!createRes.ok) {
+        const data = await createRes.json().catch(() => ({}))
+        return { error: new Error(data?.error || 'No se pudo crear la invitación') }
       }
 
-      // VALIDACIÓN: Verificar si ya es miembro del workspace
-      const membersQuery = query(
-        collection(db, 'workspace_members'),
-        where('workspace_id', '==', workspaceId)
-      )
-      const membersSnap = await getDocs(membersQuery)
-      const isAlreadyMember = membersSnap.docs.some(doc => doc.data().user_email === email)
-      
-      if (isAlreadyMember) {
-        return { error: new Error('Este email ya es miembro del workspace.') }
-      }
+      const createData = await createRes.json()
+      const workspaceName = createData.workspaceName || 'Workspace'
 
-      const workspace = workspaces.find(w => w.id === workspaceId)
-      const workspaceName = options?.workspaceDisplayName ?? workspace?.name ?? 'Workspace'
-      
-      // Log para debugging: verificar que se está usando el workspace_id correcto
-      console.log('✅ [useWorkspace] Creando invitación:', {
-        workspaceId,
-        workspaceName,
-        workspaceActualName: workspace?.name,
-        email,
-        displayName: options?.workspaceDisplayName
-      })
-      
-      // Crear la invitación con toda la información necesaria
-      const invitationRef = await addDoc(collection(db, 'workspace_invitations'), {
-        workspace_id: workspaceId,
-        email,
-        inviter_email: user.email, // Email de quien envía la invitación
-        workspace_name: workspaceName, // Nombre del workspace (o display name para Espacio Personal)
-        permissions,
-        status: 'pending',
-        created_at: serverTimestamp()
-      })
-      
-      console.log('✅ [useWorkspace] Invitación creada con ID:', invitationRef.id, 'workspace_id:', workspaceId)
+      console.log('✅ [useWorkspace] Invitación creada con ID:', createData.invitationId, 'workspace_id:', workspaceId)
 
       // Enviar email usando Resend API
       try {
@@ -871,7 +837,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.error(error)
       return { error }
     }
-  }, [user, workspaces])
+  }, [user, profile, fetchAll])
 
   const updateWorkspace = useCallback(async (id: string, name: string, icono?: string | null, logo?: string | null, ingresos_habilitado?: boolean, budget_ars?: number, budget_usd?: number) => {
     try { 
