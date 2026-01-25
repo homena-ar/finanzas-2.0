@@ -284,24 +284,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <button
                   onClick={() => {
                     ;(async () => {
+                      console.log('🏠 [Layout] Click Privado', {
+                        currentWorkspaceId: currentWorkspace?.id || null,
+                        profilePersonalId: profile?.personal_workspace_id || null,
+                      })
                       try {
                         const id = await ensurePersonalWorkspace()
+                        console.log('🏠 [Layout] ensurePersonalWorkspace() ->', id)
                         const personalWs = workspaces.find(w => w.id === id)
-                        if (personalWs) {
-                          setCurrentWorkspace(personalWs)
-                        } else if (user) {
-                          const stub: Workspace = {
-                            id,
-                            name: personalWorkspaceName,
-                            owner_id: user.uid,
-                            type: 'personal',
-                            icono: personalWorkspaceIcono,
-                            logo: personalWorkspaceLogo,
-                            ingresos_habilitado: profile?.ingresos_habilitado ?? false,
-                            created_at: new Date().toISOString(),
-                          }
-                          setCurrentWorkspace(stub)
-                        }
+                        const nextWs: Workspace | null = personalWs
+                          ? personalWs
+                          : (user ? {
+                              id,
+                              name: personalWorkspaceName,
+                              owner_id: user.uid,
+                              type: 'personal',
+                              icono: personalWorkspaceIcono,
+                              logo: personalWorkspaceLogo,
+                              ingresos_habilitado: profile?.ingresos_habilitado ?? false,
+                              created_at: new Date().toISOString(),
+                            } : null)
+
+                        console.log('🏠 [Layout] setCurrentWorkspace(Personal) ->', nextWs?.id || null)
+                        if (nextWs) setCurrentWorkspace(nextWs)
+                      } catch (e: any) {
+                        console.error('❌ [Layout] Error seleccionando Privado:', e?.message || e, e)
                       } finally {
                         setWorkspaceDropdownOpen(false)
                       }
