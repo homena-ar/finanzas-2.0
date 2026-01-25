@@ -73,6 +73,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const personalMigrationRunningRef = useRef(false)
   const initialPersonalSelectionRef = useRef(false)
   const previousUserIdRef = useRef<string | null>(null)
+  const initAttemptedForUserRef = useRef<string | null>(null)
 
   const fetchAll = useCallback(async () => {
     if (!user) {
@@ -259,6 +260,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setLoading(true)
         setInitWorkspaceReady(false)
         initialPersonalSelectionRef.current = false
+        initAttemptedForUserRef.current = null
         previousUserIdRef.current = user.uid
       }
       fetchAll()
@@ -272,6 +274,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setInitWorkspaceReady(false)
       initialPersonalSelectionRef.current = false
       previousUserIdRef.current = null
+      initAttemptedForUserRef.current = null
     }
   }, [user, fetchAll])
 
@@ -688,51 +691,102 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user, profile, updateProfile])
 
   // Init ordenado: ensurePersonalWorkspace → fetchAll → setCurrentWorkspace(personal). Así los datos se cargan con workspaceId válido.
+  // IMPORTANTE: NO re-ejecutar si ya lo intentamos para este user, para evitar loops infinitos si hay errores de permisos.
   useEffect(() => {
     if (!user || !profile) return
+    if (initAttemptedForUserRef.current === user.uid) {
+      // Ya intentamos para este usuario (éxito o fallo), no repetir
+      setInitWorkspaceReady(true)
+      return
+    }
     if (initialPersonalSelectionRef.current) {
       setInitWorkspaceReady(true)
       return
     }
+
+    // Marcar como intentado ANTES de cualquier operación async (previene loop)
+    initAttemptedForUserRef.current = user.uid
+
     let cancelled = false
     ;(async () => {
       try {
-        const personalId = await ensurePersonalWorkspace()
+        // Buscar workspace personal directamente por query (más robusto que getDoc si hay problemas de reglas)
+        const ownedQ = query(collection(db, 'workspaces'), where('owner_id', '==', user.uid))
+        const ownedSnap = await getDocs(ownedQ)
+        let personalDoc = ownedSnap.docs.find(d => d.data().type === 'personal')
+
+        let personalId: string
+        let personalData: any
+
+        if (personalDoc) {
+          personalId = personalDoc.id
+          personalData = personalDoc.data()
+          // Asegurar que el perfil tenga el ID correcto (sin releerlo después)
+          if (profile.personal_workspace_id !== personalId) {
+            try { await updateProfile({ personal_workspace_id: personalId }) } catch { /* ignore */ }
+          }
+        } else {
+          // No existe, crear
+          const personalName = profile.personal_workspace_name || 'Espacio Personal'
+          const docRef = await addDoc(collection(db, 'workspaces'), {
+            name: personalName,
+            owner_id: user.uid,
+            type: 'personal',
+            icono: profile.personal_workspace_icono || null,
+            logo: profile.personal_workspace_logo || null,
+            ingresos_habilitado: profile?.ingresos_habilitado ?? false,
+            created_at: serverTimestamp()
+          })
+          personalId = docRef.id
+          personalData = {
+            name: personalName,
+            owner_id: user.uid,
+            type: 'personal',
+            icono: profile.personal_workspace_icono || null,
+            logo: profile.personal_workspace_logo || null,
+            ingresos_habilitado: profile?.ingresos_habilitado ?? false,
+          }
+          // Crear membership para el owner
+          const mid = `${personalId}_${user.uid}`
+          await setDoc(doc(db, 'workspace_members', mid), {
+            workspace_id: personalId,
+            user_id: user.uid,
+            user_email: user.email,
+            permissions: { gastos: 'admin', ingresos: 'admin', ahorros: 'admin', tarjetas: 'admin' },
+            created_at: serverTimestamp()
+          })
+          try { await updateProfile({ personal_workspace_id: personalId }) } catch { /* ignore */ }
+        }
+
         if (cancelled) return
         await fetchAll()
         if (cancelled) return
-        if (initialPersonalSelectionRef.current) {
-          setInitWorkspaceReady(true)
-          return
-        }
-        const wsSnap = await getDoc(doc(db, 'workspaces', personalId))
-        if (cancelled || !wsSnap.exists()) {
-          setInitWorkspaceReady(true)
-          return
-        }
-        const d = wsSnap.data()
+
         const personalWs: Workspace = {
-          id: wsSnap.id,
-          name: d.name,
-          owner_id: d.owner_id,
-          type: (d.type === 'personal' ? 'personal' : 'collaborative') as Workspace['type'],
-          icono: d.icono || null,
-          logo: d.logo || null,
-          ingresos_habilitado: d.ingresos_habilitado || false,
-          budget_ars: d.budget_ars || 0,
-          budget_usd: d.budget_usd || 0,
-          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : (d.created_at || new Date().toISOString())
+          id: personalId,
+          name: personalData.name || 'Espacio Personal',
+          owner_id: personalData.owner_id || user.uid,
+          type: 'personal',
+          icono: personalData.icono || null,
+          logo: personalData.logo || null,
+          ingresos_habilitado: personalData.ingresos_habilitado || false,
+          budget_ars: personalData.budget_ars || 0,
+          budget_usd: personalData.budget_usd || 0,
+          created_at: personalData.created_at instanceof Timestamp
+            ? personalData.created_at.toDate().toISOString()
+            : (personalData.created_at || new Date().toISOString())
         }
         setCurrentWorkspace(personalWs)
         initialPersonalSelectionRef.current = true
         setInitWorkspaceReady(true)
       } catch (e) {
         console.warn('[useWorkspace] init ensurePersonalWorkspace failed:', e)
+        // Aún así marcar como ready para no bloquear la UI
         setInitWorkspaceReady(true)
       }
     })()
     return () => { cancelled = true }
-  }, [user?.uid, profile, ensurePersonalWorkspace, fetchAll])
+  }, [user?.uid, profile?.personal_workspace_id, fetchAll, updateProfile])
 
   const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions, options?: { workspaceDisplayName?: string }) => {
     if (!user) return { error: new Error('No user') }

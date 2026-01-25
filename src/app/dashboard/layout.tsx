@@ -18,7 +18,7 @@ import { NotificationsBell } from '@/components/NotificationsBell'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
-  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading, initWorkspaceReady, ensurePersonalWorkspace } = useWorkspace()
+  const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading, initWorkspaceReady } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -283,36 +283,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Personal Option (workspace real type=personal) */}
                 <button
                   onClick={() => {
-                    ;(async () => {
-                      console.log('🏠 [Layout] Click Privado', {
-                        currentWorkspaceId: currentWorkspace?.id || null,
-                        profilePersonalId: profile?.personal_workspace_id || null,
-                      })
-                      try {
-                        const id = await ensurePersonalWorkspace()
-                        console.log('🏠 [Layout] ensurePersonalWorkspace() ->', id)
-                        const personalWs = workspaces.find(w => w.id === id)
-                        const nextWs: Workspace | null = personalWs
-                          ? personalWs
-                          : (user ? {
-                              id,
-                              name: personalWorkspaceName,
-                              owner_id: user.uid,
-                              type: 'personal',
-                              icono: personalWorkspaceIcono,
-                              logo: personalWorkspaceLogo,
-                              ingresos_habilitado: profile?.ingresos_habilitado ?? false,
-                              created_at: new Date().toISOString(),
-                            } : null)
+                    // Buscar el workspace personal en la lista ya cargada (más robusto que llamar a ensurePersonalWorkspace)
+                    const personalWs = workspaces.find(w => w.type === 'personal' && w.owner_id === user?.uid)
+                      || workspaces.find(w => w.id === profile?.personal_workspace_id)
 
-                        console.log('🏠 [Layout] setCurrentWorkspace(Personal) ->', nextWs?.id || null)
-                        if (nextWs) setCurrentWorkspace(nextWs)
-                      } catch (e: any) {
-                        console.error('❌ [Layout] Error seleccionando Privado:', e?.message || e, e)
-                      } finally {
-                        setWorkspaceDropdownOpen(false)
+                    if (personalWs) {
+                      setCurrentWorkspace(personalWs)
+                    } else if (user) {
+                      // Fallback: usar stub con datos del perfil
+                      const stub: Workspace = {
+                        id: profile?.personal_workspace_id || 'personal-stub',
+                        name: personalWorkspaceName,
+                        owner_id: user.uid,
+                        type: 'personal',
+                        icono: personalWorkspaceIcono,
+                        logo: personalWorkspaceLogo,
+                        ingresos_habilitado: profile?.ingresos_habilitado ?? false,
+                        budget_ars: 0,
+                        budget_usd: 0,
+                        created_at: new Date().toISOString(),
                       }
-                    })()
+                      setCurrentWorkspace(stub)
+                    }
+                    setWorkspaceDropdownOpen(false)
                   }}
                   className={`
                     w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
