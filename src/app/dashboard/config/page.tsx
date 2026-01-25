@@ -488,6 +488,7 @@ export default function ConfigPage() {
   }
 
   // Handler para invitar al Espacio Personal
+  // PROHIBIDO crear workspaces al invitar. Solo se usa un workspace existente (resuelto por ID o nombre).
   const handleInvitePersonal = async () => {
     if (!personalInviteEmail.trim()) {
       setAlertData({
@@ -509,74 +510,31 @@ export default function ConfigPage() {
       return
     }
 
-    // El Espacio Personal DEBE tener su propio workspace dedicado
-    // Si no existe, lo creamos o renombramos uno existente
-    let personalWorkspaceId: string | null = null
-    // El nombre que verá el invitado es el nombre personalizado del espacio personal (ej: "Casa")
-    const personalDisplayName = personalName || 'Espacio Personal'
-    
     const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
-    
-    // Buscar workspace que coincida con el nombre del espacio personal
-    const personalCandidates = myWorkspaces.filter(
-      w => w.name === personalName || w.name === 'Espacio Personal'
-    )
-    
-    if (personalCandidates.length > 0) {
-      // Encontramos un workspace que coincide - usarlo
-      personalWorkspaceId = personalCandidates[0].id
-      // Si el nombre del workspace no coincide con personalName, renombrarlo
-      if (personalCandidates[0].name !== personalName && personalName) {
-        console.log(`🔄 [Config] Renombrando workspace "${personalCandidates[0].name}" a "${personalName}" para espacio personal`)
-        const updateResult = await updateWorkspace(personalWorkspaceId, personalName, personalIcono || undefined, personalLogo || null)
-        if (updateResult.error) {
-          console.warn('⚠️ [Config] No se pudo renombrar el workspace, pero continuamos con la invitación')
-        }
-      }
-      console.log('✅ [Config] Usando workspace existente para espacio personal:', personalWorkspaceId, personalCandidates[0].name)
+    const personalDisplayName = personalName || 'Espacio Personal'
+
+    // Resolver el workspace del Espacio Personal: solo usar uno existente. NUNCA crear.
+    let personalWorkspaceId: string | null = null
+
+    if (profile?.personal_workspace_id && myWorkspaces.some(w => w.id === profile.personal_workspace_id)) {
+      personalWorkspaceId = profile.personal_workspace_id
     } else {
-      // No hay workspace para el espacio personal - crear uno nuevo
-      const workspaceName = personalName || 'Espacio Personal'
-      console.log('⚠️ [Config] No se encontró workspace para espacio personal, creando:', workspaceName)
-      
-      const result = await createWorkspace(
-        workspaceName,
-        personalIcono || undefined,
-        personalLogo || null
+      const cand = myWorkspaces.find(
+        w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
       )
-      
-      if (!result.error && 'workspace' in result && result.workspace) {
-        personalWorkspaceId = result.workspace.id
-        console.log('✅ [Config] Workspace creado para espacio personal:', personalWorkspaceId)
-      } else {
-        // Si falla la creación (ej. límite de 3 workspaces), mostrar error claro
-        const errorMessage = result.error?.message || 'Error desconocido'
-        const isLimitError = errorMessage.includes('Límite') || errorMessage.includes('límite') || errorMessage.includes('limit')
-        
-        if (isLimitError && myWorkspaces.length > 0) {
-          const workspaceNames = myWorkspaces.map(w => w.name).join('", "')
-          setAlertData({
-            title: 'Límite de workspaces alcanzado',
-            message: `Ya tenés 3 workspaces ("${workspaceNames}"). Para invitar desde tu espacio personal, necesitás renombrar uno de tus workspaces a "${workspaceName}" o eliminá uno para crear el espacio personal.`,
-            variant: 'error'
-          })
-        } else {
-          setAlertData({
-            title: 'Error',
-            message: `No se pudo crear el workspace para el espacio personal. ${errorMessage}`,
-            variant: 'error'
-          })
+      if (cand) {
+        personalWorkspaceId = cand.id
+        if (!profile?.personal_workspace_id) {
+          try { await updateProfile({ personal_workspace_id: cand.id }) } catch { /* ignore */ }
         }
-        setShowAlert(true)
-        setShowPersonalInviteModal(false)
-        return
       }
     }
 
     if (!personalWorkspaceId) {
+      const nombreEjemplo = personalName || 'Casa'
       setAlertData({
-        title: 'Error',
-        message: 'No se pudo obtener el workspace del espacio personal',
+        title: 'Espacio personal sin workspace',
+        message: `Para invitar desde tu espacio personal, necesitás un workspace que lo represente. Creá uno en "Workspaces Colaborativos" con el nombre "${nombreEjemplo}" (o el que uses) y usalo para invitar. No se crean workspaces al invitar.`,
         variant: 'error'
       })
       setShowAlert(true)
@@ -584,7 +542,6 @@ export default function ConfigPage() {
       return
     }
 
-    // Invitar al espacio personal; el invitado verá el nombre personalizado (ej: "Casa")
     const result = await inviteUser(personalWorkspaceId, personalInviteEmail, personalInvitePermissions, {
       workspaceDisplayName: personalDisplayName
     })
@@ -1336,10 +1293,17 @@ export default function ConfigPage() {
           {/* INVITACIONES Y MIEMBROS DEL ESPACIO PERSONAL - Solo visible cuando está expandido */}
           {expandedWorkspaceId === 'personal' && (() => {
             const myWorkspaces = workspaces.filter(w => w.owner_id === user?.uid)
-            const personalCandidates = myWorkspaces.filter(
-              w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
-            )
-            const personalWorkspace = (personalCandidates[0] ?? myWorkspaces[0]) ?? null
+            let personalWorkspace: (typeof workspaces)[0] | null = null
+            if (profile?.personal_workspace_id) {
+              const w = myWorkspaces.find(ws => ws.id === profile.personal_workspace_id)
+              if (w) personalWorkspace = w
+            }
+            if (!personalWorkspace) {
+              const cand = myWorkspaces.find(
+                w => w.name === (personalName || 'Espacio Personal') || w.name === 'Espacio Personal'
+              )
+              if (cand) personalWorkspace = cand
+            }
             const personalWorkspaceId = personalWorkspace?.id
             const personalWorkspaceMembers = personalWorkspaceId ? members.filter(m => m.workspace_id === personalWorkspaceId) : []
             const personalSentInvitations = personalWorkspaceId ? sentInvitations.filter(inv => inv.workspace_id === personalWorkspaceId) : []
@@ -1349,7 +1313,7 @@ export default function ConfigPage() {
               return (
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <p className="text-xs text-slate-400">
-                    Aún no hay un workspace creado para el espacio personal. Invitá a alguien para crearlo automáticamente.
+                    No hay un workspace vinculado a tu espacio personal. Creá uno en &quot;Workspaces Colaborativos&quot; con el nombre &quot;{personalName || 'Espacio Personal'}&quot; para ver miembros e invitaciones aquí.
                   </p>
                 </div>
               )
@@ -1358,7 +1322,7 @@ export default function ConfigPage() {
             return (
               <>
                 {/* INFORMACIÓN Y ACCIÓN PARA COLABORADORES DEL ESPACIO PERSONAL */}
-                {!isPersonalOwner && (
+                {!isPersonalOwner && personalWorkspace && (
                   <div className="mt-4 pt-4 border-t border-indigo-200">
                     <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
                       <h5 className="font-semibold mb-2 text-sm text-indigo-900">Tu acceso a este espacio</h5>

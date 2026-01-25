@@ -10,6 +10,8 @@ export interface Profile {
   personal_workspace_name?: string
   personal_workspace_icono?: string | null
   personal_workspace_logo?: string | null // data URL (PNG/JPG/WebP)
+  /** ID del workspace que representa el Espacio Personal (Privado). Nunca se crea uno nuevo al invitar. */
+  personal_workspace_id?: string | null
   // Emails
   welcome_email_sent?: boolean
   welcome_email_sent_at?: string
