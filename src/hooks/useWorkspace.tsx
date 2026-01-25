@@ -391,8 +391,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const workspace = workspaces.find(w => w.id === workspaceId)
       const workspaceName = options?.workspaceDisplayName ?? workspace?.name ?? 'Workspace'
       
+      // Log para debugging: verificar que se está usando el workspace_id correcto
+      console.log('✅ [useWorkspace] Creando invitación:', {
+        workspaceId,
+        workspaceName,
+        workspaceActualName: workspace?.name,
+        email,
+        displayName: options?.workspaceDisplayName
+      })
+      
       // Crear la invitación con toda la información necesaria
-      await addDoc(collection(db, 'workspace_invitations'), {
+      const invitationRef = await addDoc(collection(db, 'workspace_invitations'), {
         workspace_id: workspaceId,
         email,
         inviter_email: user.email, // Email de quien envía la invitación
@@ -401,6 +410,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         status: 'pending',
         created_at: serverTimestamp()
       })
+      
+      console.log('✅ [useWorkspace] Invitación creada con ID:', invitationRef.id, 'workspace_id:', workspaceId)
 
       // Enviar email usando Resend API
       try {

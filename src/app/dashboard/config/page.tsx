@@ -522,9 +522,11 @@ export default function ConfigPage() {
     if (personalCandidates.length > 0) {
       // Usar el workspace que coincide con el espacio personal (nombre personalName o "Espacio Personal")
       personalWorkspaceId = personalCandidates[0].id
-    } else if (myWorkspaces.length > 0) {
-      // No hay workspace "Espacio Personal": intentar crear uno; si falla (ej. límite), usar el primero
+      console.log('✅ [Config] Usando workspace existente para espacio personal:', personalWorkspaceId, personalCandidates[0].name)
+    } else {
+      // No hay workspace "Espacio Personal": intentar crear uno
       const workspaceName = personalName || 'Espacio Personal'
+      console.log('⚠️ [Config] No se encontró workspace para espacio personal, intentando crear:', workspaceName)
       const result = await createWorkspace(
         workspaceName,
         personalIcono || undefined,
@@ -533,32 +535,19 @@ export default function ConfigPage() {
       
       if (!result.error && 'workspace' in result && result.workspace) {
         personalWorkspaceId = result.workspace.id
+        console.log('✅ [Config] Workspace creado para espacio personal:', personalWorkspaceId)
       } else {
-        personalWorkspaceId = myWorkspaces[0].id
-      }
-    } else {
-      // Sin workspaces: crear el primero como espacio personal
-      const workspaceName = personalName || 'Espacio Personal'
-      const result = await createWorkspace(
-        workspaceName,
-        personalIcono || undefined,
-        personalLogo || null
-      )
-      
-      if (result.error) {
+        // Si falla la creación (ej. límite de 2 workspaces), mostrar error claro
+        const errorMessage = result.error?.message || 'Error desconocido'
         setAlertData({
           title: 'Error',
-          message: 'No se pudo crear el workspace para el espacio personal',
+          message: `No se pudo crear el workspace para el espacio personal. ${errorMessage.includes('Límite') ? 'Ya tenés 2 workspaces. Renombrá uno de tus workspaces existentes para usarlo como espacio personal, o eliminá uno para crear el espacio personal.' : 'Por favor, intentá nuevamente.'}`,
           variant: 'error'
         })
         setShowAlert(true)
         setShowPersonalInviteModal(false)
         return
       }
-      
-      personalWorkspaceId = !result.error && 'workspace' in result && result.workspace
-        ? result.workspace.id
-        : null
     }
 
     if (!personalWorkspaceId) {

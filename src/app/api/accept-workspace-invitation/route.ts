@@ -83,6 +83,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'workspace_id inválido en la invitación' }, { status: 400 })
     }
 
+    // Log para debugging: verificar que el workspace_id es correcto
+    console.log('✅ [API] Aceptando invitación:', {
+      invitationId,
+      workspaceId,
+      workspaceName: invitation.workspace_name,
+      email,
+      uid
+    })
+
+    // Verificar que el workspace existe antes de crear el membership
+    const workspaceRef = db.collection('workspaces').doc(workspaceId)
+    const workspaceDoc = await workspaceRef.get()
+    
+    if (!workspaceDoc.exists) {
+      console.error('❌ [API] Workspace no existe:', workspaceId)
+      return NextResponse.json({ error: 'El workspace de la invitación no existe' }, { status: 404 })
+    }
+
+    const workspaceData = workspaceDoc.data()
+    console.log('✅ [API] Workspace encontrado:', {
+      workspaceId,
+      workspaceName: workspaceData?.name,
+      ownerId: workspaceData?.owner_id
+    })
+
     const memberId = `${workspaceId}_${uid}`
 
     await db.collection('workspace_members').doc(memberId).set(
@@ -95,6 +120,13 @@ export async function POST(request: NextRequest) {
       },
       { merge: true }
     )
+
+    console.log('✅ [API] Membership creado:', {
+      memberId,
+      workspaceId,
+      workspaceName: workspaceData?.name,
+      email
+    })
 
     await invitationRef.update({ status: 'accepted' })
 
