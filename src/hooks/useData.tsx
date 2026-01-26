@@ -78,9 +78,9 @@ const DataContext = createContext<DataContextType | undefined>(undefined)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, initWorkspaceReady } = useWorkspace()
 
-  console.log('📊 [Firebase DataProvider] RENDER - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'PERSONAL')
+  console.log('📊 [Firebase DataProvider] RENDER - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'PERSONAL', 'initWorkspaceReady:', initWorkspaceReady)
 
   const [movimientos, setMovimientos] = useState<MovimientoAhorro[]>([])
   const [metas, setMetas] = useState<Meta[]>([])
@@ -604,7 +604,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
             cuenta_bancaria_id: data.cuenta_bancaria_id || null,
             comprobante_url: data.comprobante_url || null,
             comprobante_nombre: data.comprobante_nombre || null,
-            notificar_correo: data.notificar_correo !== undefined ? (data.notificar_correo === true || data.notificar_correo === 'true' || data.notificar_correo === 1) : false
+            notificar_correo: data.notificar_correo !== undefined ? (data.notificar_correo === true || data.notificar_correo === 'true' || data.notificar_correo === 1) : false,
+            // Campo para ingresos fijos
+            es_fijo: data.es_fijo === true || data.es_fijo === 'true' || data.es_fijo === 1 || false
           }
         }) as Ingreso[]
 
@@ -739,31 +741,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'NULL')
+    console.log('📊 [Firebase useData] useEffect triggered - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'NULL', 'initWorkspaceReady:', initWorkspaceReady)
 
-    if (!authLoading && user) {
-      if (!currentWorkspace?.id) {
-        setMovimientos([])
-        setMetas([])
-        setTarjetas([])
-        setGastos([])
-        setImpuestos([])
-        setCategorias([])
-        setTags([])
-        setIngresos([])
-        setCategoriasIngresos([])
-        setTagsIngresos([])
-        setMediosPago([])
-        setLoading(false)
-        return
-      }
-      console.log('📊 [Firebase useData] User and workspace ready - Calling fetchAll for', currentWorkspace.id)
-      fetchAll().catch((error) => {
-        if (isMountedRef.current) {
-          console.error('📊 [Firebase useData] Error en fetchAll:', error)
-        }
-      })
-    } else if (!authLoading && !user) {
+    // Si la autenticación aún está cargando, esperar
+    if (authLoading) {
+      console.log('📊 [Firebase useData] Auth still loading - waiting...')
+      return
+    }
+
+    // Si no hay usuario, limpiar datos
+    if (!user) {
       console.log('📊 [Firebase useData] No user and auth done loading - Clearing data and setting loading to FALSE')
       if (isMountedRef.current) {
         setMovimientos([])
@@ -779,10 +766,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setMediosPago([])
         setLoading(false)
       }
-    } else {
-      console.log('📊 [Firebase useData] Auth still loading - waiting...')
+      return
     }
-  }, [user, authLoading, fetchAll, currentWorkspace?.id])
+
+    // Si hay usuario pero el workspace aún no está inicializado, esperar
+    if (!initWorkspaceReady) {
+      console.log('📊 [Firebase useData] Workspace not ready yet - waiting for initWorkspaceReady...')
+      return
+    }
+
+    // Si el workspace no está listo después de la inicialización, puede ser que no haya workspace personal
+    // En ese caso, intentar cargar datos de todos modos (modo personal sin workspace_id)
+    // También cargar si hay workspace ID disponible
+    console.log('📊 [Firebase useData] User and workspace ready - Calling fetchAll', {
+      workspaceId: currentWorkspace?.id || 'PERSONAL (no workspace_id)',
+      workspaceName: currentWorkspace?.name || 'Personal'
+    })
+    fetchAll().catch((error) => {
+      if (isMountedRef.current) {
+        console.error('📊 [Firebase useData] Error en fetchAll:', error)
+      }
+    })
+  }, [user, authLoading, fetchAll, currentWorkspace?.id, initWorkspaceReady])
 
   const addMovimiento = useCallback(async (tipo: 'pesos' | 'usd', monto: number, descripcion?: string) => {
     if (!user) {
@@ -1045,11 +1050,17 @@ const addTarjeta = useCallback(async (data: any) => {
       if ('pendiente_cobro' in data) {
         updateData.pendiente_cobro = data.pendiente_cobro === true
       }
+      // Asegurar que es_fijo sea boolean si está presente
+      if ('es_fijo' in data) {
+        updateData.es_fijo = data.es_fijo === true
+      }
       
       console.log('🔵 [useData] Actualizando ingreso:', id, {
         descripcion: updateData.descripcion,
         pendiente_cobro: updateData.pendiente_cobro,
         pendiente_cobro_type: typeof updateData.pendiente_cobro,
+        es_fijo: updateData.es_fijo,
+        es_fijo_type: typeof updateData.es_fijo,
         fecha_cobro_esperada: updateData.fecha_cobro_esperada,
         fecha_cobro_confirmada: updateData.fecha_cobro_confirmada,
         cuenta_bancaria_id: updateData.cuenta_bancaria_id,
@@ -1060,6 +1071,7 @@ const addTarjeta = useCallback(async (data: any) => {
       
       console.log('✅ [useData] Ingreso actualizado exitosamente en Firestore:', id, {
         pendiente_cobro: updateData.pendiente_cobro,
+        es_fijo: updateData.es_fijo,
         fecha_cobro_esperada: updateData.fecha_cobro_esperada
       })
       
@@ -1119,9 +1131,15 @@ const addTarjeta = useCallback(async (data: any) => {
     
     return ingresos.filter(i => {
       // Si el ingreso es del mes actual, mostrarlo
-      if (i.mes === mes) return true
+      if (i.mes === mes) {
+        console.log('✅ [getIngresosMes] Ingreso incluido (mes actual):', i.id, i.descripcion, 'mes:', i.mes, 'es_fijo:', (i as any).es_fijo)
+        return true
+      }
       // Si es fijo y su mes es anterior al mes consultado, también mostrarlo
-      if ((i as any).es_fijo && i.mes < mes) return true
+      if ((i as any).es_fijo === true && i.mes < mes) {
+        console.log('✅ [getIngresosMes] Ingreso fijo incluido (mes anterior):', i.id, i.descripcion, 'mes:', i.mes, 'mes consultado:', mes)
+        return true
+      }
       return false
     })
   }, [ingresos])
