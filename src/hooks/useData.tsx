@@ -140,11 +140,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // --- FUNCIÓN FETCHALL PRINCIPAL ---
   const fetchAll = useCallback(async () => {
+    // Usar la referencia más reciente del workspace
+    const latestWorkspace = currentWorkspaceRef.current
+    
     console.log('📊 [Firebase useData] fetchAll called', {
       userId: user?.uid,
-      workspaceId: currentWorkspace?.id,
-      workspaceName: currentWorkspace?.name,
-      workspaceOwner: currentWorkspace?.owner_id
+      workspaceId: latestWorkspace?.id,
+      workspaceName: latestWorkspace?.name,
+      workspaceOwner: latestWorkspace?.owner_id,
+      currentWorkspaceFromRef: latestWorkspace?.id,
+      currentWorkspaceFromProp: currentWorkspace?.id
     })
     
     // 1. Limpieza de estados para evitar "fantasmas" al cambiar de usuario/workspace
@@ -169,30 +174,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      console.log('📊 [Firebase useData] Fetching data for workspace:', currentWorkspace?.name || 'Personal', {
-        workspaceId: currentWorkspace?.id,
+      console.log('📊 [Firebase useData] Fetching data for workspace:', latestWorkspace?.name || 'Personal', {
+        workspaceId: latestWorkspace?.id,
         userId: user.uid
       })
       const startTime = Date.now()
 
-      // Validar que currentWorkspace tenga id válido antes de usarlo
-      const isWorkspaceMode = currentWorkspace !== null && 
-                              currentWorkspace.id !== undefined && 
-                              currentWorkspace.id !== null &&
-                              typeof currentWorkspace.id === 'string' &&
-                              currentWorkspace.id.length > 0
+      // Validar que latestWorkspace tenga id válido antes de usarlo
+      const isWorkspaceMode = latestWorkspace !== null && 
+                              latestWorkspace.id !== undefined && 
+                              latestWorkspace.id !== null &&
+                              typeof latestWorkspace.id === 'string' &&
+                              latestWorkspace.id.length > 0
       
       console.log('📊 [Firebase useData] Workspace mode:', {
         isWorkspaceMode,
-        currentWorkspace: currentWorkspace ? {
-          id: currentWorkspace.id,
-          name: currentWorkspace.name,
-          owner_id: currentWorkspace.owner_id
+        latestWorkspace: latestWorkspace ? {
+          id: latestWorkspace.id,
+          name: latestWorkspace.name,
+          owner_id: latestWorkspace.owner_id
         } : null
       })
       
-      const workspaceFilter = isWorkspaceMode && currentWorkspace?.id
-        ? where('workspace_id', '==', currentWorkspace.id)
+      const workspaceFilter = isWorkspaceMode && latestWorkspace?.id
+        ? where('workspace_id', '==', latestWorkspace.id)
         : where('user_id', '==', user.uid)
       
       console.log('📊 [Firebase useData] Workspace filter type:', isWorkspaceMode ? 'workspace_id' : 'user_id')
@@ -206,9 +211,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
 
       // Determinar si el usuario es dueño del workspace (para usar en toda la función)
-      const isOwner = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
+        const isOwner = isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid
 
-      if (isWorkspaceMode && currentWorkspace?.id) {
+      if (isWorkspaceMode && latestWorkspace?.id) {
         // Si el usuario es el dueño del workspace, tiene permisos de admin automáticamente
         
         if (isOwner) {
@@ -220,7 +225,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           try {
             const memberQuery = query(
               collection(db, 'workspace_members'),
-              where('workspace_id', '==', currentWorkspace.id),
+              where('workspace_id', '==', latestWorkspace.id),
               where('user_id', '==', user.uid)
             );
             const memberSnap = await getDocs(memberQuery);
@@ -256,9 +261,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? movimientosSnap.docs 
           : movimientosSnap.docs.filter(d => {
               const data = d.data()
-              // Incluir si no tiene workspace_id O si tiene el workspace_id del workspace personal
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              const hasWorkspaceId = !!data.workspace_id
+              const matchesPersonalWorkspace = latestWorkspace?.id && data.workspace_id === latestWorkspace.id
+              const shouldInclude = !hasWorkspaceId || matchesPersonalWorkspace
+              
+              console.log('📊 [Firebase useData] Filtering movimiento:', {
+                docId: d.id,
+                hasWorkspaceId,
+                workspaceId: data.workspace_id,
+                currentWorkspaceId: latestWorkspace?.id,
+                matchesPersonalWorkspace,
+                shouldInclude
+              })
+              
+              return shouldInclude
             })
+        
+        console.log('📊 [Firebase useData] Movimientos after filter:', movimientosDocs.length, 'of', movimientosSnap.docs.length)
         
         let movimientosData = movimientosDocs.map(doc => {
           const data = doc.data();
@@ -291,7 +310,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.error('❌ [Firebase useData] Error fetching movimientos_ahorro:', {
             error: error.message,
             code: error.code,
-            workspaceId: currentWorkspace?.id,
+            workspaceId: latestWorkspace?.id,
             userId: user.uid
           })
           // Continuar con otras colecciones
@@ -308,7 +327,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? metasSnap.docs 
           : metasSnap.docs.filter(d => {
               const data = d.data()
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
             })
         
         let metasData = metasDocs.map(doc => {
@@ -337,7 +356,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.error('❌ [Firebase useData] Error fetching metas:', {
             error: error.message,
             code: error.code,
-            workspaceId: currentWorkspace?.id,
+            workspaceId: latestWorkspace?.id,
             userId: user.uid
           })
         }
@@ -355,7 +374,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? tarjetasSnap.docs 
           : tarjetasSnap.docs.filter(d => {
               const data = d.data()
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
             })
 
         let tarjetasData = tarjetasDocs.map(doc => {
@@ -380,7 +399,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.error('❌ [Firebase useData] Error fetching tarjetas:', {
             error: error.message,
             code: error.code,
-            workspaceId: currentWorkspace?.id,
+            workspaceId: latestWorkspace?.id,
             userId: user.uid
           })
         }
@@ -400,9 +419,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? gastosSnap.docs 
           : gastosSnap.docs.filter(d => {
               const data = d.data()
-              // Incluir si no tiene workspace_id O si tiene el workspace_id del workspace personal
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              const hasWorkspaceId = !!data.workspace_id
+              const matchesPersonalWorkspace = latestWorkspace?.id && data.workspace_id === latestWorkspace.id
+              const shouldInclude = !hasWorkspaceId || matchesPersonalWorkspace
+              
+              if (gastosSnap.docs.length <= 5) { // Solo log para los primeros 5 para no saturar
+                console.log('📊 [Firebase useData] Filtering gasto:', {
+                  docId: d.id,
+                  hasWorkspaceId,
+                  workspaceId: data.workspace_id,
+                  currentWorkspaceId: latestWorkspace?.id,
+                  matchesPersonalWorkspace,
+                  shouldInclude
+                })
+              }
+              
+              return shouldInclude
             })
+        
+        console.log('📊 [Firebase useData] Gastos after filter:', gastosDocs.length, 'of', gastosSnap.docs.length, {
+          latestWorkspaceId: latestWorkspace?.id || 'NULL',
+          isWorkspaceMode,
+          sampleWorkspaceIds: gastosSnap.docs.slice(0, 3).map(d => d.data().workspace_id)
+        })
 
         let gastosData = gastosDocs.map(doc => {
           const data = doc.data()
@@ -438,7 +477,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.error('❌ [Firebase useData] Error fetching gastos:', {
             error: error.message,
             code: error.code,
-            workspaceId: currentWorkspace?.id,
+            workspaceId: latestWorkspace?.id,
             userId: user.uid
           })
         }
@@ -454,7 +493,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? impuestosSnap.docs 
           : impuestosSnap.docs.filter(d => {
               const data = d.data()
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
             })
 
         let impuestosData = impuestosDocs.map(doc => {
@@ -489,7 +528,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.error('❌ [Firebase useData] Error fetching impuestos:', {
             error: error.message,
             code: error.code,
-            workspaceId: currentWorkspace?.id,
+            workspaceId: latestWorkspace?.id,
             userId: user.uid
           })
         }
@@ -519,7 +558,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       })) as Categoria[]
 
       // Crear categorías por defecto si no existen (y tengo permiso de admin o es personal o soy dueño)
-      const isOwnerCategorias = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
+      const isOwnerCategorias = isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid
       const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwnerCategorias
       
       if (categoriasData.length === 0 && canCreateCategories) {
@@ -541,7 +580,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             user_id: user.uid,
             created_at: serverTimestamp()
           }
-          if (isWorkspaceMode && currentWorkspace?.id) {
+          if (isWorkspaceMode && latestWorkspace?.id) {
             docData.workspace_id = currentWorkspace.id
             docData.created_by = user.uid
           }
@@ -608,7 +647,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? mediosPagoSnap.docs 
           : mediosPagoSnap.docs.filter(d => {
               const data = d.data()
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
             })
         mediosPagoData = mediosPagoDocs.map(doc => ({
             id: doc.id,
@@ -633,7 +672,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? ingresosSnap.docs 
           : ingresosSnap.docs.filter(d => {
               const data = d.data()
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
             })
 
         let ingresosData = ingresosDocs.map(doc => {
@@ -671,7 +710,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.error('❌ [Firebase useData] Error fetching ingresos:', {
             error: error.message,
             code: error.code,
-            workspaceId: currentWorkspace?.id,
+            workspaceId: latestWorkspace?.id,
             userId: user.uid
           })
         }
@@ -700,7 +739,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
       })) as CategoriaIngreso[]
 
-      const isOwnerIngresos = isWorkspaceMode && currentWorkspace?.id && currentWorkspace.owner_id === user.uid
+      const isOwnerIngresos = isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid
       const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwnerIngresos
       if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos) {
          const defaultCategoriasIngresos = [
@@ -714,7 +753,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const catIngRef = collection(db, 'categorias_ingresos')
         for (const categoria of defaultCategoriasIngresos) {
           const docData: any = { ...categoria, user_id: user.uid, created_at: serverTimestamp() }
-          if (isWorkspaceMode && currentWorkspace?.id) { 
+          if (isWorkspaceMode && latestWorkspace?.id) { 
             docData.workspace_id = currentWorkspace.id
             docData.created_by = user.uid 
           }
@@ -725,7 +764,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? newSnap.docs 
           : newSnap.docs.filter(d => {
               const data = d.data()
-              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+              return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
             })
         categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
             id: doc.id,
@@ -787,8 +826,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         error: error.message,
         code: error.code,
         stack: error.stack,
-        workspaceId: currentWorkspace?.id,
-        workspaceName: currentWorkspace?.name,
+        workspaceId: latestWorkspace?.id,
+        workspaceName: latestWorkspace?.name,
         userId: user?.uid,
         isWorkspaceMode: currentWorkspace !== null
       })
