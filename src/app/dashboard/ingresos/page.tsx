@@ -44,12 +44,10 @@ export default function IngresosPage() {
   // Modal states
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
-  const [deleteAllMonths, setDeleteAllMonths] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [alertData, setAlertData] = useState({ title: '', message: '', variant: 'info' as 'success' | 'error' | 'warning' | 'info' })
   const [selectedIngresos, setSelectedIngresos] = useState<Set<string>>(new Set())
   const [showDeleteMasivoModal, setShowDeleteMasivoModal] = useState(false)
-  const [editingAllMonths, setEditingAllMonths] = useState(false)
 
   // New tag/categoria creation states
   const [showNewTagInput, setShowNewTagInput] = useState(false)
@@ -723,104 +721,39 @@ export default function IngresosPage() {
 
     try {
       if (editing) {
-        const esFijo = (editing as any).es_fijo === true
-        
-        if (esFijo && editingAllMonths) {
-          // Actualizar todos los ingresos fijos relacionados
-          const mesActual = getMonthFromDateString(editing.fecha)
-          const ingresosRelacionados = ingresos.filter(i => {
-            if (i.id === editing.id) return true
-            const mesI = getMonthFromDateString(i.fecha)
-            return i.descripcion === editing.descripcion && 
-                   i.monto === editing.monto && 
-                   i.moneda === editing.moneda &&
-                   mesI >= mesActual
+        // Actualizar el ingreso (si es fijo, los cambios se reflejan automáticamente en todos los meses futuros)
+        const { error } = await updateIngreso(editing.id, data)
+        if (error) {
+          console.error('Error updating:', error)
+          const message = error instanceof Error ? error.message : String(error)
+          setAlertData({
+            title: 'Error al actualizar',
+            message: message,
+            variant: 'error'
           })
-          
-          for (const ingresoRel of ingresosRelacionados) {
-            const dataMes = {
-              ...data,
-              fecha: ingresoRel.fecha,
-              mes: getMonthFromDateString(ingresoRel.fecha)
-            }
-            const { error } = await updateIngreso(ingresoRel.id, dataMes)
-            if (error) {
-              console.error('Error updating related income:', error)
-              setAlertData({
-                title: 'Error al actualizar',
-                message: 'No se pudieron actualizar todos los ingresos fijos',
-                variant: 'error'
-              })
-              setShowAlert(true)
-              setSaving(false)
-              return
-            }
-          }
-        } else {
-          const { error } = await updateIngreso(editing.id, data)
-          if (error) {
-            console.error('Error updating:', error)
-            const message = error instanceof Error ? error.message : String(error)
-            setAlertData({
-              title: 'Error al actualizar',
-              message: message,
-              variant: 'error'
-            })
-            setShowAlert(true)
-            setSaving(false)
-            return
-          }
+          setShowAlert(true)
+          setSaving(false)
+          return
         }
       } else {
-        // Si es fijo, crear ingresos para los próximos 12 meses
-        if (data.es_fijo) {
-          const promises = []
-          const fechaBase = new Date(form.fecha)
-          
-          for (let i = 0; i < 12; i++) {
-            const fechaMes = new Date(fechaBase.getFullYear(), fechaBase.getMonth() + i, fechaBase.getDate())
-            const mesMes = getMonthFromDateString(fechaMes.toISOString().split('T')[0])
-            const dataMes = {
-              ...data,
-              fecha: fechaMes.toISOString().split('T')[0],
-              mes: mesMes
-            }
-            promises.push(addIngreso(dataMes))
-          }
-          
-          const results = await Promise.all(promises)
-          const errors = results.filter(r => r.error)
-          if (errors.length > 0) {
-            console.error('Error adding fixed incomes:', errors)
-            setAlertData({
-              title: 'Error al agregar',
-              message: `Se crearon ${results.length - errors.length} de ${results.length} ingresos fijos. Algunos fallaron.`,
-              variant: 'warning'
-            })
-            setShowAlert(true)
-            setSaving(false)
-            return
-          }
-        } else {
-          const { error } = await addIngreso(data)
-          if (error) {
-            console.error('Error adding:', error)
-            const message = error instanceof Error ? error.message : String(error)
-            setAlertData({
-              title: 'Error al agregar',
-              message: message,
-              variant: 'error'
-            })
-            setShowAlert(true)
-            setSaving(false)
-            return
-          }
+        // Crear el ingreso (si es fijo, aparecerá automáticamente en meses futuros)
+        const { error } = await addIngreso(data)
+        if (error) {
+          console.error('Error adding:', error)
+          const message = error instanceof Error ? error.message : String(error)
+          setAlertData({
+            title: 'Error al agregar',
+            message: message,
+            variant: 'error'
+          })
+          setShowAlert(true)
+          setSaving(false)
+          return
         }
       }
 
       setShowModal(false)
       setEditing(null)
-      setEditingAllMonths(false)
       resetForm()
     } catch (err) {
       console.error('Exception:', err)
@@ -836,26 +769,9 @@ export default function IngresosPage() {
   }
 
   const toggleFijo = async (ingreso: Ingreso) => {
-    const esFijo = (ingreso as any).es_fijo === true
-    await updateIngreso(ingreso.id, { es_fijo: !esFijo })
-    
-    // Si se desactiva, eliminar de los próximos meses
-    if (esFijo) {
-      const mesActual = getMonthFromDateString(ingreso.fecha)
-      const ingresosFuturos = ingresos.filter(i => {
-        if (i.id === ingreso.id) return false
-        const mesI = getMonthFromDateString(i.fecha)
-        return i.descripcion === ingreso.descripcion && 
-               i.monto === ingreso.monto && 
-               i.moneda === ingreso.moneda &&
-               mesI > mesActual
-      })
-      
-      // Eliminar ingresos futuros del mismo ingreso fijo
-      for (const ingresoFuturo of ingresosFuturos) {
-        await deleteIngreso(ingresoFuturo.id)
-      }
-    }
+    // Igual que gastos: solo actualizar el campo es_fijo
+    // El ingreso aparecerá automáticamente en meses futuros gracias a getIngresosMes
+    await updateIngreso(ingreso.id, { es_fijo: !(ingreso as any).es_fijo })
   }
 
   const handleDelete = (id: string) => {
@@ -2047,7 +1963,7 @@ export default function IngresosPage() {
                 </div>
                 {form.es_fijo && (
                   <p className="text-xs text-slate-500 ml-8 mb-3">
-                    Este ingreso se agregará automáticamente a los próximos 12 meses.
+                    Este ingreso aparecerá automáticamente en todos los meses futuros.
                   </p>
                 )}
                 <div className="flex items-center gap-3 mb-3">
@@ -2154,20 +2070,8 @@ export default function IngresosPage() {
 
               {editing && (editing as any).es_fijo && (
                 <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="editingAllMonths"
-                      checked={editingAllMonths}
-                      onChange={e => setEditingAllMonths(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300"
-                    />
-                    <label htmlFor="editingAllMonths" className="text-sm font-semibold text-indigo-900 cursor-pointer">
-                      Aplicar cambios a todos los meses siguientes
-                    </label>
-                  </div>
-                  <p className="text-xs text-indigo-700 mt-1">
-                    Si no marcas esta opción, solo se actualizará el ingreso de este mes.
+                  <p className="text-xs text-indigo-700">
+                    📌 Este es un ingreso fijo. Los cambios se aplicarán automáticamente a todos los meses.
                   </p>
                 </div>
               )}
@@ -2185,7 +2089,7 @@ export default function IngresosPage() {
 
       {/* Confirm Delete Modal */}
       {showConfirmDelete && (
-        <div className="modal-overlay" onClick={() => { setShowConfirmDelete(false); setDeleteTargetId(null); setDeleteAllMonths(false) }}>
+        <div className="modal-overlay" onClick={() => { setShowConfirmDelete(false); setDeleteTargetId(null) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200">
               <h3 className="font-bold text-lg text-red-600">¿Eliminar ingreso?</h3>
@@ -2199,20 +2103,8 @@ export default function IngresosPage() {
                     <p className="text-slate-700">Esta acción no se puede deshacer.</p>
                     {esFijo && (
                       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <input
-                            type="checkbox"
-                            id="deleteAllMonths"
-                            checked={deleteAllMonths}
-                            onChange={e => setDeleteAllMonths(e.target.checked)}
-                            className="w-4 h-4 text-amber-600 rounded border-slate-300"
-                          />
-                          <label htmlFor="deleteAllMonths" className="text-sm font-semibold text-amber-900 cursor-pointer">
-                            Eliminar de todos los meses siguientes
-                          </label>
-                        </div>
                         <p className="text-xs text-amber-700">
-                          Si no marcas esta opción, solo se eliminará el ingreso de este mes.
+                          📌 Este es un ingreso fijo. Al eliminarlo, dejará de aparecer en todos los meses.
                         </p>
                       </div>
                     )}
@@ -2222,7 +2114,7 @@ export default function IngresosPage() {
             </div>
             <div className="p-4 border-t border-slate-200 flex gap-2 justify-end">
               <button
-                onClick={() => { setShowConfirmDelete(false); setDeleteTargetId(null); setDeleteAllMonths(false) }}
+                onClick={() => { setShowConfirmDelete(false); setDeleteTargetId(null) }}
                 className="btn btn-secondary"
               >
                 Cancelar

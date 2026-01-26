@@ -1116,7 +1116,14 @@ const addTarjeta = useCallback(async (data: any) => {
 
   const getIngresosMes = useCallback((mes: string) => {
     console.log('📊 [Firebase getIngresosMes] called - mes:', mes, 'total ingresos:', ingresos.length)
-    return ingresos.filter(i => i.mes === mes)
+    
+    return ingresos.filter(i => {
+      // Si el ingreso es del mes actual, mostrarlo
+      if (i.mes === mes) return true
+      // Si es fijo y su mes es anterior al mes consultado, también mostrarlo
+      if ((i as any).es_fijo && i.mes < mes) return true
+      return false
+    })
   }, [ingresos])
 
   const getGastosMes = useCallback((mes: string) => {
