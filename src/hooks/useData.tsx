@@ -251,7 +251,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           const movimientosSnap = await getDocs(movimientosQuery)
           console.log('✅ [Firebase useData] Movimientos fetched:', movimientosSnap.docs.length)
         
-        let movimientosDocs = isWorkspaceMode ? movimientosSnap.docs : movimientosSnap.docs.filter(d => !d.data().workspace_id)
+        // En modo personal, mostrar documentos sin workspace_id O con el workspace_id del workspace personal actual
+        let movimientosDocs = isWorkspaceMode 
+          ? movimientosSnap.docs 
+          : movimientosSnap.docs.filter(d => {
+              const data = d.data()
+              // Incluir si no tiene workspace_id O si tiene el workspace_id del workspace personal
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
         
         let movimientosData = movimientosDocs.map(doc => {
           const data = doc.data();
@@ -297,7 +304,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           const metasQuery = query(metasRef, workspaceFilter, orderBy('created_at', 'desc'))
           const metasSnap = await getDocs(metasQuery)
           console.log('✅ [Firebase useData] Metas fetched:', metasSnap.docs.length)
-        let metasDocs = isWorkspaceMode ? metasSnap.docs : metasSnap.docs.filter(d => !d.data().workspace_id)
+        let metasDocs = isWorkspaceMode 
+          ? metasSnap.docs 
+          : metasSnap.docs.filter(d => {
+              const data = d.data()
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
         
         let metasData = metasDocs.map(doc => {
           const data = doc.data()
@@ -339,7 +351,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           const tarjetasQuery = query(tarjetasRef, workspaceFilter, orderBy('created_at', 'desc'))
           const tarjetasSnap = await getDocs(tarjetasQuery)
           console.log('✅ [Firebase useData] Tarjetas fetched:', tarjetasSnap.docs.length)
-        let tarjetasDocs = isWorkspaceMode ? tarjetasSnap.docs : tarjetasSnap.docs.filter(d => !d.data().workspace_id)
+        let tarjetasDocs = isWorkspaceMode 
+          ? tarjetasSnap.docs 
+          : tarjetasSnap.docs.filter(d => {
+              const data = d.data()
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
 
         let tarjetasData = tarjetasDocs.map(doc => {
           const data = doc.data()
@@ -378,7 +395,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           const gastosQuery = query(gastosRef, workspaceFilter, orderBy('created_at', 'desc'))
           const gastosSnap = await getDocs(gastosQuery)
           console.log('✅ [Firebase useData] Gastos fetched:', gastosSnap.docs.length)
-        let gastosDocs = isWorkspaceMode ? gastosSnap.docs : gastosSnap.docs.filter(d => !d.data().workspace_id)
+        // En modo personal, mostrar documentos sin workspace_id O con el workspace_id del workspace personal actual
+        let gastosDocs = isWorkspaceMode 
+          ? gastosSnap.docs 
+          : gastosSnap.docs.filter(d => {
+              const data = d.data()
+              // Incluir si no tiene workspace_id O si tiene el workspace_id del workspace personal
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
 
         let gastosData = gastosDocs.map(doc => {
           const data = doc.data()
@@ -426,7 +450,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           const impuestosQuery = query(impuestosRef, workspaceFilter, orderBy('created_at', 'desc'))
           const impuestosSnap = await getDocs(impuestosQuery)
           console.log('✅ [Firebase useData] Impuestos fetched:', impuestosSnap.docs.length)
-        let impuestosDocs = isWorkspaceMode ? impuestosSnap.docs : impuestosSnap.docs.filter(d => !d.data().workspace_id)
+        let impuestosDocs = isWorkspaceMode 
+          ? impuestosSnap.docs 
+          : impuestosSnap.docs.filter(d => {
+              const data = d.data()
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
 
         let impuestosData = impuestosDocs.map(doc => {
           const data = doc.data()
@@ -473,7 +502,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const categoriasQuery = query(categoriasRef, workspaceFilter, orderBy('created_at', 'desc'))
         const categoriasSnap = await getDocs(categoriasQuery)
         console.log('✅ [Firebase useData] Categorias fetched:', categoriasSnap.docs.length)
-      let categoriasDocs = isWorkspaceMode ? categoriasSnap.docs : categoriasSnap.docs.filter(d => !d.data().workspace_id)
+      let categoriasDocs = isWorkspaceMode 
+        ? categoriasSnap.docs 
+        : categoriasSnap.docs.filter(d => {
+            const data = d.data()
+            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+          })
 
       let categoriasData = categoriasDocs.map(doc => ({
           id: doc.id,
@@ -542,7 +576,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const tagsQuery = query(tagsRef, workspaceFilter, orderBy('created_at', 'desc'))
         const tagsSnap = await getDocs(tagsQuery)
         console.log('✅ [Firebase useData] Tags fetched:', tagsSnap.docs.length)
-      const tagsDocs = isWorkspaceMode ? tagsSnap.docs : tagsSnap.docs.filter(d => !d.data().workspace_id)
+      const tagsDocs = isWorkspaceMode 
+        ? tagsSnap.docs 
+        : tagsSnap.docs.filter(d => {
+            const data = d.data()
+            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+          })
       const tagsData = tagsDocs.map(doc => ({
           id: doc.id,
           user_id: doc.data().user_id,
@@ -565,7 +604,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const mediosPagoRef = collection(db, 'medios_pago')
         const mediosPagoQuery = query(mediosPagoRef, workspaceFilter, orderBy('created_at', 'desc'))
         const mediosPagoSnap = await getDocs(mediosPagoQuery)
-        const mediosPagoDocs = isWorkspaceMode ? mediosPagoSnap.docs : mediosPagoSnap.docs.filter(d => !d.data().workspace_id)
+        const mediosPagoDocs = isWorkspaceMode 
+          ? mediosPagoSnap.docs 
+          : mediosPagoSnap.docs.filter(d => {
+              const data = d.data()
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
         mediosPagoData = mediosPagoDocs.map(doc => ({
             id: doc.id,
             user_id: doc.data().user_id,
@@ -585,7 +629,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           const ingresosQuery = query(ingresosRef, workspaceFilter, orderBy('created_at', 'desc'))
           const ingresosSnap = await getDocs(ingresosQuery)
           console.log('✅ [Firebase useData] Ingresos fetched:', ingresosSnap.docs.length)
-        let ingresosDocs = isWorkspaceMode ? ingresosSnap.docs : ingresosSnap.docs.filter(d => !d.data().workspace_id)
+        let ingresosDocs = isWorkspaceMode 
+          ? ingresosSnap.docs 
+          : ingresosSnap.docs.filter(d => {
+              const data = d.data()
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
 
         let ingresosData = ingresosDocs.map(doc => {
           const data = doc.data()
@@ -635,7 +684,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const categoriasIngresosQuery = query(categoriasIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
         const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
         console.log('✅ [Firebase useData] Categorias ingresos fetched:', categoriasIngresosSnap.docs.length)
-      let categoriasIngresosDocs = isWorkspaceMode ? categoriasIngresosSnap.docs : categoriasIngresosSnap.docs.filter(d => !d.data().workspace_id)
+      let categoriasIngresosDocs = isWorkspaceMode 
+        ? categoriasIngresosSnap.docs 
+        : categoriasIngresosSnap.docs.filter(d => {
+            const data = d.data()
+            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+          })
       
       let categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
           id: doc.id,
@@ -667,7 +721,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           await addDoc(catIngRef, docData)
         }
         const newSnap = await getDocs(categoriasIngresosQuery)
-        categoriasIngresosDocs = isWorkspaceMode ? newSnap.docs : newSnap.docs.filter(d => !d.data().workspace_id)
+        categoriasIngresosDocs = isWorkspaceMode 
+          ? newSnap.docs 
+          : newSnap.docs.filter(d => {
+              const data = d.data()
+              return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            })
         categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
             id: doc.id,
             user_id: doc.data().user_id,
@@ -693,7 +752,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const tagsIngresosQuery = query(tagsIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
         const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
         console.log('✅ [Firebase useData] Tags ingresos fetched:', tagsIngresosSnap.docs.length)
-      const tagsIngresosDocs = isWorkspaceMode ? tagsIngresosSnap.docs : tagsIngresosSnap.docs.filter(d => !d.data().workspace_id)
+      const tagsIngresosDocs = isWorkspaceMode 
+        ? tagsIngresosSnap.docs 
+        : tagsIngresosSnap.docs.filter(d => {
+            const data = d.data()
+            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+          })
       const tagsIngresosData = tagsIngresosDocs.map(doc => ({
           id: doc.id,
           user_id: doc.data().user_id,
