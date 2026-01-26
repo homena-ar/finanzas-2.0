@@ -545,7 +545,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ? categoriasSnap.docs 
         : categoriasSnap.docs.filter(d => {
             const data = d.data()
-            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
           })
 
       let categoriasData = categoriasDocs.map(doc => ({
@@ -581,7 +581,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             created_at: serverTimestamp()
           }
           if (isWorkspaceMode && latestWorkspace?.id) {
-            docData.workspace_id = currentWorkspace.id
+            docData.workspace_id = latestWorkspace.id
             docData.created_by = user.uid
           }
           await addDoc(categoriasRef, docData)
@@ -619,7 +619,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ? tagsSnap.docs 
         : tagsSnap.docs.filter(d => {
             const data = d.data()
-            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
           })
       const tagsData = tagsDocs.map(doc => ({
           id: doc.id,
@@ -727,7 +727,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ? categoriasIngresosSnap.docs 
         : categoriasIngresosSnap.docs.filter(d => {
             const data = d.data()
-            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
           })
       
       let categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
@@ -754,7 +754,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         for (const categoria of defaultCategoriasIngresos) {
           const docData: any = { ...categoria, user_id: user.uid, created_at: serverTimestamp() }
           if (isWorkspaceMode && latestWorkspace?.id) { 
-            docData.workspace_id = currentWorkspace.id
+            docData.workspace_id = latestWorkspace.id
             docData.created_by = user.uid 
           }
           await addDoc(catIngRef, docData)
@@ -795,7 +795,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ? tagsIngresosSnap.docs 
         : tagsIngresosSnap.docs.filter(d => {
             const data = d.data()
-            return !data.workspace_id || (currentWorkspace?.id && data.workspace_id === currentWorkspace.id)
+            return !data.workspace_id || (latestWorkspace?.id && data.workspace_id === latestWorkspace.id)
           })
       const tagsIngresosData = tagsIngresosDocs.map(doc => ({
           id: doc.id,
