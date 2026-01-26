@@ -148,6 +148,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     })
     
     // 1. Limpieza de estados para evitar "fantasmas" al cambiar de usuario/workspace
+    console.log('📊 [Firebase useData] fetchAll starting - clearing old states')
     setMovimientos([])
     setMetas([])
     setTarjetas([])
@@ -277,6 +278,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (isWorkspaceMode && permissions.ahorros === 'solo_propios') {
           movimientosData = movimientosData.filter(m => m.user_id === user.uid)
         }
+        console.log('📊 [Firebase useData] Setting movimientos state:', movimientosData.length, 'movimientos')
         setMovimientos(movimientosData)
         } catch (error: any) {
           console.error('❌ [Firebase useData] Error fetching movimientos_ahorro:', {
@@ -406,6 +408,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (isWorkspaceMode && permissions.gastos === 'solo_propios') {
           gastosData = gastosData.filter(g => g.user_id === user.uid)
         }
+        console.log('📊 [Firebase useData] Setting gastos state:', gastosData.length, 'gastos')
         setGastos(gastosData)
         } catch (error: any) {
           console.error('❌ [Firebase useData] Error fetching gastos:', {
@@ -613,6 +616,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (isWorkspaceMode && permissions.ingresos === 'solo_propios') {
           ingresosData = ingresosData.filter(i => i.user_id === user.uid)
         }
+        console.log('📊 [Firebase useData] Setting ingresos state:', ingresosData.length, 'ingresos')
         setIngresos(ingresosData)
         } catch (error: any) {
           console.error('❌ [Firebase useData] Error fetching ingresos:', {
@@ -708,7 +712,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const endTime = Date.now()
       console.log('✅ [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
+      
+      // IMPORTANTE: setLoading(false) debe ser lo ÚLTIMO para asegurar que todos los estados se hayan actualizado
+      // React batcheará todos los setState anteriores y luego re-renderizará con los nuevos valores
       setLoading(false)
+      console.log('📊 [Firebase useData] Loading set to false - React will re-render with updated states')
 
     } catch (error: any) {
       console.error('❌ [Firebase useData] Error general en fetchAll:', {
@@ -849,6 +857,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       hasAttemptedLoadRef.current = false
     }
   }, [user?.uid])
+
+  // Debug: Log cuando los estados cambian
+  useEffect(() => {
+    if (gastos.length > 0 || ingresos.length > 0 || movimientos.length > 0) {
+      console.log('📊 [Firebase useData] States updated - gastos:', gastos.length, 'ingresos:', ingresos.length, 'movimientos:', movimientos.length)
+    }
+  }, [gastos.length, ingresos.length, movimientos.length])
 
   const addMovimiento = useCallback(async (tipo: 'pesos' | 'usd', monto: number, descripcion?: string) => {
     if (!user) {
@@ -1294,7 +1309,7 @@ const addTarjeta = useCallback(async (data: any) => {
     getDiferenciaMeses
   }
 
-  console.log('📊 [Firebase useData] Creating context value - loading:', loading, 'movimientos:', movimientos.length)
+  console.log('📊 [Firebase useData] Creating context value - loading:', loading, 'movimientos:', movimientos.length, 'gastos:', gastos.length, 'ingresos:', ingresos.length, 'impuestos:', impuestos.length)
 
   return (
     <DataContext.Provider value={value}>
