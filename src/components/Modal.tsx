@@ -1,7 +1,47 @@
 'use client'
 
+import { useEffect, useRef, useCallback } from 'react'
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+// Focus trap: atrapa Tab dentro del modal
+function useFocusTrap(isOpen: boolean) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen || !ref.current) return
+    const el = ref.current
+    const focusable = el.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusable.length > 0) focusable[0].focus()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus() }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    el.addEventListener('keydown', handleKeyDown)
+    return () => el.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen])
+
+  return ref
+}
+
+// Cierra con Escape
+function useEscapeKey(isOpen: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [isOpen, onClose])
+}
 
 interface ModalProps {
   isOpen: boolean
@@ -12,6 +52,9 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+  const trapRef = useFocusTrap(isOpen)
+  useEscapeKey(isOpen, onClose)
+
   if (!isOpen) return null
 
   const sizeClasses = {
@@ -21,12 +64,12 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className={`modal ${sizeClasses[size]}`} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={title || 'Modal'} onClick={onClose}>
+      <div ref={trapRef} className={`modal ${sizeClasses[size]}`} onClick={e => e.stopPropagation()}>
         {title && (
           <div className="p-4 border-b border-slate-200 flex items-center justify-between">
             <h3 className="font-bold text-lg">{title}</h3>
-            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
+            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded" aria-label="Cerrar modal">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -60,6 +103,9 @@ export function ConfirmModal({
   cancelText = 'Cancelar',
   variant = 'danger'
 }: ConfirmModalProps) {
+  const trapRef = useFocusTrap(isOpen)
+  useEscapeKey(isOpen, onClose)
+
   if (!isOpen) return null
 
   const handleConfirm = () => {
@@ -91,8 +137,8 @@ export function ConfirmModal({
   const config = variants[variant]
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal max-w-md" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
+      <div ref={trapRef} className="modal max-w-md" onClick={e => e.stopPropagation()}>
         <div className={`p-6 ${config.bg} border-b ${config.border}`}>
           <div className="flex flex-col items-center text-center gap-4">
             {config.icon}
@@ -130,6 +176,10 @@ export function AlertModal({
   message,
   variant = 'info'
 }: AlertModalProps) {
+  const stableOnClose = useCallback(onClose, [onClose])
+  const trapRef = useFocusTrap(isOpen)
+  useEscapeKey(isOpen, stableOnClose)
+
   const variants = {
     success: {
       icon: <CheckCircle className="w-16 h-16 text-emerald-500" />,
@@ -168,9 +218,13 @@ export function AlertModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="modal-overlay"
-          onClick={onClose}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={title}
+          onClick={stableOnClose}
         >
           <motion.div
+            ref={trapRef}
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -194,7 +248,7 @@ export function AlertModal({
               </div>
             </div>
             <div className="p-4 flex justify-center">
-              <button onClick={onClose} className="btn btn-primary px-8">
+              <button onClick={stableOnClose} className="btn btn-primary px-8">
                 Entendido
               </button>
             </div>

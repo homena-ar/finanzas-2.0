@@ -82,6 +82,14 @@ function getFirebaseErrorMessage(error: any): string {
   }
 }
 
+// Fetch con timeout para evitar que requests cuelguen indefinidamente
+const FETCH_TIMEOUT_MS = 15000
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout))
+}
+
 // Claves para almacenamiento de respaldo de sesión (iOS Safari puede perder IndexedDB)
 const SESSION_BACKUP_KEY = 'fincontrol:auth_session_backup'
 const SESSION_BACKUP_TIMESTAMP_KEY = 'fincontrol:auth_session_timestamp'
@@ -206,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 welcomeAlreadySent,
                 uid: firebaseUser.uid
               })
-              const welcomeResponse = await fetch('/api/send-welcome-email', {
+              const welcomeResponse = await fetchWithTimeout('/api/send-welcome-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -457,7 +465,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log(`📧 [Firebase useAuth] Intento ${attempt}/3 de enviar correo personalizado...`)
           
           // Generar link de verificación usando nuestro endpoint
-          const linkResponse = await fetch('/api/generate-verification-link', {
+          const linkResponse = await fetchWithTimeout('/api/generate-verification-link', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
@@ -492,7 +500,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('📧 [Firebase useAuth] Link generado correctamente, enviando correo...')
           
           // Enviar correo de verificación personalizado
-          const verificationResponse = await fetch('/api/send-verification-email', {
+          const verificationResponse = await fetchWithTimeout('/api/send-verification-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -593,7 +601,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔑 [Firebase useAuth] Intentando enviar correo de recuperación personalizado...')
       
       // Generar link de recuperación usando nuestro endpoint
-      const linkResponse = await fetch('/api/generate-password-reset-link', {
+      const linkResponse = await fetchWithTimeout('/api/generate-password-reset-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -614,7 +622,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('🔑 [Firebase useAuth] Link generado correctamente, enviando correo...')
         
         // Enviar correo de recuperación personalizado
-        const resetResponse = await fetch('/api/send-password-reset-email', {
+        const resetResponse = await fetchWithTimeout('/api/send-password-reset-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -676,7 +684,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     try {
       // Generar link de verificación usando nuestro endpoint
-      const linkResponse = await fetch('/api/generate-verification-link', {
+      const linkResponse = await fetchWithTimeout('/api/generate-verification-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -687,7 +695,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const verificationLink = linkData.verificationLink
         
         // Enviar correo de verificación personalizado
-        const verificationResponse = await fetch('/api/send-verification-email', {
+        const verificationResponse = await fetchWithTimeout('/api/send-verification-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -156,13 +156,25 @@ export function getTagClass(tipo: string): string {
   return classes[tipo] || classes.other
 }
 
+const DOLAR_FALLBACK = 1050
+
 export async function fetchDolar(): Promise<number> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10000)
   try {
-    const res = await fetch('https://dolarapi.com/v1/dolares/oficial')
+    const res = await fetch('https://dolarapi.com/v1/dolares/oficial', { signal: controller.signal })
+    if (!res.ok) {
+      console.warn(`[fetchDolar] API respondió ${res.status}, usando fallback $${DOLAR_FALLBACK}`)
+      return DOLAR_FALLBACK
+    }
     const data = await res.json()
-    return data.venta || 1050
-  } catch {
-    return 1050
+    return data.venta || DOLAR_FALLBACK
+  } catch (error: any) {
+    const reason = error?.name === 'AbortError' ? 'timeout' : error?.message || 'unknown'
+    console.warn(`[fetchDolar] Error (${reason}), usando fallback $${DOLAR_FALLBACK}`)
+    return DOLAR_FALLBACK
+  } finally {
+    clearTimeout(timeout)
   }
 }
 

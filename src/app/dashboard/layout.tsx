@@ -148,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-slate-50">
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4">
-        <button onClick={() => setSidebarOpen(true)} className="p-2">
+        <button onClick={() => setSidebarOpen(true)} className="p-2" aria-label="Abrir menú">
           <Menu className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2 min-w-0 flex-1 mx-2">
@@ -201,12 +201,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Sidebar */}
-      <aside className={`
+      <aside
+        className={`
         fixed top-0 left-0 h-full w-64 bg-white border-r border-slate-200 z-50
         transform transition-transform duration-200
         lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      `}
+        role="navigation"
+        aria-label="Menú principal"
+      >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
@@ -224,7 +228,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="text-xs text-slate-500">{profile?.nombre}</div>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1" aria-label="Cerrar menú">
             <X className="w-5 h-5" />
           </button>
         </div>
