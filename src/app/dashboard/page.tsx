@@ -840,14 +840,14 @@ export default function DashboardPage() {
           <h3 className="font-bold">Desglose por Tarjeta</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[500px]">
             <thead>
               <tr className="bg-slate-50">
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Tarjeta</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">ARS</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">USD</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Imp</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Total</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Tarjeta</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">ARS</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">USD</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Imp</th>
+                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -865,32 +865,22 @@ export default function DashboardPage() {
 
                 if (gEfectivo.length > 0 || iEfectivo.length > 0) {
                   return (
-                    <tr className="border-b border-slate-100 hover:bg-emerald-50 transition-colors">
-                      <td 
-                        className="p-4 cursor-pointer"
-                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
-                      >
+                    <tr
+                      className="border-b border-slate-100 hover:bg-emerald-50 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter') router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`) }}
+                    >
+                      <td className="p-4">
                         <span className="tag bg-emerald-100 text-emerald-700">💵 Efectivo</span>
                       </td>
-                      <td 
-                        className="p-4 font-semibold cursor-pointer"
-                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
-                      >
-                        {formatMoney(efectivoARS)}
-                      </td>
-                      <td 
-                        className="p-4 font-semibold text-emerald-600 cursor-pointer"
-                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
-                      >
+                      <td className="p-4 font-semibold whitespace-nowrap">{formatMoney(efectivoARS)}</td>
+                      <td className="p-4 font-semibold text-emerald-600 whitespace-nowrap">
                         {efectivoUSD > 0 ? formatMoney(efectivoUSD, 'USD') : '-'}
                       </td>
-                      <td 
-                        className="p-4 font-semibold cursor-pointer"
-                        onClick={() => router.push(`/dashboard/gastos?tarjeta=efectivo&mes=${monthKey}`)}
-                      >
-                        {formatMoney(efectivoImp)}
-                      </td>
-                      <td className="p-4 font-bold">{formatMoney(efectivoARS + efectivoImp)}</td>
+                      <td className="p-4 font-semibold whitespace-nowrap">{formatMoney(efectivoImp)}</td>
+                      <td className="p-4 font-bold whitespace-nowrap">{formatMoney(efectivoARS + efectivoImp)}</td>
                     </tr>
                   )
                 }
@@ -910,33 +900,21 @@ export default function DashboardPage() {
                 return (
                   <tr
                     key={t.id}
-                    className="border-b border-slate-100 hover:bg-indigo-50 transition-colors"
+                    className="border-b border-slate-100 hover:bg-indigo-50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
+                    role="link"
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter') router.push(`/dashboard/gastos?tarjeta=${t.id}`) }}
                   >
-                    <td 
-                      className="p-4 cursor-pointer"
-                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
-                    >
+                    <td className="p-4">
                       <span className={`tag ${getTagClass(t.tipo)}`}>{t.nombre}</span>
                     </td>
-                    <td 
-                      className="p-4 font-semibold cursor-pointer"
-                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
-                    >
-                      {formatMoney(cARS)}
-                    </td>
-                    <td 
-                      className="p-4 font-semibold text-emerald-600 cursor-pointer"
-                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
-                    >
+                    <td className="p-4 font-semibold whitespace-nowrap">{formatMoney(cARS)}</td>
+                    <td className="p-4 font-semibold text-emerald-600 whitespace-nowrap">
                       {cUSD > 0 ? formatMoney(cUSD, 'USD') : '-'}
                     </td>
-                    <td 
-                      className="p-4 font-semibold cursor-pointer"
-                      onClick={() => router.push(`/dashboard/gastos?tarjeta=${t.id}`)}
-                    >
-                      {formatMoney(cImp)}
-                    </td>
-                    <td className="p-4 font-bold">{formatMoney(cARS + cImp)}</td>
+                    <td className="p-4 font-semibold whitespace-nowrap">{formatMoney(cImp)}</td>
+                    <td className="p-4 font-bold whitespace-nowrap">{formatMoney(cARS + cImp)}</td>
                   </tr>
                 )
               }) : (

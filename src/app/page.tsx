@@ -318,7 +318,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-white/60 mt-6 text-sm">
-          © 2025 FinControl
+          © {new Date().getFullYear()} FinControl
         </p>
       </div>
     </div>
