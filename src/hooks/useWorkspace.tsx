@@ -102,41 +102,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           : d.data().created_at
       })) as Workspace[]
 
-      // 2. Workspaces donde soy miembro
+      // 2. Workspaces donde soy miembro (en paralelo)
       const membersRef = collection(db, 'workspace_members')
       const membersQuery = query(membersRef, where('user_id', '==', user.uid))
       const membersSnap = await getDocs(membersQuery)
-      
-      const memberWorkspaceIds = new Set(membersSnap.docs.map(doc => doc.data().workspace_id))
-      const memberWorkspaces: Workspace[] = []
 
-      for (const wsId of Array.from(memberWorkspaceIds)) {
-        if (ownedWorkspaces.find(w => w.id === wsId)) continue; // Evitar duplicados
+      const ownedIds = new Set(ownedWorkspaces.map(w => w.id))
+      const memberWorkspaceIds = membersSnap.docs
+        .map(doc => doc.data().workspace_id)
+        .filter(wsId => !ownedIds.has(wsId))
+      const uniqueMemberWsIds = Array.from(new Set(memberWorkspaceIds))
 
-        try {
-            // Obtener el workspace directamente por ID
-            const wsDoc = await getDoc(doc(db, 'workspaces', wsId))
-            if (wsDoc.exists()) {
-                const data = wsDoc.data()
-                memberWorkspaces.push({
-                    id: wsDoc.id,
-                    name: data.name,
-                    owner_id: data.owner_id,
-                    type: (data.type === 'personal' ? 'personal' : 'collaborative') as Workspace['type'],
-                    icono: data.icono || null,
-                    logo: data.logo || null,
-                    ingresos_habilitado: data.ingresos_habilitado || false,
-                    budget_ars: data.budget_ars || 0,
-                    budget_usd: data.budget_usd || 0,
-                    created_at: data.created_at instanceof Timestamp 
-                      ? data.created_at.toDate().toISOString() 
-                      : data.created_at
-                })
-            }
-        } catch (e) {
-            console.warn(`No se pudo cargar info del workspace ${wsId}`, e)
-        }
-      }
+      // Fetch all member workspaces in parallel instead of sequentially
+      const memberWorkspaceResults = await Promise.allSettled(
+        uniqueMemberWsIds.map(wsId => getDoc(doc(db, 'workspaces', wsId)))
+      )
+      const memberWorkspaces: Workspace[] = memberWorkspaceResults
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.exists())
+        .map(r => {
+          const wsDoc = r.value
+          const data = wsDoc.data()
+          return {
+            id: wsDoc.id,
+            name: data.name,
+            owner_id: data.owner_id,
+            type: (data.type === 'personal' ? 'personal' : 'collaborative') as Workspace['type'],
+            icono: data.icono || null,
+            logo: data.logo || null,
+            ingresos_habilitado: data.ingresos_habilitado || false,
+            budget_ars: data.budget_ars || 0,
+            budget_usd: data.budget_usd || 0,
+            created_at: data.created_at instanceof Timestamp
+              ? data.created_at.toDate().toISOString()
+              : data.created_at
+          } as Workspace
+        })
 
       const allWorkspaces = [...ownedWorkspaces, ...memberWorkspaces]
       // Deduplicar por ID por seguridad
@@ -169,37 +169,33 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const allMembersData: WorkspaceMember[] = [...myMembersData]
 
       if (ownedWorkspaceIds.length > 0) {
-        // Solo el dueño puede leer todos los miembros de sus workspaces
-        for (const wsId of ownedWorkspaceIds) {
-          try {
-            const workspaceMembersQuery = query(
-              collection(db, 'workspace_members'),
-              where('workspace_id', '==', wsId)
-            )
-            const workspaceMembersSnap = await getDocs(workspaceMembersQuery)
-            
-            const workspaceMembers = workspaceMembersSnap.docs.map(doc => ({
-              id: doc.id,
-              workspace_id: doc.data().workspace_id,
-              user_id: doc.data().user_id,
-              user_email: doc.data().user_email,
-              display_name: doc.data().display_name,
-              permissions: doc.data().permissions,
-              created_at: doc.data().created_at instanceof Timestamp
-                ? doc.data().created_at.toDate().toISOString()
-                : doc.data().created_at
-            })) as WorkspaceMember[]
-
-            // Agregar solo los que no están ya en la lista
-            workspaceMembers.forEach(member => {
-              if (!allMembersData.find(m => m.id === member.id)) {
-                allMembersData.push(member)
+        // Fetch all owned workspace members in parallel
+        const memberResults = await Promise.allSettled(
+          ownedWorkspaceIds.map(wsId =>
+            getDocs(query(collection(db, 'workspace_members'), where('workspace_id', '==', wsId)))
+          )
+        )
+        const existingIds = new Set(allMembersData.map(m => m.id))
+        memberResults.forEach(result => {
+          if (result.status === 'fulfilled') {
+            result.value.docs.forEach(doc => {
+              if (!existingIds.has(doc.id)) {
+                existingIds.add(doc.id)
+                allMembersData.push({
+                  id: doc.id,
+                  workspace_id: doc.data().workspace_id,
+                  user_id: doc.data().user_id,
+                  user_email: doc.data().user_email,
+                  display_name: doc.data().display_name,
+                  permissions: doc.data().permissions,
+                  created_at: doc.data().created_at instanceof Timestamp
+                    ? doc.data().created_at.toDate().toISOString()
+                    : doc.data().created_at
+                } as WorkspaceMember)
               }
             })
-          } catch (e) {
-            console.warn(`Error cargando miembros del workspace ${wsId}:`, e)
           }
-        }
+        })
       }
 
       console.log('🏢 [useWorkspace] Total miembros cargados:', allMembersData.length)
@@ -222,22 +218,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const sentInvitationsList: WorkspaceInvitation[] = []
       
       if (ownedWorkspaceIds.length > 0) {
-        // Cargar todas las invitaciones de los workspaces que poseo
-        for (const wsId of ownedWorkspaceIds) {
-          try {
-            const sentQuery = query(
-              collection(db, 'workspace_invitations'),
-              where('workspace_id', '==', wsId)
-            )
-            const sentSnap = await getDocs(sentQuery)
-            sentInvitationsList.push(...sentSnap.docs.map(doc => ({
+        // Fetch all sent invitations in parallel
+        const invResults = await Promise.allSettled(
+          ownedWorkspaceIds.map(wsId =>
+            getDocs(query(collection(db, 'workspace_invitations'), where('workspace_id', '==', wsId)))
+          )
+        )
+        invResults.forEach(result => {
+          if (result.status === 'fulfilled') {
+            sentInvitationsList.push(...result.value.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             })) as WorkspaceInvitation[])
-          } catch (e) {
-            console.warn(`Error cargando invitaciones enviadas para workspace ${wsId}:`, e)
           }
-        }
+        })
       }
       
       setSentInvitations(sentInvitationsList)

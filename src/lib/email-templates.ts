@@ -1,5 +1,14 @@
 // Templates profesionales de correos electrónicos para FinControl
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export interface EmailPermissions {
   gastos: string
   ingresos: string
@@ -30,7 +39,10 @@ export function getInvitationEmailTemplate(
     return permissionLabels[perm.toLowerCase()] || perm
   }
 
-  const subject = `Invitación a ${workspaceName} - FinControl`
+  const safeWorkspaceName = escapeHtml(workspaceName)
+  const safeEmail = escapeHtml(email)
+  const safeInviterName = inviterName ? escapeHtml(inviterName) : undefined
+  const subject = `Invitación a ${safeWorkspaceName} - FinControl`
 
   const html = `
 <!DOCTYPE html>
@@ -53,12 +65,12 @@ export function getInvitationEmailTemplate(
               </h1>
             </td>
           </tr>
-          
+
           <!-- Content -->
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                ${inviterName ? `Hola,<br><br><strong>${inviterName}</strong> te ha invitado a colaborar en el workspace <strong style="color: #6366f1;">${workspaceName}</strong> en FinControl.` : `Has sido invitado a colaborar en el workspace <strong style="color: #6366f1;">${workspaceName}</strong> en FinControl.`}
+                ${safeInviterName ? `Hola,<br><br><strong>${safeInviterName}</strong> te ha invitado a colaborar en el workspace <strong style="color: #6366f1;">${safeWorkspaceName}</strong> en FinControl.` : `Has sido invitado a colaborar en el workspace <strong style="color: #6366f1;">${safeWorkspaceName}</strong> en FinControl.`}
               </p>
 
               <!-- Permisos Section -->
@@ -108,7 +120,7 @@ export function getInvitationEmailTemplate(
                   📝 Cómo aceptar la invitación
                 </h3>
                 <ol style="margin: 0; padding-left: 20px; color: #78350f; font-size: 14px; line-height: 1.8;">
-                  <li style="margin-bottom: 8px;">Inicia sesión en FinControl con tu email: <strong style="color: #6366f1;">${email}</strong></li>
+                  <li style="margin-bottom: 8px;">Inicia sesión en FinControl con tu email: <strong style="color: #6366f1;">${safeEmail}</strong></li>
                   <li style="margin-bottom: 8px;">Ve a la página de <strong>Configuración</strong></li>
                   <li style="margin-bottom: 8px;">Verás la invitación pendiente y podrás aceptarla</li>
                 </ol>
@@ -170,7 +182,10 @@ export function getInvitationAcceptedEmailTemplate(
   invitedUserEmail: string,
   invitedUserName?: string
 ): { html: string; text: string; subject: string } {
-  const subject = `Invitación aceptada: ${workspaceName} - FinControl`
+  const safeWorkspaceName = escapeHtml(workspaceName)
+  const safeInvitedUserEmail = escapeHtml(invitedUserEmail)
+  const safeInvitedUserName = invitedUserName ? escapeHtml(invitedUserName) : undefined
+  const subject = `Invitación aceptada: ${safeWorkspaceName} - FinControl`
 
   const html = `
 <!DOCTYPE html>
@@ -193,16 +208,16 @@ export function getInvitationAcceptedEmailTemplate(
               </h1>
             </td>
           </tr>
-          
+
           <!-- Content -->
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
                 ¡Excelente noticia!
               </p>
-              
+
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                <strong>${invitedUserName || invitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+                <strong>${safeInvitedUserName || safeInvitedUserEmail}</strong> ha aceptado tu invitación para colaborar en el workspace <strong>${safeWorkspaceName}</strong>.
               </p>
 
               <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #10b981;">
@@ -213,13 +228,13 @@ export function getInvitationAcceptedEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
                     <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
-                      ${workspaceName}
+                      ${safeWorkspaceName}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
                     <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
-                      ${invitedUserEmail}
+                      ${safeInvitedUserEmail}
                     </td>
                   </tr>
                   <tr>
@@ -281,7 +296,10 @@ export function getInvitationRejectedEmailTemplate(
   invitedUserEmail: string,
   invitedUserName?: string
 ): { html: string; text: string; subject: string } {
-  const subject = `Invitación rechazada: ${workspaceName} - FinControl`
+  const safeWorkspaceName = escapeHtml(workspaceName)
+  const safeInvitedUserEmail = escapeHtml(invitedUserEmail)
+  const safeInvitedUserName = invitedUserName ? escapeHtml(invitedUserName) : undefined
+  const subject = `Invitación rechazada: ${safeWorkspaceName} - FinControl`
 
   const html = `
 <!DOCTYPE html>
@@ -304,16 +322,16 @@ export function getInvitationRejectedEmailTemplate(
               </h1>
             </td>
           </tr>
-          
+
           <!-- Content -->
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
                 Te informamos que:
               </p>
-              
+
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                <strong>${invitedUserName || invitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${workspaceName}</strong>.
+                <strong>${safeInvitedUserName || safeInvitedUserEmail}</strong> ha rechazado tu invitación para colaborar en el workspace <strong>${safeWorkspaceName}</strong>.
               </p>
 
               <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #ef4444;">
@@ -324,13 +342,13 @@ export function getInvitationRejectedEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Workspace:</td>
                     <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
-                      ${workspaceName}
+                      ${safeWorkspaceName}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Usuario:</td>
                     <td align="right" style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">
-                      ${invitedUserEmail}
+                      ${safeInvitedUserEmail}
                     </td>
                   </tr>
                   <tr>
@@ -397,6 +415,7 @@ export function getWelcomeEmailTemplate(
   userName: string,
   userEmail: string
 ): { html: string; text: string; subject: string } {
+  const safeUserName = escapeHtml(userName)
   const subject = '¡Bienvenido a FinControl! 🎉'
 
   const html = `
@@ -420,12 +439,12 @@ export function getWelcomeEmailTemplate(
               </h1>
             </td>
           </tr>
-          
+
           <!-- Content -->
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Hola <strong>${userName}</strong>,
+                Hola <strong>${safeUserName}</strong>,
               </p>
               
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
@@ -639,6 +658,7 @@ export function getEmailVerificationTemplate(
   userName: string,
   verificationLink: string
 ): { html: string; text: string; subject: string } {
+  const safeUserName = escapeHtml(userName)
   const subject = 'Confirma tu email - FinControl'
 
   const html = `
@@ -667,9 +687,9 @@ export function getEmailVerificationTemplate(
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Hola <strong>${userName}</strong>,
+                Hola <strong>${safeUserName}</strong>,
               </p>
-              
+
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
                 Gracias por registrarte en FinControl. Para completar tu registro y asegurar la seguridad de tu cuenta, por favor confirma tu dirección de email.
               </p>
@@ -753,6 +773,7 @@ export function getPasswordResetTemplate(
   userName: string,
   resetLink: string
 ): { html: string; text: string; subject: string } {
+  const safeUserName = escapeHtml(userName)
   const subject = 'Restablecé tu contraseña - FinControl'
 
   const html = `
@@ -781,9 +802,9 @@ export function getPasswordResetTemplate(
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Hola <strong>${userName}</strong>,
+                Hola <strong>${safeUserName}</strong>,
               </p>
-              
+
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
                 Recibimos una solicitud para restablecer la contraseña de tu cuenta en FinControl. Si fuiste vos, hacé clic en el botón de abajo para crear una nueva contraseña.
               </p>
@@ -871,7 +892,10 @@ export function getCierreNotificationTemplate(
   diaCierre: number,
   fechaCierre: string
 ): { html: string; text: string; subject: string } {
-  const subject = `🔔 Recordatorio: Cierre de ${tarjetaNombre} - FinControl`
+  const safeUserName = escapeHtml(userName)
+  const safeTarjetaNombre = escapeHtml(tarjetaNombre)
+  const safeFechaCierre = escapeHtml(fechaCierre)
+  const subject = `🔔 Recordatorio: Cierre de ${safeTarjetaNombre} - FinControl`
 
   const html = `
 <!DOCTYPE html>
@@ -899,11 +923,11 @@ export function getCierreNotificationTemplate(
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Hola <strong>${userName}</strong>,
+                Hola <strong>${safeUserName}</strong>,
               </p>
-              
+
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Te recordamos que la tarjeta <strong style="color: #f59e0b;">${tarjetaNombre}</strong> cierra en <strong>2 días</strong> (día ${diaCierre}).
+                Te recordamos que la tarjeta <strong style="color: #f59e0b;">${safeTarjetaNombre}</strong> cierra en <strong>2 días</strong> (día ${diaCierre}).
               </p>
 
               <!-- Info Box -->
@@ -915,13 +939,13 @@ export function getCierreNotificationTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #78350f; font-size: 14px;">💳 Tarjeta</td>
                     <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
-                      ${tarjetaNombre}
+                      ${safeTarjetaNombre}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #78350f; font-size: 14px;">📅 Fecha de cierre</td>
                     <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
-                      ${fechaCierre}
+                      ${safeFechaCierre}
                     </td>
                   </tr>
                   <tr>
@@ -998,7 +1022,10 @@ export function getVencimientoNotificationTemplate(
   diaVencimiento: number,
   fechaVencimiento: string
 ): { html: string; text: string; subject: string } {
-  const subject = `🔔 Recordatorio: Vencimiento de pago ${tarjetaNombre} - FinControl`
+  const safeUserName = escapeHtml(userName)
+  const safeTarjetaNombre = escapeHtml(tarjetaNombre)
+  const safeFechaVencimiento = escapeHtml(fechaVencimiento)
+  const subject = `🔔 Recordatorio: Vencimiento de pago ${safeTarjetaNombre} - FinControl`
 
   const html = `
 <!DOCTYPE html>
@@ -1026,11 +1053,11 @@ export function getVencimientoNotificationTemplate(
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Hola <strong>${userName}</strong>,
+                Hola <strong>${safeUserName}</strong>,
               </p>
-              
+
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                Te recordamos que el vencimiento de pago de <strong style="color: #ef4444;">${tarjetaNombre}</strong> es en <strong>2 días</strong> (día ${diaVencimiento}).
+                Te recordamos que el vencimiento de pago de <strong style="color: #ef4444;">${safeTarjetaNombre}</strong> es en <strong>2 días</strong> (día ${diaVencimiento}).
               </p>
 
               <!-- Warning Box -->
@@ -1042,13 +1069,13 @@ export function getVencimientoNotificationTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #7f1d1d; font-size: 14px;">💳 Tarjeta</td>
                     <td align="right" style="padding: 8px 0; color: #7f1d1d; font-size: 14px; font-weight: 600;">
-                      ${tarjetaNombre}
+                      ${safeTarjetaNombre}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #7f1d1d; font-size: 14px;">📅 Fecha de vencimiento</td>
                     <td align="right" style="padding: 8px 0; color: #7f1d1d; font-size: 14px; font-weight: 600;">
-                      ${fechaVencimiento}
+                      ${safeFechaVencimiento}
                     </td>
                   </tr>
                   <tr>
@@ -1124,7 +1151,10 @@ export function getMemberLeftEmailTemplate(
   leavingUserEmail: string,
   leavingUserName?: string
 ): { html: string; text: string; subject: string } {
-  const subject = `Miembro salió del espacio: ${workspaceName} - FinControl`
+  const safeWorkspaceName = escapeHtml(workspaceName)
+  const safeLeavingUserEmail = escapeHtml(leavingUserEmail)
+  const safeLeavingUserName = leavingUserName ? escapeHtml(leavingUserName) : undefined
+  const subject = `Miembro salió del espacio: ${safeWorkspaceName} - FinControl`
 
   const html = `
 <!DOCTYPE html>
@@ -1156,7 +1186,7 @@ export function getMemberLeftEmailTemplate(
               </p>
               
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                <strong>${leavingUserName || leavingUserEmail}</strong> ha salido del espacio <strong>${workspaceName}</strong>.
+                <strong>${safeLeavingUserName || safeLeavingUserEmail}</strong> ha salido del espacio <strong>${safeWorkspaceName}</strong>.
               </p>
 
               <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #f59e0b;">
@@ -1167,13 +1197,13 @@ export function getMemberLeftEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #78350f; font-size: 14px;">Espacio:</td>
                     <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
-                      ${workspaceName}
+                      ${safeWorkspaceName}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #78350f; font-size: 14px;">Usuario:</td>
                     <td align="right" style="padding: 8px 0; color: #78350f; font-size: 14px; font-weight: 600;">
-                      ${leavingUserEmail}
+                      ${safeLeavingUserEmail}
                     </td>
                   </tr>
                   <tr>
