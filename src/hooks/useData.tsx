@@ -12,8 +12,7 @@ import {
   doc,
   serverTimestamp,
   orderBy,
-  Timestamp,
-  or
+  Timestamp
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from './useAuth'
@@ -139,32 +138,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [monthKey])
 
   // --- FUNCIÓN FETCHALL PRINCIPAL ---
-  const fetchAll = useCallback(async () => {
+  // clearFirst: solo true al cambiar de workspace/usuario, false en CRUD (evita flash vacío)
+  const fetchAllInternal = useCallback(async (clearFirst: boolean) => {
     // Usar la referencia más reciente del workspace
     const latestWorkspace = currentWorkspaceRef.current
-    
+
     console.log('📊 [Firebase useData] fetchAll called', {
       userId: user?.uid,
       workspaceId: latestWorkspace?.id,
-      workspaceName: latestWorkspace?.name,
-      workspaceOwner: latestWorkspace?.owner_id,
-      currentWorkspaceFromRef: latestWorkspace?.id,
-      currentWorkspaceFromProp: currentWorkspace?.id
+      clearFirst
     })
-    
-    // 1. Limpieza de estados para evitar "fantasmas" al cambiar de usuario/workspace
-    console.log('📊 [Firebase useData] fetchAll starting - clearing old states')
-    setMovimientos([])
-    setMetas([])
-    setTarjetas([])
-    setGastos([])
-    setImpuestos([])
-    setCategorias([])
-    setTags([])
-    setIngresos([])
-    setCategoriasIngresos([])
-    setTagsIngresos([])
-    setMediosPago([])
+
+    if (clearFirst) {
+      setMovimientos([])
+      setMetas([])
+      setTarjetas([])
+      setGastos([])
+      setImpuestos([])
+      setCategorias([])
+      setTags([])
+      setIngresos([])
+      setCategoriasIngresos([])
+      setTagsIngresos([])
+      setMediosPago([])
+    }
 
     setLoading(true)
     try {
@@ -246,29 +243,57 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // --- AHORROS (Movimientos y Metas) ---
+      // --- FETCH PARALELO DE TODAS LAS COLECCIONES ---
+      // Preparar todas las queries independientes
+      const queries: Record<string, ReturnType<typeof getDocs> | null> = {}
+
       if (permissions.ahorros !== 'ninguno') {
-        // Movimientos
-        try {
-          console.log('📊 [Firebase useData] Fetching movimientos_ahorro...')
-          const movimientosRef = collection(db, 'movimientos_ahorro')
-          const movimientosQuery = query(movimientosRef, workspaceFilter, orderBy('created_at', 'desc'))
-          const movimientosSnap = await getDocs(movimientosQuery)
-          console.log('✅ [Firebase useData] Movimientos fetched:', movimientosSnap.docs.length)
-        
-        // En modo personal, mostrar TODOS los documentos del usuario (sin filtrar por workspace_id)
-        // Esto es porque en modo personal queremos ver todos los datos del usuario, independientemente del workspace_id
-        let movimientosDocs = isWorkspaceMode 
-          ? movimientosSnap.docs 
-          : movimientosSnap.docs // En modo personal, mostrar todos los documentos del usuario
-        
-        console.log('📊 [Firebase useData] Movimientos after filter:', movimientosDocs.length, 'of', movimientosSnap.docs.length, {
-          isWorkspaceMode,
-          latestWorkspaceId: latestWorkspace?.id || 'NULL'
-        })
-        
-        let movimientosData = movimientosDocs.map(doc => {
-          const data = doc.data();
+        queries.movimientos = getDocs(query(collection(db, 'movimientos_ahorro'), workspaceFilter, orderBy('created_at', 'desc')))
+        queries.metas = getDocs(query(collection(db, 'metas'), workspaceFilter, orderBy('created_at', 'desc')))
+      }
+      if (permissions.tarjetas !== 'ninguno') {
+        queries.tarjetas = getDocs(query(collection(db, 'tarjetas'), workspaceFilter, orderBy('created_at', 'desc')))
+      }
+      if (permissions.gastos !== 'ninguno') {
+        queries.gastos = getDocs(query(collection(db, 'gastos'), workspaceFilter, orderBy('created_at', 'desc')))
+        queries.impuestos = getDocs(query(collection(db, 'impuestos'), workspaceFilter, orderBy('created_at', 'desc')))
+      }
+      if (permissions.ingresos !== 'ninguno') {
+        queries.ingresos = getDocs(query(collection(db, 'ingresos'), workspaceFilter, orderBy('created_at', 'desc')))
+      }
+      queries.categorias = getDocs(query(collection(db, 'categorias'), workspaceFilter, orderBy('created_at', 'desc')))
+      queries.tags = getDocs(query(collection(db, 'tags'), workspaceFilter, orderBy('created_at', 'desc')))
+      queries.mediosPago = getDocs(query(collection(db, 'medios_pago'), workspaceFilter, orderBy('created_at', 'desc')))
+      queries.categoriasIngresos = getDocs(query(collection(db, 'categorias_ingresos'), workspaceFilter, orderBy('created_at', 'desc')))
+      queries.tagsIngresos = getDocs(query(collection(db, 'tags_ingresos'), workspaceFilter, orderBy('created_at', 'desc')))
+
+      // Ejecutar todas en paralelo
+      const keys = Object.keys(queries)
+      const promises = Object.values(queries).filter(Boolean) as Promise<any>[]
+      const results = await Promise.allSettled(promises)
+
+      // Mapear resultados por nombre
+      const snaps: Record<string, any> = {}
+      let resultIdx = 0
+      for (const key of keys) {
+        if (queries[key]) {
+          const r = results[resultIdx++]
+          if (r.status === 'fulfilled') {
+            snaps[key] = r.value
+          } else {
+            console.error(`❌ [Firebase useData] Error fetching ${key}:`, r.reason?.message)
+          }
+        }
+      }
+
+      console.log('📊 [Firebase useData] Parallel fetch complete:', Object.keys(snaps).map(k => `${k}: ${snaps[k]?.docs?.length ?? 0}`).join(', '))
+
+      // --- PROCESAR RESULTADOS ---
+
+      // Movimientos
+      if (snaps.movimientos) {
+        let movimientosData = snaps.movimientos.docs.map((doc: any) => {
+          const data = doc.data()
           let fecha: string
           if (data.created_at instanceof Timestamp) {
             fecha = data.created_at.toDate().toISOString()
@@ -277,490 +302,141 @@ export function DataProvider({ children }: { children: ReactNode }) {
           } else {
             fecha = new Date().toISOString()
           }
-          return { 
-            id: doc.id, 
-            tipo: data.tipo, 
-            monto: data.monto, 
-            user_id: data.user_id, 
-            fecha, 
-            descripcion: data.descripcion,
-            created_by: data.created_by,
-            workspace_id: data.workspace_id
-          } as MovimientoAhorro
+          return { id: doc.id, tipo: data.tipo, monto: data.monto, user_id: data.user_id, fecha, descripcion: data.descripcion, created_by: data.created_by, workspace_id: data.workspace_id } as MovimientoAhorro
         })
-
         if (isWorkspaceMode && permissions.ahorros === 'solo_propios') {
-          movimientosData = movimientosData.filter(m => m.user_id === user.uid)
+          movimientosData = movimientosData.filter((m: MovimientoAhorro) => m.user_id === user.uid)
         }
-        console.log('📊 [Firebase useData] Setting movimientos state:', movimientosData.length, 'movimientos')
         setMovimientos(movimientosData)
-        } catch (error: any) {
-          console.error('❌ [Firebase useData] Error fetching movimientos_ahorro:', {
-            error: error.message,
-            code: error.code,
-            workspaceId: latestWorkspace?.id,
-            userId: user.uid
-          })
-          // Continuar con otras colecciones
-        }
+      }
 
-        // Metas
-        try {
-          console.log('📊 [Firebase useData] Fetching metas...')
-          const metasRef = collection(db, 'metas')
-          const metasQuery = query(metasRef, workspaceFilter, orderBy('created_at', 'desc'))
-          const metasSnap = await getDocs(metasQuery)
-          console.log('✅ [Firebase useData] Metas fetched:', metasSnap.docs.length)
-        // En modo personal, mostrar TODOS los documentos del usuario
-        let metasDocs = isWorkspaceMode 
-          ? metasSnap.docs 
-          : metasSnap.docs
-        
-        let metasData = metasDocs.map(doc => {
+      // Metas
+      if (snaps.metas) {
+        let metasData = snaps.metas.docs.map((doc: any) => {
           const data = doc.data()
-          return {
-            id: doc.id,
-            user_id: data.user_id,
-            nombre: data.nombre,
-            icono: data.icono,
-            objetivo: data.objetivo,
-            progreso: data.progreso,
-            moneda: data.moneda,
-            completada: data.completada || false,
-            fecha_limite: data.fecha_limite || null,
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
-            created_by: data.created_by,
-            workspace_id: data.workspace_id
-          }
+          return { id: doc.id, user_id: data.user_id, nombre: data.nombre, icono: data.icono, objetivo: data.objetivo, progreso: data.progreso, moneda: data.moneda, completada: data.completada || false, fecha_limite: data.fecha_limite || null, created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at, created_by: data.created_by, workspace_id: data.workspace_id }
         }) as Meta[]
-
         if (isWorkspaceMode && permissions.ahorros === 'solo_propios') {
           metasData = metasData.filter(m => m.user_id === user.uid)
         }
         setMetas(metasData)
-        } catch (error: any) {
-          console.error('❌ [Firebase useData] Error fetching metas:', {
-            error: error.message,
-            code: error.code,
-            workspaceId: latestWorkspace?.id,
-            userId: user.uid
-          })
-        }
       }
 
-      // --- TARJETAS ---
-      if (permissions.tarjetas !== 'ninguno') {
-        try {
-          console.log('📊 [Firebase useData] Fetching tarjetas...')
-          const tarjetasRef = collection(db, 'tarjetas')
-          const tarjetasQuery = query(tarjetasRef, workspaceFilter, orderBy('created_at', 'desc'))
-          const tarjetasSnap = await getDocs(tarjetasQuery)
-          console.log('✅ [Firebase useData] Tarjetas fetched:', tarjetasSnap.docs.length)
-        // En modo personal, mostrar TODOS los documentos del usuario
-        let tarjetasDocs = isWorkspaceMode 
-          ? tarjetasSnap.docs 
-          : tarjetasSnap.docs
-
-        let tarjetasData = tarjetasDocs.map(doc => {
+      // Tarjetas
+      if (snaps.tarjetas) {
+        let tarjetasData = snaps.tarjetas.docs.map((doc: any) => {
           const data = doc.data()
-          return {
-            id: doc.id,
-            user_id: data.user_id,
-            nombre: data.nombre,
-            tipo: data.tipo,
-            banco: data.banco || null,
-            digitos: data.digitos || null,
-            cierre: data.cierre || null,
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
-          }
+          return { id: doc.id, user_id: data.user_id, nombre: data.nombre, tipo: data.tipo, banco: data.banco || null, digitos: data.digitos || null, cierre: data.cierre || null, created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at }
         }) as Tarjeta[]
-
         if (isWorkspaceMode && permissions.tarjetas === 'solo_propios') {
           tarjetasData = tarjetasData.filter(t => t.user_id === user.uid)
         }
         setTarjetas(tarjetasData)
-        } catch (error: any) {
-          console.error('❌ [Firebase useData] Error fetching tarjetas:', {
-            error: error.message,
-            code: error.code,
-            workspaceId: latestWorkspace?.id,
-            userId: user.uid
-          })
-        }
       }
 
-      // --- GASTOS E IMPUESTOS ---
-      if (permissions.gastos !== 'ninguno') {
-        // Gastos
-        try {
-          console.log('📊 [Firebase useData] Fetching gastos...')
-          const gastosRef = collection(db, 'gastos')
-          const gastosQuery = query(gastosRef, workspaceFilter, orderBy('created_at', 'desc'))
-          const gastosSnap = await getDocs(gastosQuery)
-          console.log('✅ [Firebase useData] Gastos fetched:', gastosSnap.docs.length)
-        // En modo personal, mostrar TODOS los documentos del usuario (sin filtrar por workspace_id)
-        // Esto es porque en modo personal queremos ver todos los datos del usuario, independientemente del workspace_id
-        let gastosDocs = isWorkspaceMode 
-          ? gastosSnap.docs 
-          : gastosSnap.docs // En modo personal, mostrar todos los documentos del usuario
-        
-        console.log('📊 [Firebase useData] Gastos after filter:', gastosDocs.length, 'of', gastosSnap.docs.length, {
-          isWorkspaceMode,
-          latestWorkspaceId: latestWorkspace?.id || 'NULL'
-        })
-
-        let gastosData = gastosDocs.map(doc => {
+      // Gastos
+      if (snaps.gastos) {
+        let gastosData = snaps.gastos.docs.map((doc: any) => {
           const data = doc.data()
-          return {
-            id: doc.id,
-            user_id: data.user_id,
-            tarjeta_id: data.tarjeta_id || null,
-            categoria_id: data.categoria_id || null,
-            descripcion: data.descripcion,
-            monto: data.monto,
-            moneda: data.moneda,
-            cuotas: data.cuotas,
-            cuota_actual: data.cuota_actual,
-            fecha: data.fecha,
-            mes_facturacion: data.mes_facturacion,
-            es_fijo: data.es_fijo,
-            tag_ids: data.tag_ids || [],
-            pagado: data.pagado || false,
-            fecha_pago: data.fecha_pago || null,
-            medio_pago: data.medio_pago || null,
-            comprobante_url: data.comprobante_url || null,
-            comprobante_nombre: data.comprobante_nombre || null,
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
-          }
+          return { id: doc.id, user_id: data.user_id, tarjeta_id: data.tarjeta_id || null, categoria_id: data.categoria_id || null, descripcion: data.descripcion, monto: data.monto, moneda: data.moneda, cuotas: data.cuotas, cuota_actual: data.cuota_actual, fecha: data.fecha, mes_facturacion: data.mes_facturacion, es_fijo: data.es_fijo, tag_ids: data.tag_ids || [], pagado: data.pagado || false, fecha_pago: data.fecha_pago || null, medio_pago: data.medio_pago || null, comprobante_url: data.comprobante_url || null, comprobante_nombre: data.comprobante_nombre || null, created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at }
         }) as Gasto[]
-
         if (isWorkspaceMode && permissions.gastos === 'solo_propios') {
           gastosData = gastosData.filter(g => g.user_id === user.uid)
         }
-        console.log('📊 [Firebase useData] Setting gastos state:', gastosData.length, 'gastos')
         setGastos(gastosData)
-        } catch (error: any) {
-          console.error('❌ [Firebase useData] Error fetching gastos:', {
-            error: error.message,
-            code: error.code,
-            workspaceId: latestWorkspace?.id,
-            userId: user.uid
-          })
-        }
+      }
 
-        // Impuestos
-        try {
-          console.log('📊 [Firebase useData] Fetching impuestos...')
-          const impuestosRef = collection(db, 'impuestos')
-          const impuestosQuery = query(impuestosRef, workspaceFilter, orderBy('created_at', 'desc'))
-          const impuestosSnap = await getDocs(impuestosQuery)
-          console.log('✅ [Firebase useData] Impuestos fetched:', impuestosSnap.docs.length)
-        // En modo personal, mostrar TODOS los documentos del usuario
-        let impuestosDocs = isWorkspaceMode 
-          ? impuestosSnap.docs 
-          : impuestosSnap.docs
-
-        let impuestosData = impuestosDocs.map(doc => {
+      // Impuestos
+      if (snaps.impuestos) {
+        let impuestosData = snaps.impuestos.docs.map((doc: any) => {
           const data = doc.data()
-          return {
-            id: doc.id,
-            user_id: data.user_id,
-            tarjeta_id: data.tarjeta_id || null,
-            categoria_id: data.categoria_id || null,
-            descripcion: data.descripcion,
-            monto: data.monto,
-            moneda: data.moneda || 'ARS',
-            mes: data.mes,
-            es_fijo: data.es_fijo || false,
-            tag_ids: data.tag_ids || [],
-            pagado: data.pagado !== undefined ? data.pagado : false,
-            fecha_pago: data.fecha_pago || null,
-            medio_pago: data.medio_pago || null,
-            comprobante_url: data.comprobante_url || null,
-            comprobante_nombre: data.comprobante_nombre || null,
-            workspace_id: data.workspace_id || null,
-            created_by: data.created_by || null,
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at
-          }
+          return { id: doc.id, user_id: data.user_id, tarjeta_id: data.tarjeta_id || null, categoria_id: data.categoria_id || null, descripcion: data.descripcion, monto: data.monto, moneda: data.moneda || 'ARS', mes: data.mes, es_fijo: data.es_fijo || false, tag_ids: data.tag_ids || [], pagado: data.pagado !== undefined ? data.pagado : false, fecha_pago: data.fecha_pago || null, medio_pago: data.medio_pago || null, comprobante_url: data.comprobante_url || null, comprobante_nombre: data.comprobante_nombre || null, workspace_id: data.workspace_id || null, created_by: data.created_by || null, created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at }
         }) as Impuesto[]
-
         if (isWorkspaceMode && permissions.gastos === 'solo_propios') {
           impuestosData = impuestosData.filter(i => i.user_id === user.uid)
         }
         setImpuestos(impuestosData)
-        } catch (error: any) {
-          console.error('❌ [Firebase useData] Error fetching impuestos:', {
-            error: error.message,
-            code: error.code,
-            workspaceId: latestWorkspace?.id,
-            userId: user.uid
-          })
-        }
       }
 
-      // --- CONFIGURACIÓN (Categorías y Tags) ---
-      try {
-        console.log('📊 [Firebase useData] Fetching categorias...')
-        const categoriasRef = collection(db, 'categorias')
-        const categoriasQuery = query(categoriasRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const categoriasSnap = await getDocs(categoriasQuery)
-        console.log('✅ [Firebase useData] Categorias fetched:', categoriasSnap.docs.length)
-      // En modo personal, mostrar TODOS los documentos del usuario
-      let categoriasDocs = isWorkspaceMode 
-        ? categoriasSnap.docs 
-        : categoriasSnap.docs
-
-      let categoriasData = categoriasDocs.map(doc => ({
-          id: doc.id,
-          user_id: doc.data().user_id,
-          nombre: doc.data().nombre,
-          icono: doc.data().icono,
-          color: doc.data().color,
-          created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-      })) as Categoria[]
-
-      // Crear categorías por defecto si no existen (y tengo permiso de admin o es personal o soy dueño)
-      const isOwnerCategorias = isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid
-      const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwnerCategorias
-      
-      if (categoriasData.length === 0 && canCreateCategories) {
-        console.log('📂 [Firebase useData] No categories found - Creating default categories')
-        const defaultCategorias = [
-          { nombre: 'Comida', icono: '🍔', color: '#f97316' },
-          { nombre: 'Hogar', icono: '🏠', color: '#3b82f6' },
-          { nombre: 'Transporte', icono: '🚗', color: '#10b981' },
-          { nombre: 'Entretenimiento', icono: '🎮', color: '#8b5cf6' },
-          { nombre: 'Ropa', icono: '👕', color: '#ec4899' },
-          { nombre: 'Salud', icono: '💊', color: '#ef4444' },
-          { nombre: 'Educación', icono: '📚', color: '#06b6d4' },
-          { nombre: 'Otros', icono: '💰', color: '#6b7280' }
-        ]
-        const categoriasRef = collection(db, 'categorias')
-        for (const categoria of defaultCategorias) {
-          const docData: any = {
-            ...categoria,
-            user_id: user.uid,
-            created_at: serverTimestamp()
-          }
-          if (isWorkspaceMode && latestWorkspace?.id) {
-            docData.workspace_id = latestWorkspace.id
-            docData.created_by = user.uid
-          }
-          await addDoc(categoriasRef, docData)
-        }
-        // Fetch again
-        const categoriasSnapNew = await getDocs(categoriasQuery)
-        categoriasDocs = isWorkspaceMode ? categoriasSnapNew.docs : categoriasSnapNew.docs.filter(d => !d.data().workspace_id)
-        categoriasData = categoriasDocs.map(doc => ({
-            id: doc.id,
-            user_id: doc.data().user_id,
-            nombre: doc.data().nombre,
-            icono: doc.data().icono,
-            color: doc.data().color,
-            created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-        })) as Categoria[]
-      }
-      setCategorias(categoriasData)
-      } catch (error: any) {
-        console.error('❌ [Firebase useData] Error fetching categorias:', {
-          error: error.message,
-          code: error.code,
-          workspaceId: currentWorkspace?.id,
-          userId: user.uid
-        })
-      }
-
-      // Tags
-      try {
-        console.log('📊 [Firebase useData] Fetching tags...')
-        const tagsRef = collection(db, 'tags')
-        const tagsQuery = query(tagsRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const tagsSnap = await getDocs(tagsQuery)
-        console.log('✅ [Firebase useData] Tags fetched:', tagsSnap.docs.length)
-      // En modo personal, mostrar TODOS los documentos del usuario
-      const tagsDocs = isWorkspaceMode 
-        ? tagsSnap.docs 
-        : tagsSnap.docs
-      const tagsData = tagsDocs.map(doc => ({
-          id: doc.id,
-          user_id: doc.data().user_id,
-          nombre: doc.data().nombre,
-          created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-      })) as Tag[]
-      setTags(tagsData)
-      } catch (error: any) {
-        console.error('❌ [Firebase useData] Error fetching tags:', {
-          error: error.message,
-          code: error.code,
-          workspaceId: currentWorkspace?.id,
-          userId: user.uid
-        })
-      }
-
-      // Medios Pago
-      let mediosPagoData: MedioPago[] = []
-      try {
-        const mediosPagoRef = collection(db, 'medios_pago')
-        const mediosPagoQuery = query(mediosPagoRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const mediosPagoSnap = await getDocs(mediosPagoQuery)
-        // En modo personal, mostrar TODOS los documentos del usuario
-        const mediosPagoDocs = isWorkspaceMode 
-          ? mediosPagoSnap.docs 
-          : mediosPagoSnap.docs
-        mediosPagoData = mediosPagoDocs.map(doc => ({
-            id: doc.id,
-            user_id: doc.data().user_id,
-            nombre: doc.data().nombre,
-            created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-        })) as MedioPago[]
-      } catch (e) {
-        console.warn('Medios pago fetch failed', e)
-      }
-      setMediosPago(mediosPagoData)
-
-      // --- INGRESOS ---
-      if (permissions.ingresos !== 'ninguno') {
-        try {
-          console.log('📊 [Firebase useData] Fetching ingresos...')
-          const ingresosRef = collection(db, 'ingresos')
-          const ingresosQuery = query(ingresosRef, workspaceFilter, orderBy('created_at', 'desc'))
-          const ingresosSnap = await getDocs(ingresosQuery)
-          console.log('✅ [Firebase useData] Ingresos fetched:', ingresosSnap.docs.length)
-        // En modo personal, mostrar TODOS los documentos del usuario
-        let ingresosDocs = isWorkspaceMode 
-          ? ingresosSnap.docs 
-          : ingresosSnap.docs
-
-        let ingresosData = ingresosDocs.map(doc => {
+      // Ingresos
+      if (snaps.ingresos) {
+        let ingresosData = snaps.ingresos.docs.map((doc: any) => {
           const data = doc.data()
-          return {
-            id: doc.id,
-            user_id: data.user_id,
-            categoria_id: data.categoria_id || null,
-            descripcion: data.descripcion,
-            monto: data.monto,
-            moneda: data.moneda,
-            fecha: data.fecha,
-            mes: data.mes,
-            tag_ids: data.tag_ids || [],
-            created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
-            // Campos nuevos para pendiente de cobro
-            pendiente_cobro: data.pendiente_cobro === true || data.pendiente_cobro === 'true' || data.pendiente_cobro === 1 || false,
-            fecha_cobro_esperada: data.fecha_cobro_esperada || null,
-            fecha_cobro_confirmada: data.fecha_cobro_confirmada || null,
-            cuenta_bancaria_id: data.cuenta_bancaria_id || null,
-            comprobante_url: data.comprobante_url || null,
-            comprobante_nombre: data.comprobante_nombre || null,
-            notificar_correo: data.notificar_correo !== undefined ? (data.notificar_correo === true || data.notificar_correo === 'true' || data.notificar_correo === 1) : false,
-            // Campo para ingresos fijos
-            es_fijo: data.es_fijo === true || data.es_fijo === 'true' || data.es_fijo === 1 || false
-          }
+          return { id: doc.id, user_id: data.user_id, categoria_id: data.categoria_id || null, descripcion: data.descripcion, monto: data.monto, moneda: data.moneda, fecha: data.fecha, mes: data.mes, tag_ids: data.tag_ids || [], created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at, pendiente_cobro: data.pendiente_cobro === true || data.pendiente_cobro === 'true' || data.pendiente_cobro === 1 || false, fecha_cobro_esperada: data.fecha_cobro_esperada || null, fecha_cobro_confirmada: data.fecha_cobro_confirmada || null, cuenta_bancaria_id: data.cuenta_bancaria_id || null, comprobante_url: data.comprobante_url || null, comprobante_nombre: data.comprobante_nombre || null, notificar_correo: data.notificar_correo !== undefined ? (data.notificar_correo === true || data.notificar_correo === 'true' || data.notificar_correo === 1) : false, es_fijo: data.es_fijo === true || data.es_fijo === 'true' || data.es_fijo === 1 || false }
         }) as Ingreso[]
-
         if (isWorkspaceMode && permissions.ingresos === 'solo_propios') {
           ingresosData = ingresosData.filter(i => i.user_id === user.uid)
         }
-        console.log('📊 [Firebase useData] Setting ingresos state:', ingresosData.length, 'ingresos')
         setIngresos(ingresosData)
-        } catch (error: any) {
-          console.error('❌ [Firebase useData] Error fetching ingresos:', {
-            error: error.message,
-            code: error.code,
-            workspaceId: latestWorkspace?.id,
-            userId: user.uid
-          })
-        }
       }
 
-      // Configuración de Ingresos (Categorías y Tags)
-      try {
-        console.log('📊 [Firebase useData] Fetching categorias_ingresos...')
-        const categoriasIngresosRef = collection(db, 'categorias_ingresos')
-        const categoriasIngresosQuery = query(categoriasIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const categoriasIngresosSnap = await getDocs(categoriasIngresosQuery)
-        console.log('✅ [Firebase useData] Categorias ingresos fetched:', categoriasIngresosSnap.docs.length)
-      // En modo personal, mostrar TODOS los documentos del usuario
-      let categoriasIngresosDocs = isWorkspaceMode 
-        ? categoriasIngresosSnap.docs 
-        : categoriasIngresosSnap.docs
-      
-      let categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
-          id: doc.id,
-          user_id: doc.data().user_id,
-          nombre: doc.data().nombre,
-          icono: doc.data().icono,
-          color: doc.data().color,
-          created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-      })) as CategoriaIngreso[]
+      // Tags
+      if (snaps.tags) {
+        setTags(snaps.tags.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as Tag[])
+      }
 
-      const isOwnerIngresos = isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid
-      const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwnerIngresos
-      if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos) {
-         const defaultCategoriasIngresos = [
-          { nombre: 'Salario', icono: '💼', color: '#3b82f6' },
-          { nombre: 'Freelance', icono: '💻', color: '#8b5cf6' },
-          { nombre: 'Inversiones', icono: '📈', color: '#10b981' },
-          { nombre: 'Alquiler', icono: '🏠', color: '#f59e0b' },
-          { nombre: 'Ventas', icono: '🛍️', color: '#ec4899' },
-          { nombre: 'Otros', icono: '💵', color: '#6b7280' }
-        ]
-        const catIngRef = collection(db, 'categorias_ingresos')
-        for (const categoria of defaultCategoriasIngresos) {
-          const docData: any = { ...categoria, user_id: user.uid, created_at: serverTimestamp() }
-          if (isWorkspaceMode && latestWorkspace?.id) { 
-            docData.workspace_id = latestWorkspace.id
-            docData.created_by = user.uid 
+      // Medios Pago
+      if (snaps.mediosPago) {
+        setMediosPago(snaps.mediosPago.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as MedioPago[])
+      }
+
+      // Tags Ingresos
+      if (snaps.tagsIngresos) {
+        setTagsIngresos(snaps.tagsIngresos.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as TagIngreso[])
+      }
+
+      // --- CATEGORÍAS (pueden necesitar crear defaults) ---
+      if (snaps.categorias) {
+        let categoriasData = snaps.categorias.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, icono: doc.data().icono, color: doc.data().color, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as Categoria[]
+
+        const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwner
+        if (categoriasData.length === 0 && canCreateCategories) {
+          const defaultCategorias = [
+            { nombre: 'Comida', icono: '🍔', color: '#f97316' },
+            { nombre: 'Hogar', icono: '🏠', color: '#3b82f6' },
+            { nombre: 'Transporte', icono: '🚗', color: '#10b981' },
+            { nombre: 'Entretenimiento', icono: '🎮', color: '#8b5cf6' },
+            { nombre: 'Ropa', icono: '👕', color: '#ec4899' },
+            { nombre: 'Salud', icono: '💊', color: '#ef4444' },
+            { nombre: 'Educación', icono: '📚', color: '#06b6d4' },
+            { nombre: 'Otros', icono: '💰', color: '#6b7280' }
+          ]
+          const catRef = collection(db, 'categorias')
+          for (const cat of defaultCategorias) {
+            const docData: any = { ...cat, user_id: user.uid, created_at: serverTimestamp() }
+            if (isWorkspaceMode && latestWorkspace?.id) { docData.workspace_id = latestWorkspace.id; docData.created_by = user.uid }
+            await addDoc(catRef, docData)
           }
-          await addDoc(catIngRef, docData)
+          const newSnap = await getDocs(query(collection(db, 'categorias'), workspaceFilter, orderBy('created_at', 'desc')))
+          categoriasData = newSnap.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, icono: doc.data().icono, color: doc.data().color, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as Categoria[]
         }
-        const newSnap = await getDocs(categoriasIngresosQuery)
-        // En modo personal, mostrar TODOS los documentos del usuario
-        categoriasIngresosDocs = isWorkspaceMode 
-          ? newSnap.docs 
-          : newSnap.docs
-        categoriasIngresosData = categoriasIngresosDocs.map(doc => ({
-            id: doc.id,
-            user_id: doc.data().user_id,
-            nombre: doc.data().nombre,
-            icono: doc.data().icono,
-            color: doc.data().color,
-            created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-        })) as CategoriaIngreso[]
-      }
-      setCategoriasIngresos(categoriasIngresosData)
-      } catch (error: any) {
-        console.error('❌ [Firebase useData] Error fetching categorias_ingresos:', {
-          error: error.message,
-          code: error.code,
-          workspaceId: currentWorkspace?.id,
-          userId: user.uid
-        })
+        setCategorias(categoriasData)
       }
 
-      try {
-        console.log('📊 [Firebase useData] Fetching tags_ingresos...')
-        const tagsIngresosRef = collection(db, 'tags_ingresos')
-        const tagsIngresosQuery = query(tagsIngresosRef, workspaceFilter, orderBy('created_at', 'desc'))
-        const tagsIngresosSnap = await getDocs(tagsIngresosQuery)
-        console.log('✅ [Firebase useData] Tags ingresos fetched:', tagsIngresosSnap.docs.length)
-      // En modo personal, mostrar TODOS los documentos del usuario
-      const tagsIngresosDocs = isWorkspaceMode 
-        ? tagsIngresosSnap.docs 
-        : tagsIngresosSnap.docs
-      const tagsIngresosData = tagsIngresosDocs.map(doc => ({
-          id: doc.id,
-          user_id: doc.data().user_id,
-          nombre: doc.data().nombre,
-          created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at
-      })) as TagIngreso[]
-      setTagsIngresos(tagsIngresosData)
-      } catch (error: any) {
-        console.error('❌ [Firebase useData] Error fetching tags_ingresos:', {
-          error: error.message,
-          code: error.code,
-          workspaceId: currentWorkspace?.id,
-          userId: user.uid
-        })
+      // Categorías Ingresos (pueden necesitar crear defaults)
+      if (snaps.categoriasIngresos) {
+        let categoriasIngresosData = snaps.categoriasIngresos.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, icono: doc.data().icono, color: doc.data().color, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as CategoriaIngreso[]
+
+        const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwner
+        if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos) {
+          const defaultCategoriasIngresos = [
+            { nombre: 'Salario', icono: '💼', color: '#3b82f6' },
+            { nombre: 'Freelance', icono: '💻', color: '#8b5cf6' },
+            { nombre: 'Inversiones', icono: '📈', color: '#10b981' },
+            { nombre: 'Alquiler', icono: '🏠', color: '#f59e0b' },
+            { nombre: 'Ventas', icono: '🛍️', color: '#ec4899' },
+            { nombre: 'Otros', icono: '💵', color: '#6b7280' }
+          ]
+          const catIngRef = collection(db, 'categorias_ingresos')
+          for (const cat of defaultCategoriasIngresos) {
+            const docData: any = { ...cat, user_id: user.uid, created_at: serverTimestamp() }
+            if (isWorkspaceMode && latestWorkspace?.id) { docData.workspace_id = latestWorkspace.id; docData.created_by = user.uid }
+            await addDoc(catIngRef, docData)
+          }
+          const newSnap = await getDocs(query(collection(db, 'categorias_ingresos'), workspaceFilter, orderBy('created_at', 'desc')))
+          categoriasIngresosData = newSnap.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, icono: doc.data().icono, color: doc.data().color, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as CategoriaIngreso[]
+        }
+        setCategoriasIngresos(categoriasIngresosData)
       }
 
       const endTime = Date.now()
@@ -788,6 +464,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Pero no lanzar el error para evitar que el ErrorBoundary lo capture
     }
   }, [user, currentWorkspace])
+
+  // Public fetchAll: no limpia estado (para CRUD refetch)
+  const fetchAll = useCallback(async () => {
+    return fetchAllInternal(false)
+  }, [fetchAllInternal])
   // --- FIN FETCHALL ---
 
   // Usar useRef para rastrear si el componente está montado
@@ -891,8 +572,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         userId: user.uid
       })
       
-      // Llamar fetchAll - usará el currentWorkspace más reciente del useCallback
-      fetchAll().catch((error) => {
+      // Llamar fetchAll con clearFirst: true porque estamos cambiando de workspace/usuario
+      fetchAllInternal(true).catch((error) => {
         if (isMountedRef.current) {
           console.error('📊 [Firebase useData] Error en fetchAll:', error)
           // Resetear el ref si falla para permitir reintento
@@ -901,7 +582,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       })
     })
-  }, [user, authLoading, fetchAll, currentWorkspace?.id, initWorkspaceReady])
+  }, [user, authLoading, fetchAllInternal, currentWorkspace?.id, initWorkspaceReady])
 
   // Resetear refs cuando cambia el usuario
   useEffect(() => {
