@@ -1796,12 +1796,20 @@ export default function GastosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="page-title">Gastos</h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          <><span className="text-primary font-medium">{currentWorkspace?.name || personalWorkspaceName}</span> · </>
-          Consumos de {getMonthName(currentMonth)}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="page-title">Gastos</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            <><span className="text-primary font-medium">{currentWorkspace?.name || personalWorkspaceName}</span> · </>
+            {getMonthName(currentMonth)} · {gastosMes.length} registros
+          </p>
+        </div>
+        <button onClick={() => {
+          resetGastoForm();
+          setShowGastoModal(true)
+        }} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> Nuevo gasto
+        </button>
       </div>
 
       {/* Summary Stats */}
@@ -1857,24 +1865,8 @@ export default function GastosPage() {
 
       {/* Consumos Section */}
       <div className="card overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="card-title flex items-center gap-2">
-            Consumos
-            <span className="bg-primary-50 text-primary px-2 py-0.5 rounded-lg text-xs font-semibold">
-              {gastosMes.length}
-            </span>
-          </h3>
-          <button onClick={() => {
-            console.log('🔵 [GastosPage] "Agregar Gasto" button CLICKED')
-            resetGastoForm();
-            setShowGastoModal(true)
-          }} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> Agregar
-          </button>
-        </div>
-
         {/* Filters */}
-        <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
+        <div className="p-3 sm:p-4 bg-slate-50/50 border-b border-slate-100">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
             <div className="relative col-span-2 sm:col-span-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
