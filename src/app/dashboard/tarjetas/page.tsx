@@ -166,9 +166,9 @@ export default function TarjetasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Cuentas</h1>
-          <p className="text-slate-500">
-            <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
+          <h1 className="page-title">Cuentas</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            <><span className="text-primary font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
             Administrá tus cuentas y tarjetas ({tarjetas.length})
           </p>
         </div>

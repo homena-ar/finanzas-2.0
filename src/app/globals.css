@@ -28,21 +28,26 @@ body {
 }
 
 @layer components {
+  /* ===== BUTTONS ===== */
   .btn {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
     -webkit-user-select: none;
     user-select: none;
     touch-action: manipulation;
   }
-  
-  .btn-primary {
-    @apply bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5;
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg gap-1.5;
   }
-  
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0;
+  }
+
   .btn-success {
     @apply bg-emerald-500 text-white hover:bg-emerald-600;
   }
-  
+
   .btn-danger {
     @apply bg-red-500 text-white hover:bg-red-600;
   }
@@ -52,117 +57,147 @@ body {
   }
 
   .btn-secondary {
-    @apply bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200;
+    @apply bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 hover:border-slate-300;
   }
-  
+
+  /* ===== CARDS ===== */
   .card {
-    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-sm;
   }
-  
+
+  .stat-card {
+    @apply card p-5 hover:shadow-md transition-all duration-200;
+  }
+
+  /* ===== FORM ELEMENTS ===== */
   .input {
-    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 transition-colors;
+    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all;
     font-size: 16px; /* Evita zoom en iOS */
   }
-  
-  /* Estilos para selectores - Delicados y sutiles */
+
+  /* Estilos para selectores */
   select.input,
   select {
-    color: rgb(51, 65, 85) !important; /* slate-700 - texto medio oscuro */
-    background-color: rgb(255, 255, 255) !important; /* blanco limpio */
-    border-color: rgb(203, 213, 225) !important; /* slate-300 - borde suave */
+    color: rgb(51, 65, 85) !important;
+    background-color: rgb(255, 255, 255) !important;
+    border-color: rgb(203, 213, 225) !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
     font-weight: 400 !important;
-    padding-right: 2.5rem !important; /* Espacio adicional para la flecha del select */
+    padding-right: 2.5rem !important;
   }
-  
-  /* Cuando tiene foco - borde indigo suave */
+
   select.input:focus,
   select:focus {
-    color: rgb(30, 41, 59) !important; /* slate-800 */
-    border-color: rgb(129, 140, 248) !important; /* indigo-400 */
-    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1) !important;
+    color: rgb(30, 41, 59) !important;
+    border-color: rgb(129, 140, 248) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
   }
-  
-  /* Cuando tiene un valor seleccionado - muy sutil */
+
   select.input:not([value=""]),
   select:not([value=""]) {
-    color: rgb(30, 41, 59) !important; /* slate-800 */
-    background-color: rgb(248, 250, 252) !important; /* slate-50 - muy suave */
+    color: rgb(30, 41, 59) !important;
+    background-color: rgb(248, 250, 252) !important;
     font-weight: 500 !important;
   }
-  
-  /* Opciones del selector */
+
   select.input option,
   select option {
-    color: rgb(30, 41, 59) !important; /* slate-800 */
+    color: rgb(30, 41, 59) !important;
     background-color: white !important;
     padding: 8px;
     font-weight: 400 !important;
   }
-  
-  /* Hover - efecto sutil */
+
   select:hover:not(:disabled) {
-    border-color: rgb(148, 163, 184) !important; /* slate-400 */
+    border-color: rgb(148, 163, 184) !important;
   }
-  
-  /* Disabled - gris muy claro */
+
   select:disabled {
-    color: rgb(148, 163, 184) !important; /* slate-400 */
-    background-color: rgb(248, 250, 252) !important; /* slate-50 */
+    color: rgb(148, 163, 184) !important;
+    background-color: rgb(248, 250, 252) !important;
     cursor: not-allowed !important;
   }
-  
+
   .label {
-    @apply block text-xs font-bold text-slate-500 uppercase mb-1.5;
+    @apply block text-stat-label text-slate-500 uppercase tracking-wide mb-1.5;
   }
-  
+
+  /* ===== TAGS ===== */
   .tag {
-    @apply inline-flex px-3 py-1 rounded-full text-xs font-bold;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold;
   }
-  
+
   .tag-visa {
-    @apply bg-blue-100 text-blue-700;
+    @apply bg-blue-50 text-blue-700;
   }
-  
+
   .tag-mastercard {
-    @apply bg-red-100 text-red-700;
+    @apply bg-red-50 text-red-700;
   }
-  
+
   .tag-amex {
-    @apply bg-emerald-100 text-emerald-700;
+    @apply bg-emerald-50 text-emerald-700;
   }
-  
+
   .tag-other {
-    @apply bg-slate-100 text-slate-700;
+    @apply bg-slate-100 text-slate-600;
   }
-  
-  .stat-card {
-    @apply card p-5 hover:shadow-md transition-shadow;
-  }
-  
+
+  /* ===== MODALS ===== */
   .modal-overlay {
-    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4;
   }
-  
+
   .modal {
-    @apply bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto;
+    @apply bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl;
   }
-  
+
+  /* ===== SECTION HEADERS ===== */
+  .page-title {
+    @apply text-page text-slate-900;
+  }
+
+  .section-title {
+    @apply text-section text-slate-800;
+  }
+
+  .card-title {
+    @apply text-card-title text-slate-800;
+  }
+
+  /* ===== ANIMATIONS ===== */
   @keyframes progressBar {
-    0% { 
+    0% {
       background-position: 200% 0;
     }
-    100% { 
+    100% {
       background-position: -200% 0;
     }
   }
-  
+
   .progress-bar-animated {
-    background: linear-gradient(90deg, rgb(139, 92, 246) 0%, rgb(124, 58, 237) 50%, rgb(139, 92, 246) 100%);
+    background: linear-gradient(90deg, rgb(99, 102, 241) 0%, rgb(79, 70, 229) 50%, rgb(99, 102, 241) 100%);
     background-size: 200% 100%;
     animation: progressBar 2s ease-in-out infinite;
+  }
+
+  /* ===== CURRENCY TOGGLE ===== */
+  .currency-toggle {
+    @apply flex bg-slate-100 rounded-lg p-0.5;
+  }
+
+  .currency-toggle button {
+    @apply px-3 py-1 rounded-md text-xs font-medium transition-all duration-150;
+  }
+
+  .currency-toggle button.active {
+    @apply bg-white text-primary shadow-sm;
+  }
+
+  .currency-toggle button:not(.active) {
+    @apply text-slate-500 hover:text-slate-700;
   }
 }
 
@@ -173,7 +208,7 @@ body {
   }
 
   .modal {
-    @apply rounded-t-2xl rounded-b-none max-h-[95vh];
+    @apply rounded-t-2xl rounded-b-none max-h-[95vh] shadow-2xl;
     position: fixed;
     bottom: 0;
     left: 0;

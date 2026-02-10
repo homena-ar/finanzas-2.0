@@ -1318,10 +1318,10 @@ export default function IngresosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Ingresos</h1>
-          <p className="text-slate-500">
-            <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
-            {getMonthName(currentMonth)} - {ingresosMes.length} registros
+          <h1 className="page-title">Ingresos</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            <><span className="text-primary font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
+            {getMonthName(currentMonth)} · {ingresosMes.length} registros
           </p>
         </div>
         <button

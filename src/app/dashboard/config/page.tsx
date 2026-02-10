@@ -1150,14 +1150,14 @@ export default function ConfigPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="order-0">
-        <h1 className="text-2xl font-bold">Configuración</h1>
-        <p className="text-slate-500">Personalizá tu experiencia</p>
+        <h1 className="page-title">Configuración</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Personalizá tu experiencia</p>
       </div>
 
       {/* Espacios de trabajo - Unificado */}
       <div className="card p-5 order-1 mb-8">
         <div className="mb-6">
-          <h3 className="font-bold mb-2">🏠 Espacios de trabajo</h3>
+          <h3 className="section-title mb-2">Espacios de trabajo</h3>
           <p className="text-slate-500 text-sm">Gestioná tus finanzas personales y compartidas</p>
         </div>
 
@@ -2240,7 +2240,7 @@ export default function ConfigPage() {
 
       {/* Configuración financiera mensual */}
       <div className="card p-5 order-2 mb-8">
-        <h3 className="font-bold mb-6">🧩 Configuración financiera mensual</h3>
+        <h3 className="section-title mb-6">Configuración financiera mensual</h3>
         
         {/* Gestión de Ingresos */}
         <div className="mb-6">
@@ -2326,7 +2326,7 @@ export default function ConfigPage() {
             onClick={() => setExpandedCategoriasEtiquetas(!expandedCategoriasEtiquetas)}
             className="flex items-center gap-2 text-left flex-1 group"
           >
-            <h3 className="font-bold">📂 Categorías y Etiquetas</h3>
+            <h3 className="section-title">Categorías y etiquetas</h3>
             {expandedCategoriasEtiquetas ? (
               <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
             ) : (
@@ -2632,7 +2632,7 @@ export default function ConfigPage() {
 
       {/* Sección Cambio de Contraseña */}
       <div className="card p-5 order-4 mb-8">
-        <h3 className="font-bold mb-4">🔐 Seguridad</h3>
+        <h3 className="section-title mb-4">Seguridad</h3>
         {!showPasswordChange ? (
           <button
             onClick={() => setShowPasswordChange(true)}
@@ -2737,7 +2737,7 @@ export default function ConfigPage() {
 
       {/* Info */}
       <div className="card p-5 bg-slate-50 order-5 mb-8">
-        <h3 className="font-bold mb-2">ℹ️ Información</h3>
+        <h3 className="section-title mb-2">Información</h3>
         <div className="text-sm text-slate-600 space-y-1">
           <p><strong>Email:</strong> {profile?.email}</p>
           <p><strong>Usuario:</strong> {profile?.nombre}</p>
