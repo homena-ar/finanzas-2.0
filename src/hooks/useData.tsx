@@ -436,13 +436,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!snaps.impuestos) setImpuestos([])
       if (!snaps.ingresos) setIngresos([])
 
+      // --- AUTO-MIGRACIÓN: parchear documentos huérfanos (sin workspace_id) ---
+      // Solo para el workspace personal del owner, migrar docs viejos que solo tienen user_id
+      if (isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid) {
+        const orphanCollections = [
+          'movimientos_ahorro', 'metas', 'gastos', 'impuestos', 'ingresos',
+          'tarjetas', 'categorias', 'categorias_ingresos', 'tags', 'tags_ingresos', 'medios_pago'
+        ]
+        // Ejecutar migración en background (no bloquear UI)
+        Promise.all(orphanCollections.map(async (colName) => {
+          try {
+            const orphanSnap = await getDocs(query(
+              collection(db, colName),
+              where('user_id', '==', user.uid)
+            ))
+            const orphanDocs = orphanSnap.docs.filter(d => !d.data().workspace_id)
+            if (orphanDocs.length > 0) {
+              console.log(`🔧 [Migration] Patching ${orphanDocs.length} orphan docs in ${colName}`)
+              await Promise.all(orphanDocs.map(d =>
+                updateDoc(doc(db, colName, d.id), {
+                  workspace_id: latestWorkspace.id,
+                  created_by: d.data().created_by || user.uid
+                })
+              ))
+            }
+          } catch (e) {
+            // Silently ignore migration errors (permissions, etc.)
+          }
+        })).then(() => {
+          // Refetch to pick up migrated docs
+          if (isMountedRef.current) fetchAllInternal(false)
+        })
+      }
+
       const endTime = Date.now()
       console.log('✅ [Firebase useData] Data fetched successfully in', endTime - startTime, 'ms')
 
-      // IMPORTANTE: setLoading(false) debe ser lo ÚLTIMO para asegurar que todos los estados se hayan actualizado
-      // React batcheará todos los setState anteriores y luego re-renderizará con los nuevos valores
       setLoading(false)
-      console.log('📊 [Firebase useData] Loading set to false - React will re-render with updated states')
 
     } catch (error: any) {
       console.error('❌ [Firebase useData] Error general en fetchAll:', {
@@ -594,33 +624,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [gastos.length, ingresos.length, movimientos.length])
 
+  // Helper: obtener workspace_id obligatorio para inserción
+  // Bloquea creación si el workspace no está listo (previene documentos huérfanos)
+  const getWorkspaceFields = useCallback(() => {
+    if (!currentWorkspace?.id) {
+      throw new Error('Workspace no inicializado. Esperá a que cargue antes de agregar datos.')
+    }
+    return { workspace_id: currentWorkspace.id, created_by: user?.uid || '' }
+  }, [currentWorkspace, user])
+
   const addMovimiento = useCallback(async (tipo: 'pesos' | 'usd', monto: number, descripcion?: string) => {
-    if (!user) {
-      console.error('💵 [Firebase addMovimiento] No user!')
-      return { error: new Error('No user') }
-    }
-
-    console.log('💵 [Firebase addMovimiento] called - tipo:', tipo, 'monto:', monto, 'descripcion:', descripcion)
-    const insertData: any = {
-      tipo,
-      monto,
-      user_id: user.uid,
-      created_at: new Date().toISOString()
-    }
-    if (descripcion) insertData.descripcion = descripcion
-    if (currentWorkspace?.id) {
-      insertData.workspace_id = currentWorkspace.id
-      insertData.created_by = user.uid
-    }
-
+    if (!user) return { error: new Error('No user') }
     try {
+      const wsFields = getWorkspaceFields()
+      const insertData: any = {
+        tipo, monto, user_id: user.uid,
+        created_at: new Date().toISOString(),
+        ...wsFields
+      }
+      if (descripcion) insertData.descripcion = descripcion
       await addDoc(collection(db, 'movimientos_ahorro'), insertData)
       await fetchAll()
       return { error: null }
-    } catch (error) {
-      return { error }
-    }
-  }, [user, currentWorkspace, fetchAll])
+    } catch (error) { return { error } }
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateMovimiento = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -675,11 +702,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addMeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, completada: false, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { ...data, user_id: user.uid, completada: false, created_at: serverTimestamp(), ...wsFields }
       await addDoc(collection(db, 'metas'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateMeta = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -694,11 +721,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addTag = useCallback(async (nombre: string) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       await addDoc(collection(db, 'tags'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const deleteTag = useCallback(async (id: string) => {
     if (!user) return { error: new Error('No user') }
@@ -708,13 +735,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addCategoria = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       const docRef = await addDoc(collection(db, 'categorias'), insertData)
       await fetchAll()
       return { error: null, id: docRef.id }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateCategoria = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -729,11 +756,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addGasto = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       const docRef = await addDoc(collection(db, 'gastos'), insertData); await fetchAll(); return { error: null, data: { id: docRef.id, ...data } }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateGasto = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -748,13 +775,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
 const addTarjeta = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       const docRef = await addDoc(collection(db, 'tarjetas'), insertData)
       await fetchAll()
       return { error: null, id: docRef.id }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateTarjeta = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -769,16 +796,17 @@ const addTarjeta = useCallback(async (data: any) => {
   const addImpuesto = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { 
-        ...data, 
+      const wsFields = getWorkspaceFields()
+      const insertData: any = {
+        ...data,
         pagado: data.pagado !== undefined ? data.pagado : false,
-        user_id: user.uid, 
-        created_at: serverTimestamp() 
+        user_id: user.uid,
+        created_at: serverTimestamp(),
+        ...wsFields
       }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
       await addDoc(collection(db, 'impuestos'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateImpuesto = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -793,11 +821,11 @@ const addTarjeta = useCallback(async (data: any) => {
   const addMedioPago = useCallback(async (nombre: string) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       await addDoc(collection(db, 'medios_pago'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const deleteMedioPago = useCallback(async (id: string) => {
     if (!user) return { error: new Error('No user') }
@@ -807,45 +835,22 @@ const addTarjeta = useCallback(async (data: any) => {
   const addIngreso = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      // Asegurar que pendiente_cobro sea boolean
-      const insertData: any = { 
-        ...data, 
+      const wsFields = getWorkspaceFields()
+      const insertData: any = {
+        ...data,
         pendiente_cobro: data.pendiente_cobro === true,
-        user_id: user.uid, 
-        created_at: serverTimestamp() 
+        user_id: user.uid,
+        created_at: serverTimestamp(),
+        ...wsFields
       }
-      if (currentWorkspace?.id) { 
-        insertData.workspace_id = currentWorkspace.id
-        insertData.created_by = user.uid 
-      }
-      
-      console.log('🔵 [useData] Agregando ingreso con datos:', {
-        descripcion: insertData.descripcion,
-        pendiente_cobro: insertData.pendiente_cobro,
-        pendiente_cobro_type: typeof insertData.pendiente_cobro,
-        fecha_cobro_esperada: insertData.fecha_cobro_esperada,
-        fecha_cobro_confirmada: insertData.fecha_cobro_confirmada,
-        cuenta_bancaria_id: insertData.cuenta_bancaria_id,
-        notificar_correo: insertData.notificar_correo
-      })
-      
       const docRef = await addDoc(collection(db, 'ingresos'), insertData)
-      
-      console.log('✅ [useData] Ingreso agregado exitosamente a Firestore:', docRef.id, {
-        pendiente_cobro: insertData.pendiente_cobro,
-        fecha_cobro_esperada: insertData.fecha_cobro_esperada
-      })
-      
       await fetchAll()
-      
-      console.log('✅ [useData] Datos refrescados después de agregar ingreso')
-      
       return { error: null, data: { id: docRef.id, ...insertData } }
-    } catch (error) { 
+    } catch (error) {
       console.error('❌ [useData] Error agregando ingreso:', error)
-      return { error } 
+      return { error }
     }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateIngreso = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }
@@ -899,11 +904,11 @@ const addTarjeta = useCallback(async (data: any) => {
   const addTagIngreso = useCallback(async (nombre: string) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { nombre, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       await addDoc(collection(db, 'tags_ingresos'), insertData); await fetchAll(); return { error: null }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const deleteTagIngreso = useCallback(async (id: string) => {
     if (!user) return { error: new Error('No user') }
@@ -913,13 +918,13 @@ const addTarjeta = useCallback(async (data: any) => {
   const addCategoriaIngreso = useCallback(async (data: any) => {
     if (!user) return { error: new Error('No user') }
     try {
-      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp() }
-      if (currentWorkspace?.id) { insertData.workspace_id = currentWorkspace.id; insertData.created_by = user.uid }
+      const wsFields = getWorkspaceFields()
+      const insertData: any = { ...data, user_id: user.uid, created_at: serverTimestamp(), ...wsFields }
       const docRef = await addDoc(collection(db, 'categorias_ingresos'), insertData)
       await fetchAll()
       return { error: null, id: docRef.id }
     } catch (error) { return { error } }
-  }, [user, currentWorkspace, fetchAll])
+  }, [user, getWorkspaceFields, fetchAll])
 
   const updateCategoriaIngreso = useCallback(async (id: string, data: any) => {
     if (!user) return { error: new Error('No user') }

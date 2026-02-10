@@ -1375,110 +1375,104 @@ export default function IngresosPage() {
       {/* Ingresos List */}
       <div className="card overflow-hidden">
         {/* Filters */}
-        <div className="p-3 sm:p-4 bg-slate-50/50 border-b border-slate-100">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
-          <div className="relative col-span-2 sm:col-span-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="input pl-9 w-full"
-              value={filters.search}
-              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-            />
-          </div>
-          <select
-            className="input w-full"
-            value={filters.moneda}
-            onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
-          >
-            <option value="">Moneda</option>
-            <option value="ARS">ARS</option>
-            <option value="USD">USD</option>
-          </select>
-          <select
-            className="input w-full"
-            value={filters.categoria}
-            onChange={e => setFilters(f => ({ ...f, categoria: e.target.value }))}
-          >
-            <option value="">Categoría</option>
-            {categoriasIngresos.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.icono} {c.nombre}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input w-full"
-            value={filters.tag}
-            onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
-          >
-            <option value="">Tag</option>
-            {tagsIngresos.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input w-full"
-            value={filters.cuenta}
-            onChange={e => setFilters(f => ({ ...f, cuenta: e.target.value }))}
-          >
-            <option value="">Cuenta</option>
-            {tarjetas.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input w-full"
-            value={filters.pendiente}
-            onChange={e => setFilters(f => ({ ...f, pendiente: e.target.value }))}
-          >
-            <option value="">Estado</option>
-            <option value="si">Pendientes</option>
-            <option value="no">Confirmados</option>
-          </select>
-          <select
-            className="input w-full col-span-2 sm:col-span-1"
-            value={filters.sort}
-            onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
-          >
-            <option value="monto-desc">Mayor a menor</option>
-            <option value="monto-asc">Menor a mayor</option>
-            <option value="fecha-desc">Más recientes</option>
-            <option value="fecha-asc">Más antiguos</option>
-            <option value="descripcion-asc">A-Z</option>
-            <option value="descripcion-desc">Z-A</option>
-          </select>
-          {currentWorkspace && members.length > 0 && (
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50/50 border-b border-slate-100">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="input-compact pl-7 w-40"
+                value={filters.search}
+                onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+              />
+            </div>
             <select
-              className="input w-full"
-              value={filters.colaborador}
-              onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
+              className="input-compact w-auto min-w-[75px]"
+              value={filters.moneda}
+              onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
             >
-              <option value="">Colaborador</option>
-              <option value="yo">Tú</option>
-              {currentWorkspace.owner_id !== user?.uid && (
-                <option value="propietario">
-                  {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
-                   members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
-                   'Propietario'}
-                </option>
-              )}
-              {members
-                .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
-                .map(m => (
-                  <option key={m.id} value={m.user_id}>
-                    {m.display_name || m.user_email.split('@')[0]}
-                  </option>
-                ))}
+              <option value="">Moneda</option>
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
             </select>
-          )}
+            <select
+              className="input-compact w-auto min-w-[100px]"
+              value={filters.categoria}
+              onChange={e => setFilters(f => ({ ...f, categoria: e.target.value }))}
+            >
+              <option value="">Categoría</option>
+              {categoriasIngresos.map(c => (
+                <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+              ))}
+            </select>
+            <select
+              className="input-compact w-auto min-w-[80px]"
+              value={filters.tag}
+              onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
+            >
+              <option value="">Etiqueta</option>
+              {tagsIngresos.map(t => (
+                <option key={t.id} value={t.id}>{t.nombre}</option>
+              ))}
+            </select>
+            <select
+              className="input-compact w-auto min-w-[90px]"
+              value={filters.cuenta}
+              onChange={e => setFilters(f => ({ ...f, cuenta: e.target.value }))}
+            >
+              <option value="">Cuenta</option>
+              {tarjetas.map(t => (
+                <option key={t.id} value={t.id}>{t.nombre}</option>
+              ))}
+            </select>
+            <select
+              className="input-compact w-auto min-w-[90px]"
+              value={filters.pendiente}
+              onChange={e => setFilters(f => ({ ...f, pendiente: e.target.value }))}
+            >
+              <option value="">Estado</option>
+              <option value="si">Pendientes</option>
+              <option value="no">Confirmados</option>
+            </select>
+            <select
+              className="input-compact w-auto min-w-[110px]"
+              value={filters.sort}
+              onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
+            >
+              <option value="monto-desc">Mayor a menor</option>
+              <option value="monto-asc">Menor a mayor</option>
+              <option value="fecha-desc">Más recientes</option>
+              <option value="fecha-asc">Más antiguos</option>
+              <option value="descripcion-asc">A-Z</option>
+              <option value="descripcion-desc">Z-A</option>
+            </select>
+            {currentWorkspace && members.length > 0 && (
+              <select
+                className="input-compact w-auto min-w-[100px]"
+                value={filters.colaborador}
+                onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
+              >
+                <option value="">Colaborador</option>
+                <option value="yo">Tú</option>
+                {currentWorkspace.owner_id !== user?.uid && (
+                  <option value="propietario">
+                    {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name ||
+                     members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] ||
+                     'Propietario'}
+                  </option>
+                )}
+                {members
+                  .filter(m => m.workspace_id === currentWorkspace.id && m.user_id !== user?.uid && m.user_id !== currentWorkspace.owner_id)
+                  .map(m => (
+                    <option key={m.id} value={m.user_id}>
+                      {m.display_name || m.user_email.split('@')[0]}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
         </div>
-      </div>
 
         {/* Acciones masivas */}
         {selectedIngresos.size > 0 && (
