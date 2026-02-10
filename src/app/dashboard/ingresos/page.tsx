@@ -1328,7 +1328,7 @@ export default function IngresosPage() {
           onClick={() => { resetForm(); setEditing(null); setShowModal(true) }}
           className="btn btn-primary"
         >
-          <Plus className="w-4 h-4" /> Nuevo Ingreso
+          <Plus className="w-4 h-4" /> Nuevo ingreso
         </button>
       </div>
 
@@ -1372,8 +1372,10 @@ export default function IngresosPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
+      {/* Ingresos List */}
+      <div className="card overflow-hidden">
+        {/* Filters */}
+        <div className="p-3 sm:p-4 bg-slate-50/50 border-b border-slate-100">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
           <div className="relative col-span-2 sm:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1478,8 +1480,6 @@ export default function IngresosPage() {
         </div>
       </div>
 
-      {/* Ingresos List */}
-      <div className="card">
         {/* Acciones masivas */}
         {selectedIngresos.size > 0 && (
           <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between flex-wrap gap-2">
