@@ -468,16 +468,16 @@ export default function AhorrosPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Ahorros y Metas</h1>
-        <p className="text-slate-500">
-          <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
-          Construí tu futuro 🚀
+        <h1 className="page-title">Ahorros y metas</h1>
+        <p className="text-sm text-slate-500 mt-0.5">
+          <><span className="text-primary font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
+          Construí tu futuro
         </p>
       </div>
 
       {/* Patrimonio Hero - SEPARADO */}
-      <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 rounded-2xl p-6 text-white">
-        <div className="text-sm opacity-80 mb-4">💰 Patrimonio Total</div>
+      <div className="bg-gradient-to-r from-primary via-accent to-emerald-500 rounded-2xl p-6 text-white">
+        <div className="text-xs font-medium uppercase tracking-wider opacity-80 mb-4">Patrimonio total</div>
 
         {/* Valores separados */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -745,7 +745,7 @@ export default function AhorrosPage() {
       {/* Metas */}
       <div className="card p-5">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-lg">🎯 Metas</h3>
+          <h3 className="section-title">Metas</h3>
           <button onClick={() => { resetMetaForm(); setEditingMeta(null); setShowMetaModal(true) }} className="btn btn-primary">
             <Plus className="w-4 h-4" /> Nueva
           </button>

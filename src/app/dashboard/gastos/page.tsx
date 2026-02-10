@@ -1792,19 +1792,19 @@ export default function GastosPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Gastos</h1>
-        <p className="text-slate-500">
-          <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || personalWorkspaceName}</span> · </>
+        <h1 className="page-title">Gastos</h1>
+        <p className="text-sm text-slate-500 mt-0.5">
+          <><span className="text-primary font-medium">{currentWorkspace?.name || personalWorkspaceName}</span> · </>
           Consumos de {getMonthName(currentMonth)}
         </p>
       </div>
 
       {/* Consumos Section */}
       <div className="card overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-bold flex items-center gap-2">
+        <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h3 className="card-title flex items-center gap-2">
             Consumos
-            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-bold">
+            <span className="bg-primary-50 text-primary px-2 py-0.5 rounded-lg text-xs font-semibold">
               {gastosMes.length}
             </span>
           </h3>
@@ -2167,10 +2167,10 @@ export default function GastosPage() {
 
       {/* Impuestos Section */}
       <div className="card overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="font-bold flex items-center gap-2">
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="card-title flex items-center gap-2">
             Impuestos
-            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-bold">
+            <span className="bg-primary-50 text-primary px-2 py-0.5 rounded-lg text-xs font-semibold">
               {impuestosMes.length}
             </span>
           </h3>

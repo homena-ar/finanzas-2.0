@@ -191,9 +191,9 @@ export default function ProyeccionPage() {
       className="space-y-6"
     >
       <motion.div variants={itemVariants}>
-        <h1 className="text-2xl font-bold">Proyección</h1>
-        <p className="text-slate-500">
-          <><span className="text-indigo-600 font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
+        <h1 className="page-title">Proyección</h1>
+        <p className="text-sm text-slate-500 mt-0.5">
+          <><span className="text-primary font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
           Mirá cómo vienen los próximos 12 meses
         </p>
       </motion.div>
@@ -201,7 +201,7 @@ export default function ProyeccionPage() {
       {/* Gráfico de Proyección */}
       {showIngresos && (
         <motion.div variants={itemVariants} className="card p-5">
-          <h3 className="font-bold mb-4">📈 Proyección de Ingresos vs Gastos (12 meses)</h3>
+          <h3 className="card-title mb-4">Proyección de ingresos vs gastos (12 meses)</h3>
           <div className="h-80">
             <Line data={chartData} options={chartOptions} />
           </div>
@@ -211,7 +211,7 @@ export default function ProyeccionPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Próximos 12 meses */}
         <motion.div variants={itemVariants} className="card p-5">
-          <h3 className="font-bold mb-4">📅 Próximos 12 Meses</h3>
+          <h3 className="card-title mb-4">Próximos 12 meses</h3>
           <div className="space-y-2">
             {proyeccion.map(p => (
               <div key={p.mesKey} className="py-3 border-b border-slate-100 last:border-0">
@@ -248,7 +248,7 @@ export default function ProyeccionPage() {
 
         {/* Gastos Fijos */}
         <motion.div variants={itemVariants} className="card p-5">
-          <h3 className="font-bold mb-4">🔄 Gastos Fijos</h3>
+          <h3 className="card-title mb-4">Gastos fijos</h3>
           {fijos.length === 0 ? (
             <p className="text-slate-400 text-center py-8">Sin gastos fijos</p>
           ) : (
@@ -281,7 +281,7 @@ export default function ProyeccionPage() {
       {/* Cuotas Pendientes */}
       <motion.div variants={itemVariants} className="card overflow-hidden">
         <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <h3 className="font-bold">📊 Cuotas Pendientes</h3>
+          <h3 className="card-title">Cuotas pendientes</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
