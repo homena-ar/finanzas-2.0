@@ -7,6 +7,12 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont',
+          '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif',
+        ],
+      },
       colors: {
         primary: {
           50: '#eef2ff',
@@ -34,11 +40,11 @@ module.exports = {
         },
       },
       fontSize: {
-        'page': ['1.5rem', { lineHeight: '2rem', fontWeight: '700' }],
-        'section': ['1.125rem', { lineHeight: '1.75rem', fontWeight: '600' }],
-        'card-title': ['0.9375rem', { lineHeight: '1.5rem', fontWeight: '600' }],
-        'stat-value': ['1.25rem', { lineHeight: '1.75rem', fontWeight: '700' }],
-        'stat-label': ['0.6875rem', { lineHeight: '1rem', fontWeight: '500', letterSpacing: '0.025em' }],
+        'page': ['1.375rem', { lineHeight: '1.75rem', fontWeight: '600', letterSpacing: '-0.01em' }],
+        'section': ['1.0625rem', { lineHeight: '1.5rem', fontWeight: '600', letterSpacing: '-0.005em' }],
+        'card-title': ['0.875rem', { lineHeight: '1.25rem', fontWeight: '500' }],
+        'stat-value': ['1.125rem', { lineHeight: '1.5rem', fontWeight: '600', letterSpacing: '-0.01em' }],
+        'stat-label': ['0.6875rem', { lineHeight: '1rem', fontWeight: '500', letterSpacing: '0.03em' }],
       },
     },
   },

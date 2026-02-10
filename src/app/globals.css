@@ -30,18 +30,18 @@ body {
 @layer components {
   /* ===== BUTTONS ===== */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg font-medium text-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
     -webkit-user-select: none;
     user-select: none;
     touch-action: manipulation;
   }
 
   .btn-sm {
-    @apply px-3 py-1.5 text-xs rounded-lg gap-1.5;
+    @apply px-2.5 py-1.5 text-xs rounded-md gap-1;
   }
 
   .btn-primary {
-    @apply bg-primary text-white hover:bg-primary-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0;
+    @apply bg-primary text-white hover:bg-primary-600 active:bg-primary-700;
   }
 
   .btn-success {
@@ -62,51 +62,58 @@ body {
 
   /* ===== CARDS ===== */
   .card {
-    @apply bg-white rounded-2xl border border-slate-200/80 shadow-sm;
+    @apply bg-white rounded-xl border border-slate-200/60 shadow-sm;
   }
 
   .stat-card {
-    @apply card p-5 hover:shadow-md transition-all duration-200;
+    @apply card p-4 hover:shadow-md transition-shadow duration-200;
   }
 
   /* ===== FORM ELEMENTS ===== */
   .input {
-    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all;
-    font-size: 16px; /* Evita zoom en iOS */
+    @apply px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 placeholder:text-slate-400
+           focus:outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100 transition-colors;
+    font-size: 14px;
+  }
+
+  /* Compact input variant for filters */
+  .input-compact {
+    @apply px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600
+           focus:outline-none focus:border-primary-400 focus:bg-white focus:ring-1 focus:ring-primary-100 transition-all;
+    font-size: 13px;
   }
 
   /* Estilos para selectores */
   select.input,
+  select.input-compact,
   select {
-    color: rgb(51, 65, 85) !important;
-    background-color: rgb(255, 255, 255) !important;
-    border-color: rgb(203, 213, 225) !important;
+    color: rgb(71, 85, 105) !important;
+    background-color: rgb(248, 250, 252) !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
     font-weight: 400 !important;
-    padding-right: 2.5rem !important;
+    padding-right: 2rem !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.5rem center !important;
   }
 
   select.input:focus,
+  select.input-compact:focus,
   select:focus {
     color: rgb(30, 41, 59) !important;
+    background-color: white !important;
     border-color: rgb(129, 140, 248) !important;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
-  }
-
-  select.input:not([value=""]),
-  select:not([value=""]) {
-    color: rgb(30, 41, 59) !important;
-    background-color: rgb(248, 250, 252) !important;
-    font-weight: 500 !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.08) !important;
   }
 
   select.input option,
+  select.input-compact option,
   select option {
     color: rgb(30, 41, 59) !important;
     background-color: white !important;
-    padding: 8px;
+    padding: 6px;
     font-weight: 400 !important;
   }
 
@@ -121,50 +128,50 @@ body {
   }
 
   .label {
-    @apply block text-stat-label text-slate-500 uppercase tracking-wide mb-1.5;
+    @apply block text-stat-label text-slate-500 uppercase tracking-wide mb-1;
   }
 
   /* ===== TAGS ===== */
   .tag {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold;
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
   }
 
   .tag-visa {
-    @apply bg-blue-50 text-blue-700;
+    @apply bg-blue-50 text-blue-600;
   }
 
   .tag-mastercard {
-    @apply bg-red-50 text-red-700;
+    @apply bg-red-50 text-red-600;
   }
 
   .tag-amex {
-    @apply bg-emerald-50 text-emerald-700;
+    @apply bg-emerald-50 text-emerald-600;
   }
 
   .tag-other {
-    @apply bg-slate-100 text-slate-600;
+    @apply bg-slate-50 text-slate-500;
   }
 
   /* ===== MODALS ===== */
   .modal-overlay {
-    @apply fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4;
   }
 
   .modal {
-    @apply bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl;
+    @apply bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl;
   }
 
   /* ===== SECTION HEADERS ===== */
   .page-title {
-    @apply text-page text-slate-900;
+    @apply text-page text-slate-800;
   }
 
   .section-title {
-    @apply text-section text-slate-800;
+    @apply text-section text-slate-700;
   }
 
   .card-title {
-    @apply text-card-title text-slate-800;
+    @apply text-card-title text-slate-700;
   }
 
   /* ===== ANIMATIONS ===== */
@@ -204,15 +211,19 @@ body {
 /* Mejoras de responsive */
 @media (max-width: 640px) {
   .card {
-    @apply rounded-xl;
+    @apply rounded-lg;
   }
 
   .modal {
-    @apply rounded-t-2xl rounded-b-none max-h-[95vh] shadow-2xl;
+    @apply rounded-t-xl rounded-b-none max-h-[95vh] shadow-2xl;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
+  }
+
+  .input {
+    font-size: 16px; /* Evita zoom en iOS */
   }
 }
 
@@ -226,13 +237,12 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {

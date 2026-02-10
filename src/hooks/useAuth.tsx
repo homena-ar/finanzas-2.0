@@ -449,8 +449,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       await setDoc(doc(db, 'profiles', userCredential.user.uid), defaultProfile)
 
-      // Create default categorias
-      await createDefaultCategorias(userCredential.user.uid)
+      // Las categorías por defecto se crean automáticamente en useData.fetchAllInternal
+      // cuando detecta colecciones vacías, ya con el workspace_id correcto
 
       // Enviar correo de verificación personalizado (en lugar del de Firebase)
       // Esperar un momento para asegurar que Firebase Admin SDK pueda encontrar el usuario

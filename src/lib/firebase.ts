@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
+import { getAuth, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 // Validar que todas las variables de Firebase estén configuradas
@@ -38,9 +38,13 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 const auth = getAuth(app)
 const db = getFirestore(app)
 
-// NOTA: No llamamos setPersistence() aquí porque:
-// 1. browserLocalPersistence es el valor por defecto
-// 2. Llamarlo repetidamente puede borrar sesiones existentes en otras pestañas
-// 3. En iOS Safari, IndexedDB puede ser poco confiable, así que usamos un sistema de respaldo manual
+// Forzar IndexedDB como persistencia primaria para PWA en móviles
+// IndexedDB persiste mejor que localStorage cuando la app se cierra/backgroundea
+if (typeof window !== 'undefined') {
+  setPersistence(auth, indexedDBLocalPersistence).catch(() => {
+    // Fallback a localStorage si IndexedDB no está disponible
+    setPersistence(auth, browserLocalPersistence).catch(() => {})
+  })
+}
 
 export { app, auth, db }

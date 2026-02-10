@@ -1866,20 +1866,20 @@ export default function GastosPage() {
       {/* Consumos Section */}
       <div className="card overflow-hidden">
         {/* Filters */}
-        <div className="p-3 sm:p-4 bg-slate-50/50 border-b border-slate-100">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
-            <div className="relative col-span-2 sm:col-span-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50/50 border-b border-slate-100">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Buscar..."
-                className="input pl-9 w-full"
+                className="input-compact pl-7 w-40"
                 value={filters.search}
                 onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
               />
             </div>
             <select
-              className="input w-full"
+              className="input-compact w-auto min-w-[90px]"
               value={filters.tarjeta}
               onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
             >
@@ -1887,7 +1887,7 @@ export default function GastosPage() {
               {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
             </select>
             <select
-              className="input w-full"
+              className="input-compact w-auto min-w-[75px]"
               value={filters.moneda}
               onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
             >
@@ -1896,16 +1896,16 @@ export default function GastosPage() {
               <option value="USD">USD</option>
             </select>
             <select
-              className="input w-full"
+              className="input-compact w-auto min-w-[90px]"
               value={filters.tag}
               onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
             >
-              <option value="">Etiquetas</option>
+              <option value="">Etiqueta</option>
               {tags.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
             </select>
             {currentWorkspace && members.length > 0 && (
               <select
-                className="input w-full"
+                className="input-compact w-auto min-w-[100px]"
                 value={filters.colaborador}
                 onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
               >
@@ -1928,7 +1928,7 @@ export default function GastosPage() {
               </select>
             )}
             <select
-              className="input w-full"
+              className="input-compact w-auto min-w-[110px]"
               value={filters.sort}
               onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
             >
