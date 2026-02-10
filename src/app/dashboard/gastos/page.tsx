@@ -6,7 +6,7 @@ import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace' // Importamos para identificar al usuario
 import { useAuth } from '@/hooks/useAuth' // Importamos para saber "quién soy yo"
 import { formatMoney, getMonthName, getTagClass, formatDateSafe, normalizeAccountName } from '@/lib/utils'
-import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Pin, X, Download, Upload, Image as ImageIcon, Loader2, CheckCircle2, TrendingUp, CreditCard, DollarSign, Receipt } from 'lucide-react'
 import { Gasto, Impuesto } from '@/types'
 import { ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
@@ -281,6 +281,11 @@ export default function GastosPage() {
   const sortParts = filters.sort.split('-')
   const [sortField, sortDir] = sortParts.length === 2 ? sortParts : ['monto', 'desc']
   gastosMes.sort((a, b) => {
+    if (sortField === 'descripcion') {
+      return sortDir === 'asc'
+        ? a.descripcion.localeCompare(b.descripcion)
+        : b.descripcion.localeCompare(a.descripcion)
+    }
     let vA, vB
     if (sortField === 'monto') {
       vA = a.cuotas > 1 ? a.monto / a.cuotas : a.monto
@@ -1799,6 +1804,57 @@ export default function GastosPage() {
         </p>
       </div>
 
+      {/* Summary Stats */}
+      {(() => {
+        let sumARS = 0, sumUSD = 0, sumFijos = 0, sumImp = 0
+        gastosMes.filter(g => !g.pagado).forEach(g => {
+          const m = g.cuotas > 1 ? g.monto / g.cuotas : g.monto
+          if (g.moneda === 'USD') sumUSD += m
+          else { sumARS += m; if (g.es_fijo) sumFijos += m }
+        })
+        sumImp = impuestosMes.reduce((s, i) => s + i.monto, 0)
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="stat-card">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-red-500" />
+                </div>
+                <div className="text-stat-label text-slate-400 uppercase">Total ARS</div>
+              </div>
+              <div className="text-stat-value text-red-600">{formatMoney(sumARS + sumImp)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="text-stat-label text-slate-400 uppercase">Total USD</div>
+              </div>
+              <div className="text-stat-value text-emerald-600">{formatMoney(sumUSD, 'USD')}</div>
+            </div>
+            <div className="stat-card">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 bg-accent-50 rounded-xl flex items-center justify-center">
+                  <Pin className="w-4 h-4 text-accent" />
+                </div>
+                <div className="text-stat-label text-slate-400 uppercase">Fijos</div>
+              </div>
+              <div className="text-stat-value">{formatMoney(sumFijos)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+                  <Receipt className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="text-stat-label text-slate-400 uppercase">Impuestos</div>
+              </div>
+              <div className="text-stat-value">{formatMoney(sumImp)}</div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Consumos Section */}
       <div className="card overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1821,17 +1877,17 @@ export default function GastosPage() {
         <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
             <div className="relative col-span-2 sm:col-span-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Buscar..."
-                className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+                className="input pl-9 w-full"
                 value={filters.search}
                 onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
               />
             </div>
             <select
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              className="input w-full"
               value={filters.tarjeta}
               onChange={e => setFilters(f => ({ ...f, tarjeta: e.target.value }))}
             >
@@ -1839,7 +1895,7 @@ export default function GastosPage() {
               {tarjetas.map(t => <option key={t.id} value={t.id}>{normalizeAccountName(t.nombre)}</option>)}
             </select>
             <select
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              className="input w-full"
               value={filters.moneda}
               onChange={e => setFilters(f => ({ ...f, moneda: e.target.value }))}
             >
@@ -1848,7 +1904,7 @@ export default function GastosPage() {
               <option value="USD">USD</option>
             </select>
             <select
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              className="input w-full"
               value={filters.tag}
               onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
             >
@@ -1857,7 +1913,7 @@ export default function GastosPage() {
             </select>
             {currentWorkspace && members.length > 0 && (
               <select
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+                className="input w-full"
                 value={filters.colaborador}
                 onChange={e => setFilters(f => ({ ...f, colaborador: e.target.value }))}
               >
@@ -1865,8 +1921,8 @@ export default function GastosPage() {
                 <option value="yo">Tú</option>
                 {currentWorkspace.owner_id !== user?.uid && (
                   <option value="propietario">
-                    {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name || 
-                     members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] || 
+                    {members.find(m => m.user_id === currentWorkspace.owner_id)?.display_name ||
+                     members.find(m => m.user_id === currentWorkspace.owner_id)?.user_email?.split('@')[0] ||
                      'Propietario'}
                   </option>
                 )}
@@ -1880,13 +1936,16 @@ export default function GastosPage() {
               </select>
             )}
             <select
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 transition-colors"
+              className="input w-full"
               value={filters.sort}
               onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
             >
-              <option value="monto-desc">Mayor $</option>
-              <option value="monto-asc">Menor $</option>
-              <option value="fecha-desc">Reciente</option>
+              <option value="monto-desc">Mayor a menor</option>
+              <option value="monto-asc">Menor a mayor</option>
+              <option value="fecha-desc">Más recientes</option>
+              <option value="fecha-asc">Más antiguos</option>
+              <option value="descripcion-asc">A-Z</option>
+              <option value="descripcion-desc">Z-A</option>
             </select>
           </div>
         </div>

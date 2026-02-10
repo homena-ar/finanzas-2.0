@@ -1,15 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Mail, Lock, Loader2, X } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, Loader2, X, Check } from 'lucide-react'
+
+// Password requirements
+const PASSWORD_RULES = [
+  { key: 'length', label: 'Mínimo 6 caracteres', test: (p: string) => p.length >= 6 },
+  { key: 'upper', label: 'Una letra mayúscula', test: (p: string) => /[A-Z]/.test(p) },
+  { key: 'lower', label: 'Una letra minúscula', test: (p: string) => /[a-z]/.test(p) },
+  { key: 'number', label: 'Un número', test: (p: string) => /[0-9]/.test(p) },
+]
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -21,14 +31,20 @@ export default function LoginPage() {
   const { signIn, signUp, user, loading: authLoading, sendPasswordReset } = useAuth()
   const router = useRouter()
 
+  // Real-time password validation
+  const passwordChecks = useMemo(() =>
+    PASSWORD_RULES.map(rule => ({ ...rule, passed: rule.test(password) })),
+    [password]
+  )
+  const allPasswordChecksPassed = passwordChecks.every(c => c.passed)
+  const passwordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword
+
   // Redirect to dashboard when user is authenticated AND email is verified
   useEffect(() => {
     if (!authLoading && user) {
-      // Si el correo no está verificado, redirigir a la página de verificación
       if (!user.emailVerified) {
         router.push('/verificar-email')
       } else {
-        // Solo redirigir al dashboard si el correo está verificado
         router.push('/dashboard/gastos')
       }
     }
@@ -40,9 +56,8 @@ export default function LoginPage() {
     const resetPassword = params.get('resetPassword')
     const oobCode = params.get('oobCode')
     const mode = params.get('mode')
-    
+
     if (resetPassword || (oobCode && mode === 'resetPassword')) {
-      // Redirigir a la página de restablecer contraseña
       router.push(`/restablecer-password${oobCode ? `?oobCode=${oobCode}&mode=${mode}` : ''}`)
     }
   }, [router])
@@ -51,28 +66,36 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setSuccess('')
-    setLoading(true)
 
     if (isLogin) {
+      setLoading(true)
       const { error, needsVerification } = await signIn(email, password)
       if (error) {
         const message = error instanceof Error ? error.message : String(error)
         setError(message)
         setLoading(false)
       } else if (needsVerification) {
-        // Redirigir a la página de verificación
         router.push('/verificar-email')
         setLoading(false)
       }
-      // Don't navigate here - let useEffect handle it when user is ready
     } else {
+      // Registration validation
+      if (!allPasswordChecksPassed) {
+        setError('La contraseña no cumple todos los requisitos')
+        return
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden')
+        return
+      }
+
+      setLoading(true)
       const { error } = await signUp(email, password)
       if (error) {
         const message = error instanceof Error ? error.message : String(error)
         setError(message)
       } else {
         setSuccess('¡Cuenta creada! Revisá tu email para confirmar tu cuenta.')
-        // Redirigir inmediatamente a la página de verificación después del registro
         router.push('/verificar-email')
       }
       setLoading(false)
@@ -94,7 +117,6 @@ export default function LoginPage() {
     const { error } = await sendPasswordReset(forgotPasswordEmail)
     if (error) {
       const message = error instanceof Error ? error.message : String(error)
-      // Traducir mensajes específicos
       if (message.includes('user-not-found') || message.includes('no existe una cuenta')) {
         setError('No existe una cuenta con este correo electrónico')
       } else if (message.includes('too-many-requests') || message.includes('demasiados intentos')) {
@@ -109,14 +131,13 @@ export default function LoginPage() {
     setForgotPasswordLoading(false)
   }
 
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-accent-600 to-pink-500 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur rounded-2xl mb-4">
-            <svg className="w-12 h-12" viewBox="0 0 100 100" fill="none">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl mb-4 shadow-lg shadow-black/10">
+            <svg className="w-9 h-9" viewBox="0 0 100 100" fill="none">
               <g fill="white">
                 <rect x="25" y="45" width="10" height="30" rx="2"/>
                 <rect x="45" y="35" width="10" height="40" rx="2"/>
@@ -126,125 +147,179 @@ export default function LoginPage() {
               </g>
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white">FinControl</h1>
-          <p className="text-white/80 mt-2">Controlá tus finanzas personales</p>
+          <h1 className="text-2xl font-bold text-white">FinControl</h1>
+          <p className="text-white/70 mt-1 text-sm">Controlá tus finanzas personales</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8">
-          <h2 className="text-2xl font-bold text-center mb-6">
-            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-          </h2>
+        <div className="bg-white rounded-2xl shadow-2xl shadow-black/20 overflow-hidden">
+          {/* Tab Toggle */}
+          <div className="flex border-b border-slate-100">
+            <button
+              onClick={() => { setIsLogin(true); setError(''); setSuccess('') }}
+              className={`flex-1 py-3.5 text-sm font-semibold transition-colors ${
+                isLogin ? 'text-primary border-b-2 border-primary' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Iniciar sesión
+            </button>
+            <button
+              onClick={() => { setIsLogin(false); setError(''); setSuccess('') }}
+              className={`flex-1 py-3.5 text-sm font-semibold transition-colors ${
+                !isLogin ? 'text-primary border-b-2 border-primary' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Crear cuenta
+            </button>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div>
-              <label className="label">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-12"
-                  placeholder="tu@email.com"
-                  required
-                />
+          <div className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Email */}
+              <div>
+                <label className="label">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input pl-10"
+                    placeholder="tu@email.com"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="label mb-0">Contraseña</label>
-                {isLogin && (
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="label mb-0">Contraseña</label>
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(true)
+                        setError('')
+                        setSuccess('')
+                      }}
+                      className="text-xs text-primary hover:text-primary-700 font-medium"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input pl-10 pr-10"
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                  />
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowForgotPassword(true)
-                      setError('')
-                      setSuccess('')
-                    }}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
                   >
-                    ¿Olvidaste tu contraseña?
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
-                )}
+                </div>
               </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-12 pr-12"
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
 
-            {/* Error */}
-            {error && (
-              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Success */}
-            {success && (
-              <div className="bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-sm">
-                {success}
-              </div>
-            )}
-
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-primary w-full justify-center py-3"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isLogin ? (
-                'Ingresar'
-              ) : (
-                'Crear Cuenta'
+              {/* Password Requirements - only in registration mode */}
+              {!isLogin && password.length > 0 && (
+                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+                  {passwordChecks.map(check => (
+                    <div key={check.key} className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors ${
+                        check.passed ? 'bg-emerald-500' : 'bg-slate-200'
+                      }`}>
+                        {check.passed && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <span className={`text-xs ${check.passed ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+                        {check.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Toggle */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsLogin(!isLogin)
-                setError('')
-                setSuccess('')
-                setShowForgotPassword(false)
-              }}
-              className="text-indigo-600 hover:text-indigo-700 font-medium"
-            >
-              {isLogin ? '¿No tenés cuenta? Registrate' : '¿Ya tenés cuenta? Ingresá'}
-            </button>
+              {/* Confirm Password - only in registration mode */}
+              {!isLogin && (
+                <div>
+                  <label className="label">Confirmar contraseña</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={`input pl-10 pr-10 ${
+                        confirmPassword.length > 0
+                          ? passwordsMatch
+                            ? 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100'
+                            : 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                          : ''
+                      }`}
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword.length > 0 && !passwordsMatch && (
+                    <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden</p>
+                  )}
+                </div>
+              )}
+
+              {/* Error */}
+              {error && (
+                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
+
+              {/* Success */}
+              {success && (
+                <div className="bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-sm">
+                  {success}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading || (!isLogin && (!allPasswordChecksPassed || !passwordsMatch))}
+                className="btn btn-primary w-full justify-center py-3"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isLogin ? (
+                  'Ingresar'
+                ) : (
+                  'Crear cuenta'
+                )}
+              </button>
+            </form>
           </div>
         </div>
 
         {/* Forgot Password Modal */}
         {showForgotPassword && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Recuperar Contraseña</h2>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="section-title">Recuperar contraseña</h2>
                 <button
                   onClick={() => {
                     setShowForgotPassword(false)
@@ -252,22 +327,22 @@ export default function LoginPage() {
                     setError('')
                     setForgotPasswordSuccess('')
                   }}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-4 h-4 text-slate-400" />
                 </button>
               </div>
 
-              <form onSubmit={handleForgotPassword} className="space-y-5">
+              <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div>
                   <label className="label">Email</label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="email"
                       value={forgotPasswordEmail}
                       onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                      className="input pl-12"
+                      className="input pl-10"
                       placeholder="tu@email.com"
                       required
                     />
@@ -317,7 +392,7 @@ export default function LoginPage() {
         )}
 
         {/* Footer */}
-        <p className="text-center text-white/60 mt-6 text-sm">
+        <p className="text-center text-white/50 mt-6 text-xs">
           © {new Date().getFullYear()} FinControl
         </p>
       </div>

@@ -6,34 +6,32 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName, fetchDolar } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js'
-import { Line } from 'react-chartjs-2'
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js'
+import { Bar } from 'react-chartjs-2'
+import { TrendingDown, TrendingUp, Repeat, CreditCard, Calendar, Info } from 'lucide-react'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler)
 
 export default function ProyeccionPage() {
   const { currentWorkspace } = useWorkspace()
   const { profile } = useAuth()
   const { gastos, ingresos, currentMonth } = useData()
   const [dolar, setDolar] = useState(1000)
-  
+
   useEffect(() => {
     fetchDolar().then(setDolar).catch(() => setDolar(1000))
   }, [])
-  
-  // Verificar si ingresos están habilitados
+
   const showIngresos = currentWorkspace
     ? currentWorkspace.ingresos_habilitado
     : profile?.ingresos_habilitado
 
-  // Gastos fijos - ordenados: primero USD mayor a menor, luego ARS mayor a menor
+  // === GASTOS FIJOS ===
   const fijos = gastos
     .filter(g => g.es_fijo)
     .sort((a, b) => {
-      // Primero USD, luego ARS
       if (a.moneda === 'USD' && b.moneda !== 'USD') return -1
       if (a.moneda !== 'USD' && b.moneda === 'USD') return 1
-      // Dentro de la misma moneda, de mayor a menor
       return b.monto - a.monto
     })
 
@@ -43,234 +41,298 @@ export default function ProyeccionPage() {
     else totalFijosARS += g.monto
   })
 
-  // Cuotas pendientes
+  // === CUOTAS PENDIENTES ===
   const cuotas = gastos.filter(g => g.cuotas > 1 && !g.es_fijo)
 
-  // Proyección 12 meses
+  // === PROYECCIÓN 12 MESES ===
   const proyeccion = []
   for (let i = 0; i < 12; i++) {
     const mes = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + i, 1)
     const mesKey = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}`
 
-    // Empezar con los gastos fijos
     let totalGastosARS = totalFijosARS
     let totalGastosUSD = totalFijosUSD
+    let cuotasActivasCount = 0
 
-    // Sumar las cuotas correspondientes a este mes
     cuotas.forEach(g => {
       const start = new Date(g.mes_facturacion + '-01')
       const diff = (mes.getFullYear() - start.getFullYear()) * 12 + mes.getMonth() - start.getMonth()
       if (diff >= 0 && diff < g.cuotas) {
+        cuotasActivasCount++
         const cuotaMonto = g.monto / g.cuotas
-        if (g.moneda === 'USD') {
-          totalGastosUSD += cuotaMonto
-        } else {
-          totalGastosARS += cuotaMonto
-        }
+        if (g.moneda === 'USD') totalGastosUSD += cuotaMonto
+        else totalGastosARS += cuotaMonto
       }
     })
 
-    // Ingresos proyectados - solo usar ingresos que ya existen en ese mes específico
-    // Excluir ingresos pendientes: solo sumar confirmados o ingresos normales (sin estado pendiente)
-    let totalIngresosARS = 0
-    let totalIngresosUSD = 0
-    
+    let totalIngresosARS = 0, totalIngresosUSD = 0
     if (showIngresos) {
-      // Solo considerar ingresos que ya están registrados para ese mes específico (usar campo 'mes')
-      // Y que NO estén pendientes (o que estén confirmados)
-      ingresos.forEach(i => {
-        if (i.mes === mesKey && (!(i as any).pendiente_cobro || (i as any).fecha_cobro_confirmada)) {
-          if (i.moneda === 'USD') {
-            totalIngresosUSD += i.monto
-          } else {
-            totalIngresosARS += i.monto
-          }
+      ingresos.forEach(ingreso => {
+        if (ingreso.mes === mesKey && (!(ingreso as any).pendiente_cobro || (ingreso as any).fecha_cobro_confirmada)) {
+          if (ingreso.moneda === 'USD') totalIngresosUSD += ingreso.monto
+          else totalIngresosARS += ingreso.monto
         }
       })
     }
 
-    // Calcular balance
     const gastosTotalARS = totalGastosARS + (totalGastosUSD * dolar)
     const ingresosTotalARS = totalIngresosARS + (totalIngresosUSD * dolar)
-    const balanceARS = ingresosTotalARS - gastosTotalARS
 
-    proyeccion.push({ 
-      mes, 
-      mesKey, 
-      totalGastosARS, 
-      totalGastosUSD,
-      totalIngresosARS,
-      totalIngresosUSD,
-      balanceARS
+    proyeccion.push({
+      mes, mesKey,
+      totalGastosARS, totalGastosUSD, gastosTotalARS,
+      totalIngresosARS, totalIngresosUSD, ingresosTotalARS,
+      balanceARS: ingresosTotalARS - gastosTotalARS,
+      cuotasActivas: cuotasActivasCount
     })
   }
-  
-  // Datos para el gráfico
+
+  // Max gasto para barras de progreso
+  const maxGasto = Math.max(...proyeccion.map(p => p.gastosTotalARS), 1)
+
+  // Chart data - barras agrupadas, mucho más claras que líneas
   const chartData = {
-    labels: proyeccion.map(p => getMonthName(p.mes)),
+    labels: proyeccion.map(p => {
+      const parts = getMonthName(p.mes).split(' ')
+      return parts[0].substring(0, 3)
+    }),
     datasets: [
       {
-        label: 'Gastos',
-        data: proyeccion.map(p => p.totalGastosARS + (p.totalGastosUSD * dolar)),
-        borderColor: 'rgb(239, 68, 68)',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        fill: true,
-        tension: 0.4
+        label: 'Gastos (ARS)',
+        data: proyeccion.map(p => p.gastosTotalARS),
+        backgroundColor: '#f43f5e',
+        borderRadius: 4,
+        barPercentage: showIngresos ? 0.4 : 0.6,
+        categoryPercentage: 0.7,
       },
       ...(showIngresos ? [{
-        label: 'Ingresos',
-        data: proyeccion.map(p => p.totalIngresosARS + (p.totalIngresosUSD * dolar)),
-        borderColor: 'rgb(16, 185, 129)',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        fill: true,
-        tension: 0.4
-      }] : []),
-      ...(showIngresos ? [{
-        label: 'Balance',
-        data: proyeccion.map(p => p.balanceARS),
-        borderColor: 'rgb(99, 102, 241)',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        fill: false,
-        tension: 0.4,
-        borderDash: [5, 5]
+        label: 'Ingresos (ARS)',
+        data: proyeccion.map(p => p.ingresosTotalARS),
+        backgroundColor: '#10b981',
+        borderRadius: 4,
+        barPercentage: 0.4,
+        categoryPercentage: 0.7,
       }] : [])
     ]
   }
-  
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'top' as const,
+        labels: {
+          boxWidth: 12,
+          padding: 16,
+          font: { size: 12 },
+          color: '#64748b'
+        }
       },
-      title: {
-        display: true,
-        text: 'Proyección de 12 meses'
-      },
+      title: { display: false },
       tooltip: {
         callbacks: {
-          label: function(context: any) {
-            return `${context.dataset.label}: ${formatMoney(context.parsed.y)}`
-          }
+          label: (ctx: any) => ` ${ctx.dataset.label}: ${formatMoney(ctx.parsed.y)}`
         }
       }
     },
     scales: {
       y: {
         beginAtZero: true,
+        grid: { color: '#f1f5f9' },
+        border: { display: false },
         ticks: {
-          callback: function(value: any) {
-            return formatMoney(value)
-          }
+          callback: (value: any) => {
+            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+            if (value >= 1000) return `${(value / 1000).toFixed(0)}K`
+            return value
+          },
+          font: { size: 11 },
+          color: '#94a3b8'
         }
+      },
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: { font: { size: 11 }, color: '#64748b' }
       }
     }
   }
+
+  // Mes actual vs. último mes proyectado
+  const mesActual = proyeccion[0]
+  const mesUltimo = proyeccion[proyeccion.length - 1]
+  const tendenciaGastos = mesUltimo.gastosTotalARS - mesActual.gastosTotalARS
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.08 } }
   }
-
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 }
   }
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="show"
-      variants={containerVariants}
-      className="space-y-6"
-    >
+    <motion.div initial="hidden" animate="show" variants={containerVariants} className="space-y-5">
       <motion.div variants={itemVariants}>
         <h1 className="page-title">Proyección</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          <><span className="text-primary font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span> · </>
-          Mirá cómo vienen los próximos 12 meses
+          <span className="text-primary font-medium">{currentWorkspace?.name || (profile?.personal_workspace_name || 'Espacio Personal')}</span>
+          {' · '}Proyección de gastos a 12 meses
         </p>
       </motion.div>
 
-      {/* Gráfico de Proyección */}
-      {showIngresos && (
-        <motion.div variants={itemVariants} className="card p-5">
-          <h3 className="card-title mb-4">Proyección de ingresos vs gastos (12 meses)</h3>
-          <div className="h-80">
-            <Line data={chartData} options={chartOptions} />
-          </div>
-        </motion.div>
-      )}
+      {/* Explicación clara */}
+      <motion.div variants={itemVariants} className="bg-primary-50/50 border border-primary-100 rounded-xl p-4 flex items-start gap-3">
+        <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+        <p className="text-sm text-primary-800">
+          Esta proyección calcula tus gastos futuros sumando <strong>gastos fijos</strong> (se repiten cada mes) + <strong>cuotas pendientes</strong> (hasta que terminen).
+          {showIngresos && ' Los ingresos solo se muestran si ya están registrados para ese mes.'}
+        </p>
+      </motion.div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Próximos 12 meses */}
+      {/* Summary Cards */}
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+              <Repeat className="w-4 h-4 text-blue-500" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Gastos fijos</div>
+          </div>
+          <div className="text-stat-value">{formatMoney(totalFijosARS)}</div>
+          {totalFijosUSD > 0 && <div className="text-xs text-slate-400 mt-0.5">+ {formatMoney(totalFijosUSD, 'USD')}</div>}
+          <div className="text-xs text-slate-400 mt-0.5">{fijos.length} gastos por mes</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-accent-50 rounded-xl flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-accent" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Cuotas activas</div>
+          </div>
+          <div className="text-stat-value">{cuotas.length}</div>
+          <div className="text-xs text-slate-400 mt-0.5">{mesActual.cuotasActivas} este mes</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
+              <TrendingDown className="w-4 h-4 text-red-500" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Gasto este mes</div>
+          </div>
+          <div className="text-stat-value text-red-600">{formatMoney(mesActual.gastosTotalARS)}</div>
+          <div className="text-xs text-slate-400 mt-0.5">ARS equivalente</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${tendenciaGastos <= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+              <Calendar className={`w-4 h-4 ${tendenciaGastos <= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">En 12 meses</div>
+          </div>
+          <div className={`text-stat-value ${tendenciaGastos <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            {formatMoney(mesUltimo.gastosTotalARS)}
+          </div>
+          <div className={`text-xs mt-0.5 ${tendenciaGastos <= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            {tendenciaGastos <= 0
+              ? `${formatMoney(Math.abs(tendenciaGastos))} menos`
+              : `${formatMoney(tendenciaGastos)} más`
+            }
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Chart - barras agrupadas */}
+      <motion.div variants={itemVariants} className="card p-5">
+        <h3 className="card-title mb-4">
+          {showIngresos ? 'Gastos vs ingresos por mes' : 'Gastos proyectados por mes'}
+        </h3>
+        <div className="h-72">
+          <Bar data={chartData} options={chartOptions} />
+        </div>
+        <p className="text-xs text-slate-400 mt-3 text-center">
+          Montos en ARS equivalente (dólar a {formatMoney(dolar)})
+        </p>
+      </motion.div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Desglose mensual */}
         <motion.div variants={itemVariants} className="card p-5">
-          <h3 className="card-title mb-4">Próximos 12 meses</h3>
-          <div className="space-y-2">
-            {proyeccion.map(p => (
-              <div key={p.mesKey} className="py-3 border-b border-slate-100 last:border-0">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-slate-600 font-medium">{getMonthName(p.mes)}</span>
-                  <div className="text-right">
-                    <div className="font-bold text-red-600">{formatMoney(p.totalGastosARS + (p.totalGastosUSD * dolar))}</div>
-                    {showIngresos && (
-                      <>
-                        <div className="text-sm font-semibold text-emerald-600">
-                          + {formatMoney(p.totalIngresosARS + (p.totalIngresosUSD * dolar))}
-                        </div>
-                        <div className={`text-xs font-bold ${p.balanceARS >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          Balance: {formatMoney(p.balanceARS)}
-                        </div>
-                      </>
+          <h3 className="card-title mb-4">Desglose mensual</h3>
+          <div className="space-y-3">
+            {proyeccion.map((p, i) => {
+              const pct = (p.gastosTotalARS / maxGasto) * 100
+              const isCurrentMonth = i === 0
+              return (
+                <div key={p.mesKey}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-medium ${isCurrentMonth ? 'text-primary' : 'text-slate-600'}`}>
+                        {getMonthName(p.mes).split(' ')[0].substring(0, 3)} {getMonthName(p.mes).split(' ')[1]}
+                      </span>
+                      {isCurrentMonth && (
+                        <span className="text-[10px] bg-primary-50 text-primary px-1.5 py-0.5 rounded font-medium">HOY</span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold text-red-600">{formatMoney(p.gastosTotalARS)}</span>
+                      {showIngresos && p.ingresosTotalARS > 0 && (
+                        <span className="text-xs text-emerald-500 ml-2">+{formatMoney(p.ingresosTotalARS)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${isCurrentMonth ? 'bg-primary' : 'bg-red-400'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-0.5">
+                    <span className="text-[10px] text-slate-400">
+                      Fijos + {p.cuotasActivas} cuota{p.cuotasActivas !== 1 ? 's' : ''}
+                    </span>
+                    {p.totalGastosUSD > 0 && (
+                      <span className="text-[10px] text-emerald-500">{formatMoney(p.totalGastosUSD, 'USD')}</span>
                     )}
                   </div>
                 </div>
-                {(p.totalGastosUSD > 0 || (showIngresos && p.totalIngresosUSD > 0)) && (
-                  <div className="flex justify-end gap-2 text-xs text-slate-500">
-                    {p.totalGastosUSD > 0 && (
-                      <span>Gastos USD: {formatMoney(p.totalGastosUSD, 'USD')}</span>
-                    )}
-                    {showIngresos && p.totalIngresosUSD > 0 && (
-                      <span>Ingresos USD: {formatMoney(p.totalIngresosUSD, 'USD')}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </motion.div>
 
         {/* Gastos Fijos */}
         <motion.div variants={itemVariants} className="card p-5">
-          <h3 className="card-title mb-4">Gastos fijos</h3>
+          <h3 className="card-title mb-1">Gastos fijos</h3>
+          <p className="text-xs text-slate-400 mb-4">Se repiten todos los meses</p>
           {fijos.length === 0 ? (
-            <p className="text-slate-400 text-center py-8">Sin gastos fijos</p>
+            <p className="text-slate-400 text-center text-sm py-8">Sin gastos fijos</p>
           ) : (
             <>
-              <div className="space-y-2 mb-4">
+              <div className="space-y-1">
                 {fijos.map(g => (
-                  <div key={g.id} className="flex justify-between items-center py-3 border-b border-slate-100 last:border-0">
-                    <span className="text-slate-600">{g.descripcion}</span>
-                    <span className={`font-bold ${g.moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                  <div key={g.id} className="flex justify-between items-center p-2.5 rounded-lg hover:bg-slate-50 transition-colors">
+                    <span className="text-sm text-slate-700">{g.descripcion}</span>
+                    <span className={`text-sm font-semibold ${g.moneda === 'USD' ? 'text-emerald-600' : 'text-slate-800'}`}>
                       {formatMoney(g.monto, g.moneda)}
                     </span>
                   </div>
                 ))}
               </div>
-              <div className="bg-indigo-50 rounded-xl p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="font-semibold text-indigo-700">Total ARS</span>
-                  <span className="font-bold text-indigo-700">{formatMoney(totalFijosARS)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold text-indigo-700">Total USD</span>
-                  <span className="font-bold text-indigo-700">{formatMoney(totalFijosUSD, 'USD')}</span>
+              <div className="bg-primary-50 rounded-xl p-3 mt-4">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-primary-700">Total mensual</span>
+                  <div className="text-right">
+                    <span className="font-bold text-primary-700">{formatMoney(totalFijosARS)}</span>
+                    {totalFijosUSD > 0 && (
+                      <span className="text-xs text-primary-500 ml-1">+ {formatMoney(totalFijosUSD, 'USD')}</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -280,49 +342,59 @@ export default function ProyeccionPage() {
 
       {/* Cuotas Pendientes */}
       <motion.div variants={itemVariants} className="card overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <h3 className="card-title">Cuotas pendientes</h3>
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="card-title">Cuotas pendientes</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Desaparecen de la proyección al terminar</p>
+          </div>
+          <span className="text-stat-label bg-primary-50 text-primary px-2 py-0.5 rounded-lg">{cuotas.length} cuotas</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[560px]">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Descripción</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Cuota</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Valor</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Restante</th>
-                <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Finaliza</th>
+              <tr className="bg-slate-50/50">
+                <th className="text-left px-5 py-3 text-stat-label text-slate-400 uppercase">Descripción</th>
+                <th className="text-left px-5 py-3 text-stat-label text-slate-400 uppercase">Progreso</th>
+                <th className="text-left px-5 py-3 text-stat-label text-slate-400 uppercase">Cuota</th>
+                <th className="text-left px-5 py-3 text-stat-label text-slate-400 uppercase">Restante</th>
+                <th className="text-left px-5 py-3 text-stat-label text-slate-400 uppercase">Finaliza</th>
               </tr>
             </thead>
             <tbody>
               {cuotas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400">Sin cuotas pendientes</td>
+                  <td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400">Sin cuotas pendientes</td>
                 </tr>
               ) : cuotas.map(g => {
                 const valorCuota = g.monto / g.cuotas
                 const start = new Date(g.mes_facturacion + '-01')
                 const diff = (currentMonth.getFullYear() - start.getFullYear()) * 12 + currentMonth.getMonth() - start.getMonth()
-                const cuotaActual = Math.min(diff + 1, g.cuotas)
+                const cuotaActual = Math.max(1, Math.min(diff + 1, g.cuotas))
                 const restante = (g.cuotas - cuotaActual) * valorCuota
+                const pctCompleted = (cuotaActual / g.cuotas) * 100
                 const finMes = new Date(start)
                 finMes.setMonth(finMes.getMonth() + g.cuotas - 1)
 
                 return (
-                  <tr key={g.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="p-4 font-semibold">{g.descripcion}</td>
-                    <td className="p-4">
-                      <span className="tag bg-indigo-100 text-indigo-700">
-                        {cuotaActual}/{g.cuotas}
-                      </span>
+                  <tr key={g.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="font-medium text-sm text-slate-800">{g.descripcion}</div>
                     </td>
-                    <td className={`p-4 font-bold ${g.moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${pctCompleted}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-500 whitespace-nowrap">{cuotaActual}/{g.cuotas}</span>
+                      </div>
+                    </td>
+                    <td className={`px-5 py-3 font-semibold text-sm ${g.moneda === 'USD' ? 'text-emerald-600' : 'text-slate-800'}`}>
                       {formatMoney(valorCuota, g.moneda)}
                     </td>
-                    <td className={`p-4 font-bold ${g.moneda === 'USD' ? 'text-emerald-600' : ''}`}>
+                    <td className={`px-5 py-3 text-sm ${g.moneda === 'USD' ? 'text-emerald-600' : 'text-slate-600'}`}>
                       {formatMoney(restante, g.moneda)}
                     </td>
-                    <td className="p-4 text-slate-600">{getMonthName(finMes)}</td>
+                    <td className="px-5 py-3 text-sm text-slate-500 whitespace-nowrap">{getMonthName(finMes)}</td>
                   </tr>
                 )
               })}
