@@ -5,7 +5,7 @@ import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuth } from '@/hooks/useAuth'
 import { formatMoney, getMonthName, getMonthFromDateString, parseDateSafe, normalizeAccountName } from '@/lib/utils'
-import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2, CheckCircle2, Download } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Wallet, Search, Upload, Image as ImageIcon, Loader2, CheckCircle2, Download, TrendingUp, DollarSign, Clock } from 'lucide-react'
 import { Ingreso } from '@/types'
 import { ConfirmModal, AlertModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
@@ -1332,23 +1332,43 @@ export default function IngresosPage() {
         </button>
       </div>
 
-      {/* Totals */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-6">
-          <div className="text-sm text-slate-500 mb-1">Total ARS</div>
-          <div className="text-2xl font-bold text-emerald-600">{formatMoney(totalARS, 'ARS')}</div>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-emerald-500" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Total ARS</div>
+          </div>
+          <div className="text-stat-value text-emerald-600">{formatMoney(totalARS, 'ARS')}</div>
         </div>
-        <div className="card p-6">
-          <div className="text-sm text-slate-500 mb-1">Total USD</div>
-          <div className="text-2xl font-bold text-emerald-600">{formatMoney(totalUSD, 'USD')}</div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-blue-500" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Total USD</div>
+          </div>
+          <div className="text-stat-value text-blue-600">{formatMoney(totalUSD, 'USD')}</div>
         </div>
-        <div className="card p-6">
-          <div className="text-sm text-slate-500 mb-1">Pendiente ARS</div>
-          <div className="text-2xl font-bold text-amber-600">{formatMoney(totalPendienteARS, 'ARS')}</div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center">
+              <Clock className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Pendiente ARS</div>
+          </div>
+          <div className="text-stat-value text-amber-600">{formatMoney(totalPendienteARS, 'ARS')}</div>
         </div>
-        <div className="card p-6">
-          <div className="text-sm text-slate-500 mb-1">Pendiente USD</div>
-          <div className="text-2xl font-bold text-amber-600">{formatMoney(totalPendienteUSD, 'USD')}</div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center">
+              <Clock className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-stat-label text-slate-400 uppercase">Pendiente USD</div>
+          </div>
+          <div className="text-stat-value text-amber-600">{formatMoney(totalPendienteUSD, 'USD')}</div>
         </div>
       </div>
 

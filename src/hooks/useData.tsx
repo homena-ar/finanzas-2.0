@@ -140,8 +140,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // --- FUNCIÓN FETCHALL PRINCIPAL ---
   // clearFirst: solo true al cambiar de workspace/usuario, false en CRUD (evita flash vacío)
   const fetchAllInternal = useCallback(async (clearFirst: boolean) => {
-    // Usar la referencia más reciente del workspace
-    const latestWorkspace = currentWorkspaceRef.current
+    // Usar el workspace del closure (no el ref mutable) para evitar race conditions
+    const latestWorkspace = currentWorkspace
 
     console.log('📊 [Firebase useData] fetchAll called', {
       userId: user?.uid,
@@ -477,13 +477,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const lastLoadedWorkspaceIdRef = useRef<string | null>(null)
   // Rastrear si ya se intentó cargar para este usuario
   const hasAttemptedLoadRef = useRef(false)
-  // Mantener una referencia actualizada del workspace para usar en fetchAll
-  const currentWorkspaceRef = useRef(currentWorkspace)
-  
-  // Actualizar la referencia cuando cambia el workspace
-  useEffect(() => {
-    currentWorkspaceRef.current = currentWorkspace
-  }, [currentWorkspace])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -545,42 +538,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     hasAttemptedLoadRef.current = true
     lastLoadedWorkspaceIdRef.current = currentWorkspaceId
 
-    // Usar queueMicrotask para asegurar que se ejecute después de que React termine de actualizar todos los estados
-    // Esto es especialmente importante cuando initWorkspaceReady y currentWorkspace se actualizan al mismo tiempo
-    queueMicrotask(() => {
-      // Verificar que el componente aún está montado
-      if (!isMountedRef.current) {
-        return
-      }
+    // Cargar datos directamente (fetchAllInternal usa currentWorkspace del closure)
+    console.log('📊 [Firebase useData] User and workspace ready - Calling fetchAll', {
+      workspaceId: currentWorkspaceId || 'PERSONAL (no workspace_id)',
+      workspaceName: currentWorkspace?.name || 'Personal',
+      userId: user.uid
+    })
 
-      // Verificar nuevamente el workspace ID actual (puede haber cambiado)
-      const latestWorkspaceId = currentWorkspaceRef.current?.id || null
-      
-      // Si el workspace cambió mientras esperábamos, actualizar
-      if (latestWorkspaceId !== currentWorkspaceId) {
-        console.log('📊 [Firebase useData] Workspace changed during microtask, updating:', {
-          old: currentWorkspaceId || 'PERSONAL',
-          new: latestWorkspaceId || 'PERSONAL'
-        })
-        lastLoadedWorkspaceIdRef.current = latestWorkspaceId
+    fetchAllInternal(true).catch((error) => {
+      if (isMountedRef.current) {
+        console.error('📊 [Firebase useData] Error en fetchAll:', error)
+        // Resetear el ref si falla para permitir reintento
+        hasAttemptedLoadRef.current = false
+        lastLoadedWorkspaceIdRef.current = null
       }
-
-      // Cargar datos
-      console.log('📊 [Firebase useData] User and workspace ready - Calling fetchAll', {
-        workspaceId: lastLoadedWorkspaceIdRef.current || 'PERSONAL (no workspace_id)',
-        workspaceName: currentWorkspaceRef.current?.name || 'Personal',
-        userId: user.uid
-      })
-      
-      // Llamar fetchAll con clearFirst: true porque estamos cambiando de workspace/usuario
-      fetchAllInternal(true).catch((error) => {
-        if (isMountedRef.current) {
-          console.error('📊 [Firebase useData] Error en fetchAll:', error)
-          // Resetear el ref si falla para permitir reintento
-          hasAttemptedLoadRef.current = false
-          lastLoadedWorkspaceIdRef.current = null
-        }
-      })
     })
   }, [user, authLoading, fetchAllInternal, currentWorkspace?.id, initWorkspaceReady])
 
