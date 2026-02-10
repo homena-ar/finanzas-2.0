@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getAuth, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from 'firebase/auth'
+import { Auth, getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 // Validar que todas las variables de Firebase estén configuradas
@@ -17,7 +17,7 @@ if (typeof window === 'undefined') {
   const missingVars = Object.entries(requiredEnvVars)
     .filter(([key, value]) => !value)
     .map(([key]) => `NEXT_PUBLIC_FIREBASE_${key.toUpperCase().replace(/([A-Z])/g, '_$1').replace(/^_/, '')}`)
-  
+
   if (missingVars.length > 0) {
     console.error('❌ [Firebase] Variables de entorno faltantes:', missingVars.join(', '))
     console.error('❌ [Firebase] Por favor, configura estas variables en Railway → Variables')
@@ -35,16 +35,25 @@ const firebaseConfig = {
 
 // Initialize Firebase (singleton pattern)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
-const auth = getAuth(app)
-const db = getFirestore(app)
 
-// Forzar IndexedDB como persistencia primaria para PWA en móviles
-// IndexedDB persiste mejor que localStorage cuando la app se cierra/backgroundea
+// CRITICAL for PWA iOS: use initializeAuth with persistence array BEFORE any auth reads.
+// getAuth() uses default persistence which can lose sessions when iOS kills the PWA.
+// initializeAuth() sets persistence at init time, ensuring IndexedDB is used from the start.
+// try/catch handles HMR where initializeAuth may have already been called.
+let auth: Auth
 if (typeof window !== 'undefined') {
-  setPersistence(auth, indexedDBLocalPersistence).catch(() => {
-    // Fallback a localStorage si IndexedDB no está disponible
-    setPersistence(auth, browserLocalPersistence).catch(() => {})
-  })
+  try {
+    auth = initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence]
+    })
+  } catch {
+    // Already initialized (HMR / fast refresh) - fall back to getAuth
+    auth = getAuth(app)
+  }
+} else {
+  auth = getAuth(app)
 }
+
+const db = getFirestore(app)
 
 export { app, auth, db }

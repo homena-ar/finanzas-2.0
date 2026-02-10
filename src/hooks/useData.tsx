@@ -79,7 +79,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const { currentWorkspace, initWorkspaceReady } = useWorkspace()
 
-  console.log('📊 [Firebase DataProvider] RENDER - authLoading:', authLoading, 'user:', user?.uid || 'NULL', 'workspace:', currentWorkspace?.id || 'PERSONAL', 'initWorkspaceReady:', initWorkspaceReady)
+  // Debug render log removed to reduce console noise during workspace switch
 
   const [movimientos, setMovimientos] = useState<MovimientoAhorro[]>([])
   const [metas, setMetas] = useState<Meta[]>([])
@@ -142,8 +142,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fetchAllInternal = useCallback(async (clearFirst: boolean) => {
     // Usar el workspace del closure (no el ref mutable) para evitar race conditions
     const latestWorkspace = currentWorkspace
+    const fetchForWorkspaceId = latestWorkspace?.id || null
 
-    console.log('📊 [Firebase useData] fetchAll called', {
+    console.log('📊 [useData] fetchAll -', {
       userId: user?.uid,
       workspaceId: latestWorkspace?.id,
       clearFirst
@@ -274,7 +275,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      console.log('📊 [Firebase useData] Parallel fetch complete:', Object.keys(snaps).map(k => `${k}: ${snaps[k]?.docs?.length ?? 0}`).join(', '))
+      console.log('📊 [useData] Fetch complete:', Object.keys(snaps).map(k => `${k}: ${snaps[k]?.docs?.length ?? 0}`).join(', '))
+
+      // Staleness guard: if workspace changed during async fetch, discard results
+      if (currentWorkspaceIdRef.current !== fetchForWorkspaceId) {
+        console.log('⚠️ [useData] Workspace changed during fetch, discarding stale results')
+        setLoading(false)
+        return
+      }
 
       // --- PROCESAR RESULTADOS ---
 
@@ -378,7 +386,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         let categoriasData = snaps.categorias.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, icono: doc.data().icono, color: doc.data().color, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as Categoria[]
 
         const canCreateCategories = !isWorkspaceMode || permissions.gastos === 'admin' || isOwner
-        if (categoriasData.length === 0 && canCreateCategories) {
+        if (categoriasData.length === 0 && canCreateCategories && latestWorkspace?.id) {
           const defaultCategorias = [
             { nombre: 'Comida', icono: '🍔', color: '#f97316' },
             { nombre: 'Hogar', icono: '🏠', color: '#3b82f6' },
@@ -391,8 +399,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ]
           const catRef = collection(db, 'categorias')
           for (const cat of defaultCategorias) {
-            const docData: any = { ...cat, user_id: user.uid, created_at: serverTimestamp() }
-            if (isWorkspaceMode && latestWorkspace?.id) { docData.workspace_id = latestWorkspace.id; docData.created_by = user.uid }
+            const docData: any = { ...cat, user_id: user.uid, created_at: serverTimestamp(), workspace_id: latestWorkspace.id, created_by: user.uid }
             await addDoc(catRef, docData)
           }
           const newSnap = await getDocs(query(collection(db, 'categorias'), workspaceFilter, orderBy('created_at', 'desc')))
@@ -406,7 +413,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         let categoriasIngresosData = snaps.categoriasIngresos.docs.map((doc: any) => ({ id: doc.id, user_id: doc.data().user_id, nombre: doc.data().nombre, icono: doc.data().icono, color: doc.data().color, created_at: doc.data().created_at instanceof Timestamp ? doc.data().created_at.toDate().toISOString() : doc.data().created_at })) as CategoriaIngreso[]
 
         const canCreateCategoriasIngresos = !isWorkspaceMode || permissions.ingresos === 'admin' || isOwner
-        if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos) {
+        if (categoriasIngresosData.length === 0 && canCreateCategoriasIngresos && latestWorkspace?.id) {
           const defaultCategoriasIngresos = [
             { nombre: 'Salario', icono: '💼', color: '#3b82f6' },
             { nombre: 'Freelance', icono: '💻', color: '#8b5cf6' },
@@ -417,8 +424,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ]
           const catIngRef = collection(db, 'categorias_ingresos')
           for (const cat of defaultCategoriasIngresos) {
-            const docData: any = { ...cat, user_id: user.uid, created_at: serverTimestamp() }
-            if (isWorkspaceMode && latestWorkspace?.id) { docData.workspace_id = latestWorkspace.id; docData.created_by = user.uid }
+            const docData: any = { ...cat, user_id: user.uid, created_at: serverTimestamp(), workspace_id: latestWorkspace.id, created_by: user.uid }
             await addDoc(catIngRef, docData)
           }
           const newSnap = await getDocs(query(collection(db, 'categorias_ingresos'), workspaceFilter, orderBy('created_at', 'desc')))
@@ -438,35 +444,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       // --- AUTO-MIGRACIÓN: parchear documentos huérfanos (sin workspace_id) ---
       // Solo para el workspace personal del owner, migrar docs viejos que solo tienen user_id
-      if (isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid) {
+      // Run-once guard: solo ejecutar una vez por workspace por sesión de app
+      if (isWorkspaceMode && latestWorkspace?.id && latestWorkspace.owner_id === user.uid
+          && migrationDoneForRef.current !== latestWorkspace.id) {
+        migrationDoneForRef.current = latestWorkspace.id
+        const wsId = latestWorkspace.id
         const orphanCollections = [
           'movimientos_ahorro', 'metas', 'gastos', 'impuestos', 'ingresos',
           'tarjetas', 'categorias', 'categorias_ingresos', 'tags', 'tags_ingresos', 'medios_pago'
         ]
         // Ejecutar migración en background (no bloquear UI)
-        Promise.all(orphanCollections.map(async (colName) => {
+        ;(async () => {
+          let totalMigrated = 0
           try {
-            const orphanSnap = await getDocs(query(
-              collection(db, colName),
-              where('user_id', '==', user.uid)
-            ))
-            const orphanDocs = orphanSnap.docs.filter(d => !d.data().workspace_id)
-            if (orphanDocs.length > 0) {
-              console.log(`🔧 [Migration] Patching ${orphanDocs.length} orphan docs in ${colName}`)
-              await Promise.all(orphanDocs.map(d =>
-                updateDoc(doc(db, colName, d.id), {
-                  workspace_id: latestWorkspace.id,
-                  created_by: d.data().created_by || user.uid
-                })
-              ))
-            }
-          } catch (e) {
-            // Silently ignore migration errors (permissions, etc.)
+            const counts = await Promise.all(orphanCollections.map(async (colName) => {
+              try {
+                const orphanSnap = await getDocs(query(
+                  collection(db, colName),
+                  where('user_id', '==', user.uid)
+                ))
+                const orphanDocs = orphanSnap.docs.filter(d => !d.data().workspace_id)
+                if (orphanDocs.length > 0) {
+                  console.log(`🔧 [Migration] Patching ${orphanDocs.length} orphan docs in ${colName}`)
+                  await Promise.all(orphanDocs.map(d =>
+                    updateDoc(doc(db, colName, d.id), {
+                      workspace_id: wsId,
+                      created_by: d.data().created_by || user.uid
+                    })
+                  ))
+                  return orphanDocs.length
+                }
+                return 0
+              } catch (e) { return 0 }
+            }))
+            totalMigrated = counts.reduce((a, b) => a + b, 0)
+          } catch (e) { /* silently ignore */ }
+          // Only refetch if orphans were actually patched AND workspace hasn't changed
+          if (totalMigrated > 0 && isMountedRef.current && currentWorkspaceIdRef.current === fetchForWorkspaceId) {
+            console.log(`🔧 [Migration] ${totalMigrated} orphans patched, refetching data`)
+            fetchAllInternal(false)
           }
-        })).then(() => {
-          // Refetch to pick up migrated docs
-          if (isMountedRef.current) fetchAllInternal(false)
-        })
+        })()
       }
 
       const endTime = Date.now()
@@ -505,6 +523,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const lastLoadedWorkspaceIdRef = useRef<string | null | undefined>(undefined)
   // Rastrear si hay un fetch en progreso (evitar fetches concurrentes)
   const fetchInProgressRef = useRef(false)
+  // Run-once guard for orphan migration (per workspace per session)
+  const migrationDoneForRef = useRef<string | null>(null)
+  // Always-current workspace ID for staleness checks in async callbacks
+  const currentWorkspaceIdRef = useRef<string | null>(null)
+  currentWorkspaceIdRef.current = currentWorkspace?.id || null
 
   useEffect(() => {
     isMountedRef.current = true
@@ -601,11 +624,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Resetear refs cuando cambia el workspace (para forzar refetch)
   useEffect(() => {
     // Cuando workspace cambia, invalidar el último cargado para forzar nuevo fetch
-    const currentWorkspaceId = currentWorkspace?.id || null
+    const currentWsId = currentWorkspace?.id || null
     if (lastLoadedWorkspaceIdRef.current !== undefined &&
-        lastLoadedWorkspaceIdRef.current !== (currentWorkspaceId ?? null)) {
-      console.log('📊 [Firebase useData] Workspace changed, invalidating cache:', lastLoadedWorkspaceIdRef.current, '→', currentWorkspaceId)
+        lastLoadedWorkspaceIdRef.current !== (currentWsId ?? null)) {
+      console.log('📊 [useData] Workspace changed, clearing stale data:', lastLoadedWorkspaceIdRef.current, '->', currentWsId)
       lastLoadedWorkspaceIdRef.current = undefined
+      migrationDoneForRef.current = null
+      // Clear stale data IMMEDIATELY to prevent cross-workspace leaks
+      setMovimientos([])
+      setMetas([])
+      setTarjetas([])
+      setGastos([])
+      setImpuestos([])
+      setCategorias([])
+      setTags([])
+      setMediosPago([])
+      setIngresos([])
+      setCategoriasIngresos([])
+      setTagsIngresos([])
+      setLoading(true)
     }
   }, [currentWorkspace?.id])
 
@@ -617,12 +654,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.uid])
 
-  // Debug: Log cuando los estados cambian
-  useEffect(() => {
-    if (gastos.length > 0 || ingresos.length > 0 || movimientos.length > 0) {
-      console.log('📊 [Firebase useData] States updated - gastos:', gastos.length, 'ingresos:', ingresos.length, 'movimientos:', movimientos.length)
-    }
-  }, [gastos.length, ingresos.length, movimientos.length])
+  // State-change debug log removed to reduce console noise during workspace switch
 
   // Helper: obtener workspace_id obligatorio para inserción
   // Bloquea creación si el workspace no está listo (previene documentos huérfanos)
@@ -1043,7 +1075,7 @@ const addTarjeta = useCallback(async (data: any) => {
     getDiferenciaMeses
   }
 
-  console.log('📊 [Firebase useData] Creating context value - loading:', loading, 'movimientos:', movimientos.length, 'gastos:', gastos.length, 'ingresos:', ingresos.length, 'impuestos:', impuestos.length)
+  // Context value creation log removed to reduce console noise
 
   return (
     <DataContext.Provider value={value}>
