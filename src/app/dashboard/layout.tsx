@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, TrendingUp,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -90,11 +90,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(hasAccess('gastos') ? [{ href: '/dashboard/proyeccion', icon: TrendingUp, label: 'Proyección' }] : []),
     
     ...(hasAccess('ahorros') ? [{ href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' }] : []),
-    
+
+    { href: '/dashboard/recordatorios', icon: Bell, label: 'Recordatorios' },
+
     { href: '/dashboard/config', icon: Settings, label: 'Config' },
   ]
-
-  console.log('🏠 [DashboardLayout] Render - user:', user?.uid)
 
   useEffect(() => {
     if (!loading && !user) {

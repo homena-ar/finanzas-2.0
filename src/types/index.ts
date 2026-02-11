@@ -244,6 +244,27 @@ export interface WorkspaceInvitation {
 // NOTIFICACIONES
 // ============================================
 
+// ============================================
+// RECORDATORIOS
+// ============================================
+
+export type ReminderChannel = 'push' | 'email'
+
+export interface Recordatorio {
+  id: string
+  user_id: string
+  workspace_id?: string
+  created_by?: string
+  titulo: string             // max 80 chars - used as push notification title & email subject
+  descripcion: string        // longer description
+  fecha: string              // YYYY-MM-DD - due date
+  dias_antes: number[]       // notify X days before (e.g. [0, 2, 7] means on the day, 2 days before, 7 days before)
+  canales: ReminderChannel[] // ['push'] by default, optionally ['push', 'email']
+  status: 'activo' | 'completado'
+  created_at: string
+  updated_at?: string
+}
+
 export interface Notificacion {
   id: string
   user_id: string

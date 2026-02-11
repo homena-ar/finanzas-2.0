@@ -132,7 +132,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-accent-600 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-600 to-primary-400 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">

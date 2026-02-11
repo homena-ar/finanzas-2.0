@@ -969,26 +969,14 @@ const addTarjeta = useCallback(async (data: any) => {
   }, [user, fetchAll])
 
   const getIngresosMes = useCallback((mes: string) => {
-    console.log('📊 [Firebase getIngresosMes] called - mes:', mes, 'total ingresos:', ingresos.length)
-    
     return ingresos.filter(i => {
-      // Si el ingreso es del mes actual, mostrarlo
-      if (i.mes === mes) {
-        console.log('✅ [getIngresosMes] Ingreso incluido (mes actual):', i.id, i.descripcion, 'mes:', i.mes, 'es_fijo:', (i as any).es_fijo)
-        return true
-      }
-      // Si es fijo y su mes es anterior al mes consultado, también mostrarlo
-      if ((i as any).es_fijo === true && i.mes < mes) {
-        console.log('✅ [getIngresosMes] Ingreso fijo incluido (mes anterior):', i.id, i.descripcion, 'mes:', i.mes, 'mes consultado:', mes)
-        return true
-      }
+      if (i.mes === mes) return true
+      if ((i as any).es_fijo === true && i.mes < mes) return true
       return false
     })
   }, [ingresos])
 
   const getGastosMes = useCallback((mes: string) => {
-    console.log('📊 [Firebase getGastosMes] called - mes:', mes, 'total gastos:', gastos.length)
-
     return gastos.filter(g => {
       if (g.mes_facturacion === mes) return true
       if (g.es_fijo && g.mes_facturacion < mes) return true
@@ -1003,7 +991,6 @@ const addTarjeta = useCallback(async (data: any) => {
   }, [gastos])
 
   const getImpuestosMes = useCallback((mes: string) => {
-    console.log('📊 [Firebase getImpuestosMes] called - mes:', mes, 'total impuestos:', impuestos.length)
     return impuestos.filter(i => i.mes === mes)
   }, [impuestos])
 

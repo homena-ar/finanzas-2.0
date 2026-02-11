@@ -22,11 +22,9 @@ const getMesFacturacion = (fecha: string): string => {
 }
 
 export default function GastosPage() {
-  console.log('🔵🔵🔵 [GastosPage] COMPONENT RENDER')
-
   const searchParams = useSearchParams()
   const { user, profile } = useAuth()
-  const { currentWorkspace, members } = useWorkspace() // Traemos info del workspace
+  const { currentWorkspace, members } = useWorkspace()
   const {
     tarjetas, categorias, tags, mediosPago, gastos,
     currentMonth, monthKey, getGastosMes, getImpuestosMes,
@@ -34,8 +32,6 @@ export default function GastosPage() {
     addImpuesto, updateImpuesto, deleteImpuesto,
     addTag, addCategoria, addTarjeta, addMedioPago
   } = useData()
-
-  console.log('🔵🔵🔵 [GastosPage] addGasto function reference:', addGasto)
 
   const [showGastoModal, setShowGastoModal] = useState(false)
   const [showImpModal, setShowImpModal] = useState(false)

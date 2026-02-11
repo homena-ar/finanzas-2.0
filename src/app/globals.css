@@ -30,10 +30,15 @@ body {
 @layer components {
   /* ===== BUTTONS ===== */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg font-medium text-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm
+           transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
     -webkit-user-select: none;
     user-select: none;
     touch-action: manipulation;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
   }
 
   .btn-sm {
@@ -41,23 +46,23 @@ body {
   }
 
   .btn-primary {
-    @apply bg-primary text-white hover:bg-primary-600 active:bg-primary-700;
+    @apply bg-primary text-white hover:bg-primary-700 active:bg-primary-800 shadow-sm hover:shadow;
   }
 
   .btn-success {
-    @apply bg-emerald-500 text-white hover:bg-emerald-600;
+    @apply bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm;
   }
 
   .btn-danger {
-    @apply bg-red-500 text-white hover:bg-red-600;
+    @apply bg-red-500 text-white hover:bg-red-600 shadow-sm;
   }
 
   .btn-warning {
-    @apply bg-amber-500 text-white hover:bg-amber-600;
+    @apply bg-amber-500 text-white hover:bg-amber-600 shadow-sm;
   }
 
   .btn-secondary {
-    @apply bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 hover:border-slate-300;
+    @apply bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-sm;
   }
 
   /* ===== CARDS ===== */
@@ -66,7 +71,7 @@ body {
   }
 
   .stat-card {
-    @apply card p-4 hover:shadow-md transition-shadow duration-200;
+    @apply card p-4 hover:shadow-md transition-all duration-200;
   }
 
   /* ===== FORM ELEMENTS ===== */
@@ -76,7 +81,7 @@ body {
            placeholder:text-slate-400
            focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100/60
            disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed
-           transition-colors;
+           transition-all duration-150;
     height: 40px;
     font-size: 14px;
     line-height: 1.5;
@@ -86,7 +91,7 @@ body {
   .input-compact {
     @apply px-2.5 bg-slate-50/80 border border-slate-200/80 rounded-lg text-slate-600
            focus:outline-none focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100/60
-           transition-all;
+           transition-all duration-150;
     height: 32px;
     font-size: 13px;
     line-height: 1.5;
@@ -121,8 +126,8 @@ body {
   select:focus {
     color: rgb(30, 41, 59) !important;
     background-color: white !important;
-    border-color: rgb(129, 140, 248) !important;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.06) !important;
+    border-color: rgb(45, 212, 191) !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.08) !important;
   }
 
   select.input option,
@@ -172,10 +177,12 @@ body {
   /* ===== MODALS ===== */
   .modal-overlay {
     @apply fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    animation: fade-in-overlay 0.15s ease-out;
   }
 
   .modal {
-    @apply bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl;
+    @apply bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl;
+    animation: scale-in-modal 0.2s ease-out;
   }
 
   /* ===== SECTION HEADERS ===== */
@@ -192,17 +199,23 @@ body {
   }
 
   /* ===== ANIMATIONS ===== */
+  @keyframes fade-in-overlay {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes scale-in-modal {
+    0% { opacity: 0; transform: scale(0.95) translateY(8px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
   @keyframes progressBar {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
   .progress-bar-animated {
-    background: linear-gradient(90deg, rgb(99, 102, 241) 0%, rgb(79, 70, 229) 50%, rgb(99, 102, 241) 100%);
+    background: linear-gradient(90deg, rgb(13, 148, 136) 0%, rgb(15, 118, 110) 50%, rgb(13, 148, 136) 100%);
     background-size: 200% 100%;
     animation: progressBar 2s ease-in-out infinite;
   }
@@ -213,7 +226,7 @@ body {
   }
 
   .currency-toggle button {
-    @apply px-3 py-1 rounded-md text-xs font-medium transition-all duration-150;
+    @apply px-3 py-1 rounded-md text-xs font-medium transition-all duration-200;
   }
 
   .currency-toggle button.active {
@@ -237,6 +250,12 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
+    animation: slide-up-modal 0.25s ease-out;
+  }
+
+  @keyframes slide-up-modal {
+    0% { opacity: 0; transform: translateY(100%); }
+    100% { opacity: 1; transform: translateY(0); }
   }
 
   .input {

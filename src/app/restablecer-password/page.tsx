@@ -103,7 +103,7 @@ function RestablecerContraseñaContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-accent-600 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-600 to-primary-400 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -237,7 +237,7 @@ function RestablecerContraseñaContent() {
 export default function RestablecerContraseñaPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-primary-600 via-accent-600 to-pink-500 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-600 to-primary-400 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-2xl shadow-black/20 p-6 text-center">
             <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />

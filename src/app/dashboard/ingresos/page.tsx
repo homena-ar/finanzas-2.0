@@ -1518,9 +1518,9 @@ export default function IngresosPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 w-12">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase w-12">
                   <input
                     type="checkbox"
                     checked={selectedIngresos.size === ingresosMes.length && ingresosMes.length > 0}
@@ -1531,16 +1531,16 @@ export default function IngresosPage() {
                         setSelectedIngresos(new Set())
                       }
                     }}
-                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                    className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                   />
                 </th>
-                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 min-w-[200px]">Descripción</th>
-                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden sm:table-cell min-w-[120px]">Cuenta</th>
-                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden md:table-cell">Fecha</th>
-                <th className="text-right p-3 sm:p-4 font-semibold text-slate-700 whitespace-nowrap">Monto</th>
-                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden lg:table-cell">Estado</th>
-                <th className="text-left p-3 sm:p-4 font-semibold text-slate-700 hidden lg:table-cell">Fijo</th>
-                <th className="text-right p-3 sm:p-4 font-semibold text-slate-700">Acciones</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase min-w-[200px]">Descripción</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden sm:table-cell min-w-[120px]">Cuenta</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden md:table-cell">Fecha</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Monto</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden lg:table-cell">Estado</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase hidden lg:table-cell">Fijo</th>
+                <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase"></th>
               </tr>
             </thead>
             <tbody>

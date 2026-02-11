@@ -59,7 +59,7 @@ export function getInvitationEmailTemplate(
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center;">
+            <td style="background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); padding: 40px 30px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                 🎉 ¡Te invitaron a colaborar!
               </h1>
@@ -70,11 +70,11 @@ export function getInvitationEmailTemplate(
           <tr>
             <td style="padding: 40px 30px;">
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                ${safeInviterName ? `Hola,<br><br><strong>${safeInviterName}</strong> te ha invitado a colaborar en el workspace <strong style="color: #6366f1;">${safeWorkspaceName}</strong> en FinControl.` : `Has sido invitado a colaborar en el workspace <strong style="color: #6366f1;">${safeWorkspaceName}</strong> en FinControl.`}
+                ${safeInviterName ? `Hola,<br><br><strong>${safeInviterName}</strong> te ha invitado a colaborar en el workspace <strong style="color: #0d9488;">${safeWorkspaceName}</strong> en FinControl.` : `Has sido invitado a colaborar en el workspace <strong style="color: #0d9488;">${safeWorkspaceName}</strong> en FinControl.`}
               </p>
 
               <!-- Permisos Section -->
-              <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #6366f1;">
+              <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-radius: 8px; padding: 24px; margin: 30px 0; border-left: 4px solid #0d9488;">
                 <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
                   📋 Permisos asignados
                 </h2>
@@ -82,7 +82,7 @@ export function getInvitationEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">💰 Gastos</td>
                     <td align="right" style="padding: 8px 0;">
-                      <span style="background-color: #6366f1; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                      <span style="background-color: #0d9488; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
                         ${getPermissionLabel(permissions.gastos)}
                       </span>
                     </td>
@@ -90,7 +90,7 @@ export function getInvitationEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">💵 Ingresos</td>
                     <td align="right" style="padding: 8px 0;">
-                      <span style="background-color: #6366f1; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                      <span style="background-color: #0d9488; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
                         ${getPermissionLabel(permissions.ingresos)}
                       </span>
                     </td>
@@ -98,7 +98,7 @@ export function getInvitationEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">🏦 Ahorros</td>
                     <td align="right" style="padding: 8px 0;">
-                      <span style="background-color: #6366f1; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                      <span style="background-color: #0d9488; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
                         ${getPermissionLabel(permissions.ahorros)}
                       </span>
                     </td>
@@ -106,7 +106,7 @@ export function getInvitationEmailTemplate(
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">💳 Tarjetas</td>
                     <td align="right" style="padding: 8px 0;">
-                      <span style="background-color: #6366f1; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                      <span style="background-color: #0d9488; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
                         ${getPermissionLabel(permissions.tarjetas)}
                       </span>
                     </td>
@@ -120,7 +120,7 @@ export function getInvitationEmailTemplate(
                   📝 Cómo aceptar la invitación
                 </h3>
                 <ol style="margin: 0; padding-left: 20px; color: #78350f; font-size: 14px; line-height: 1.8;">
-                  <li style="margin-bottom: 8px;">Inicia sesión en FinControl con tu email: <strong style="color: #6366f1;">${safeEmail}</strong></li>
+                  <li style="margin-bottom: 8px;">Inicia sesión en FinControl con tu email: <strong style="color: #0d9488;">${safeEmail}</strong></li>
                   <li style="margin-bottom: 8px;">Ve a la página de <strong>Configuración</strong></li>
                   <li style="margin-bottom: 8px;">Verás la invitación pendiente y podrás aceptarla</li>
                 </ol>
@@ -129,7 +129,7 @@ export function getInvitationEmailTemplate(
               <!-- CTA Button -->
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
-                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                   style="display: inline-block; background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(13, 148, 136, 0.3);">
                   Ver Invitación
                 </a>
               </div>
@@ -140,7 +140,7 @@ export function getInvitationEmailTemplate(
           <tr>
             <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
-                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+                Este es un email automático de <strong style="color: #0d9488;">FinControl</strong>.
               </p>
               <p style="margin: 0; color: #9ca3af; font-size: 11px;">
                 Si no esperabas esta invitación, puedes ignorar este mensaje de forma segura.
@@ -368,7 +368,7 @@ export function getInvitationRejectedEmailTemplate(
 
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
-                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                   style="display: inline-block; background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(13, 148, 136, 0.3);">
                   Ver Invitaciones
                 </a>
               </div>
@@ -379,7 +379,7 @@ export function getInvitationRejectedEmailTemplate(
           <tr>
             <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
-                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+                Este es un email automático de <strong style="color: #0d9488;">FinControl</strong>.
               </p>
             </td>
           </tr>
@@ -526,7 +526,7 @@ export function getWelcomeEmailTemplate(
                           Chrome o Edge (Escritorio)
                         </h4>
                         <ol style="margin: 0; padding-left: 20px; color: #6b7280; font-size: 13px; line-height: 1.8;">
-                          <li style="margin-bottom: 6px;">Buscá el ícono de instalación <strong style="color: #6366f1;">➕</strong> en la barra de direcciones (a veces Chrome no lo muestra; en ese caso usá el menú)</li>
+                          <li style="margin-bottom: 6px;">Buscá el ícono de instalación <strong style="color: #0d9488;">➕</strong> en la barra de direcciones (a veces Chrome no lo muestra; en ese caso usá el menú)</li>
                           <li style="margin-bottom: 6px;">O ve a <strong>Menú (⋮)</strong> → <strong>"Instalar FinControl"</strong> o <strong>"Instalar app"</strong></li>
                           <li>Hacé clic en <strong>"Instalar"</strong> y listo</li>
                         </ol>
@@ -1223,7 +1223,7 @@ export function getMemberLeftEmailTemplate(
 
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config" 
-                   style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                   style="display: inline-block; background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(13, 148, 136, 0.3);">
                   Ver Miembros
                 </a>
               </div>
@@ -1234,7 +1234,7 @@ export function getMemberLeftEmailTemplate(
           <tr>
             <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
-                Este es un email automático de <strong style="color: #6366f1;">FinControl</strong>.
+                Este es un email automático de <strong style="color: #0d9488;">FinControl</strong>.
               </p>
             </td>
           </tr>
@@ -1262,6 +1262,105 @@ El usuario ya no tiene acceso al espacio. Si deseas que vuelva a colaborar, pod�
 Ver miembros: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/config
 
 Este es un email automático de FinControl.`
+
+  return { html, text, subject }
+}
+
+// ============================================
+// RECORDATORIO / REMINDER EMAIL
+// ============================================
+
+export function getReminderEmailTemplate(
+  userName: string,
+  titulo: string,
+  descripcion: string,
+  fecha: string,
+  daysUntil: number
+): { html: string; text: string; subject: string } {
+  const safeName = escapeHtml(userName)
+  const safeTitulo = escapeHtml(titulo)
+  const safeDescripcion = escapeHtml(descripcion)
+  const subject = titulo
+
+  const urgencyLabel = daysUntil === 0 ? 'Hoy' : daysUntil === 1 ? 'Mañana' : `En ${daysUntil} días`
+  const urgencyColor = daysUntil === 0 ? '#ef4444' : daysUntil <= 2 ? '#f59e0b' : '#0d9488'
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%); padding: 35px 30px; text-align: center;">
+              <div style="font-size: 36px; margin-bottom: 12px;">🔔</div>
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600; letter-spacing: -0.3px;">Recordatorio</h1>
+              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">Hola ${safeName}, te recordamos:</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 30px;">
+              <div style="background-color: #f0fdfa; border-left: 4px solid ${urgencyColor}; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+                <div style="display: inline-block; padding: 2px 10px; background-color: ${urgencyColor}; color: white; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">${urgencyLabel}</div>
+                <h2 style="margin: 8px 0 0 0; color: #115e59; font-size: 18px; font-weight: 600;">${safeTitulo}</h2>
+              </div>
+
+              ${safeDescripcion ? `
+              <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.6;">${safeDescripcion}</p>
+              </div>` : ''}
+
+              <div style="text-align: center; margin: 24px 0;">
+                <p style="margin: 0; color: #64748b; font-size: 13px;">📅 Fecha: <strong style="color: #0f4a46;">${fecha}</strong></p>
+              </div>
+
+              <div style="text-align: center; margin-top: 24px;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/recordatorios"
+                   style="display: inline-block; background: linear-gradient(135deg, #0d9488, #0f766e); color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                  Ver recordatorio
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px;">
+                Email automático de <strong style="color: #0d9488;">FinControl</strong>. No responder.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `Recordatorio: ${titulo}
+
+Hola ${userName},
+
+Te recordamos: ${titulo}
+${descripcion ? `\nDetalle: ${descripcion}` : ''}
+Fecha: ${fecha}
+Urgencia: ${urgencyLabel}
+
+Ver: ${process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'}/dashboard/recordatorios
+
+Email automático de FinControl.`
 
   return { html, text, subject }
 }
