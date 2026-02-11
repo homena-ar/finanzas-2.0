@@ -34,13 +34,9 @@ ChartJS.register(
 )
 
 export default function AhorrosPage() {
-  console.log('🟢🟢🟢 [AhorrosPage] COMPONENT RENDER')
-
-  const { profile, updateProfile, user } = useAuth()
+  const { user, profile } = useAuth()
   const { metas, movimientos, addMeta, updateMeta, deleteMeta, addMovimiento, updateMovimiento, deleteMovimiento } = useData()
   const { currentWorkspace, members } = useWorkspace()
-
-  console.log('🟢🟢🟢 [AhorrosPage] addMovimiento function reference:', addMovimiento)
 
   // Helper para obtener el nombre del usuario que creó un elemento
   const getCreatorName = (createdBy?: string) => {
@@ -80,67 +76,39 @@ export default function AhorrosPage() {
       .catch(err => console.error('Error al obtener cotización del dólar:', err))
   }, [])
 
-  // Calcular patrimonio: si está en workspace, calcular desde movimientos; si no, usar perfil personal
+  // Calcular patrimonio: SIEMPRE computar desde movimientos (fuente de verdad única)
+  // Los campos profile.ahorro_pesos/ahorro_usd son caches obsoletos y no deben usarse como fuente de verdad
   const calcularPatrimonio = () => {
-    if (currentWorkspace) {
-      // En workspace: calcular desde movimientos del workspace
-      const movimientosWorkspace = movimientos.filter(m => m.workspace_id === currentWorkspace.id)
-      const ahorroPesos = movimientosWorkspace
-        .filter(m => m.tipo === 'pesos')
-        .reduce((sum, m) => sum + m.monto, 0)
-      const ahorroUsd = movimientosWorkspace
-        .filter(m => m.tipo === 'usd')
-        .reduce((sum, m) => sum + m.monto, 0)
-      
-      return {
-        ahorroPesos,
-        ahorroUsd,
-        patrimonioEnPesos: ahorroPesos + (ahorroUsd * dolar),
-        patrimonioEnUsd: (ahorroPesos / dolar) + ahorroUsd
-      }
-    } else {
-      // En espacio personal: usar perfil
-      const ahorroPesos = profile?.ahorro_pesos || 0
-      const ahorroUsd = profile?.ahorro_usd || 0
-      return {
-        ahorroPesos,
-        ahorroUsd,
-        patrimonioEnPesos: ahorroPesos + (ahorroUsd * dolar),
-        patrimonioEnUsd: (ahorroPesos / dolar) + ahorroUsd
-      }
+    const relevantMovimientos = currentWorkspace
+      ? movimientos.filter(m => m.workspace_id === currentWorkspace.id)
+      : movimientos
+    const ahorroPesos = relevantMovimientos
+      .filter(m => m.tipo === 'pesos')
+      .reduce((sum, m) => sum + m.monto, 0)
+    const ahorroUsd = relevantMovimientos
+      .filter(m => m.tipo === 'usd')
+      .reduce((sum, m) => sum + m.monto, 0)
+
+    return {
+      ahorroPesos,
+      ahorroUsd,
+      patrimonioEnPesos: ahorroPesos + (ahorroUsd * dolar),
+      patrimonioEnUsd: (ahorroPesos / dolar) + ahorroUsd
     }
   }
 
   const { ahorroPesos, ahorroUsd, patrimonioEnPesos, patrimonioEnUsd } = calcularPatrimonio()
 
   const handleAddSavings = async (tipo: 'pesos' | 'usd', isAdd: boolean) => {
-    console.log('🟢 [AhorrosPage] handleAddSavings CALLED - tipo:', tipo, 'isAdd:', isAdd, 'workspace:', currentWorkspace?.id)
-
     const input = tipo === 'pesos' ? inputPesos : inputUsd
     const amount = parseFloat(input)
-
-    if (!amount || amount <= 0) {
-      console.log('🟢 [AhorrosPage] handleAddSavings - Invalid amount, returning')
-      return
-    }
+    if (!amount || amount <= 0) return
 
     const finalAmount = isAdd ? amount : -amount
     const descripcion = tipo === 'pesos' ? descPesos : descUsd
 
-    if (currentWorkspace) {
-      // En workspace: solo agregar movimiento, NO actualizar perfil personal
-      console.log('🟢 [AhorrosPage] Workspace mode - solo agregando movimiento')
-      await addMovimiento(tipo, finalAmount, descripcion || undefined)
-    } else {
-      // En espacio personal: actualizar perfil Y agregar movimiento
-      console.log('🟢 [AhorrosPage] Personal mode - actualizando perfil y agregando movimiento')
-      const field = tipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
-      const currentValue = tipo === 'pesos' ? (profile?.ahorro_pesos || 0) : (profile?.ahorro_usd || 0)
-      const newValue = Math.max(0, currentValue + finalAmount)
-      
-      await updateProfile({ [field]: newValue })
-      await addMovimiento(tipo, finalAmount, descripcion || undefined)
-    }
+    // Siempre solo agregar movimiento - los totales se computan desde movimientos
+    await addMovimiento(tipo, finalAmount, descripcion || undefined)
 
     if (tipo === 'pesos') {
       setInputPesos('')
@@ -310,15 +278,7 @@ export default function AhorrosPage() {
 
   const handleDeleteMovimiento = async () => {
     if (!movimientoToDelete) return
-
-    // Solo actualizar perfil si NO está en workspace
-    if (!currentWorkspace) {
-      const field = movimientoToDelete.tipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
-      const currentValue = movimientoToDelete.tipo === 'pesos' ? (profile?.ahorro_pesos || 0) : (profile?.ahorro_usd || 0)
-      const newValue = Math.max(0, currentValue - movimientoToDelete.monto)
-      await updateProfile({ [field]: newValue })
-    }
-
+    // Totales se recalculan automáticamente desde movimientos, no necesita updateProfile
     await deleteMovimiento(movimientoToDelete.id)
     setMovimientoToDelete(null)
   }
@@ -334,12 +294,7 @@ export default function AhorrosPage() {
     setIsDeleting(true)
     setDeleteProgress(0)
 
-    // Solo actualizar perfil si NO está en workspace
-    if (!currentWorkspace) {
-      const field = currentTipo === 'pesos' ? 'ahorro_pesos' : 'ahorro_usd'
-      // Al eliminar TODOS los movimientos, poner patrimonio en 0
-      await updateProfile({ [field]: 0 })
-    }
+    // Totales se recalculan automáticamente desde movimientos, no necesita updateProfile
 
     // Eliminar todos los movimientos con progreso
     for (let i = 0; i < movimientosToDelete.length; i++) {
