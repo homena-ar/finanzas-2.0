@@ -38,7 +38,14 @@ export default function RecordatoriosPage() {
   })
 
   const fetchRecordatorios = useCallback(async () => {
-    if (!user || !currentWorkspace?.id) return
+    if (!user || !currentWorkspace?.id) {
+      // Dependencies not ready yet. Set loading to false to avoid infinite
+      // "Cargando..." state when this runs before workspace is initialized.
+      // When user/workspace become available, the useCallback ref changes and
+      // the useEffect below re-triggers the fetch with loading=true.
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const constraints: any[] = [

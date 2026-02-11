@@ -38,13 +38,18 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 
 // CRITICAL for PWA iOS: use initializeAuth with persistence array BEFORE any auth reads.
 // getAuth() uses default persistence which can lose sessions when iOS kills the PWA.
-// initializeAuth() sets persistence at init time, ensuring IndexedDB is used from the start.
+// initializeAuth() sets persistence at init time.
+//
+// ORDER MATTERS: browserLocalPersistence (localStorage) FIRST, then indexedDBLocalPersistence.
+// On iOS standalone PWA, the OS can evict IndexedDB data under memory pressure when the
+// app is killed from the app switcher. localStorage is more resilient against this eviction,
+// so we prefer it as the primary persistence layer for PWA reliability.
 // try/catch handles HMR where initializeAuth may have already been called.
 let auth: Auth
 if (typeof window !== 'undefined') {
   try {
     auth = initializeAuth(app, {
-      persistence: [indexedDBLocalPersistence, browserLocalPersistence]
+      persistence: [browserLocalPersistence, indexedDBLocalPersistence]
     })
   } catch {
     // Already initialized (HMR / fast refresh) - fall back to getAuth

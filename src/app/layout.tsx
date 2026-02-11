@@ -41,11 +41,13 @@ export const metadata: Metadata = {
     description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares. Gestioná gastos, ingresos, ahorros y proyecciones.',
     siteName: 'FinControl',
     images: [
-      // PNG dinámico (mejor compatibilidad WhatsApp/Facebook)
-      { 
-        url: '/og-image.png', 
-        width: 1200, 
+      // Absolute URL required for WhatsApp/Facebook/Telegram crawlers.
+      // The path /og-image.png is rewritten to the dynamic /opengraph-image endpoint.
+      {
+        url: `${baseUrl}/og-image.png`,
+        width: 1200,
         height: 630,
+        type: 'image/png',
         alt: 'FinControl - Plataforma de Control Financiero',
       },
     ],
@@ -58,7 +60,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'FinControl - Controlá tus Finanzas',
     description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares.',
-    images: ['/twitter-image.png'],
+    images: [`${baseUrl}/twitter-image.png`],
   },
   appleWebApp: {
     capable: true,

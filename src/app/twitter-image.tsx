@@ -14,7 +14,7 @@ export default function TwitterImage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
           fontFamily:
             'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
         }}
