@@ -290,9 +290,9 @@ export function DatePicker({ value, onChange, label, className = '', placeholder
                   onClick={() => handleDateSelect(day)}
                   className={`aspect-square flex items-center justify-center text-sm rounded transition-colors ${
                     isSelected(day)
-                      ? 'bg-indigo-600 text-white font-semibold border-2 border-indigo-800'
+                      ? 'bg-primary-600 text-white font-semibold border-2 border-primary-800'
                       : isToday(day)
-                      ? 'bg-indigo-100 text-indigo-700 font-semibold'
+                      ? 'bg-primary-100 text-primary-700 font-semibold'
                       : 'hover:bg-slate-100 text-slate-700'
                   }`}
                 >
@@ -324,7 +324,7 @@ export function DatePicker({ value, onChange, label, className = '', placeholder
             <button
               type="button"
               onClick={handleToday}
-              className="text-sm text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded hover:bg-indigo-50 font-medium"
+              className="text-sm text-primary-600 hover:text-primary-800 px-3 py-1.5 rounded hover:bg-primary-50 font-medium"
             >
               Hoy
             </button>

@@ -120,7 +120,7 @@ export function MonthYearPicker({ value, onChange, label, className = '' }: Mont
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm font-medium text-slate-700 min-w-[200px] justify-between"
+        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm font-medium text-slate-700 min-w-[200px] justify-between"
       >
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-500" />
@@ -149,9 +149,9 @@ export function MonthYearPicker({ value, onChange, label, className = '' }: Mont
                     key={month.value}
                     type="button"
                     onClick={() => handleMonthSelect(month.value)}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 transition-colors ${
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors ${
                       selectedMonth === month.value
-                        ? 'bg-indigo-100 text-indigo-700 font-semibold'
+                        ? 'bg-primary-100 text-primary-700 font-semibold'
                         : 'text-slate-700'
                     }`}
                   >
@@ -178,9 +178,9 @@ export function MonthYearPicker({ value, onChange, label, className = '' }: Mont
                     key={year}
                     type="button"
                     onClick={() => handleYearSelect(year)}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 transition-colors ${
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors ${
                       selectedYear === year
-                        ? 'bg-indigo-100 text-indigo-700 font-semibold'
+                        ? 'bg-primary-100 text-primary-700 font-semibold'
                         : 'text-slate-700'
                     }`}
                   >

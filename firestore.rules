@@ -476,6 +476,39 @@ service cloud.firestore {
     }
 
     // ============================================
+    // RECORDATORIOS (REMINDERS) COLLECTION
+    // ============================================
+    match /recordatorios/{recordatorioId} {
+      // Read: own reminders OR workspace owner/member
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
+      );
+
+      // Create: must be authenticated, must include user_id + workspace_id
+      allow create: if request.auth != null &&
+        request.resource.data.user_id == request.auth.uid &&
+        request.resource.data.keys().hasAll(['workspace_id']);
+
+      // Update: own reminders OR workspace owner/member
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
+      );
+
+      // Delete: own reminders OR workspace owner
+      allow delete: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        (resource.data.keys().hasAll(['workspace_id']) &&
+         isWorkspaceOwner(resource.data.workspace_id))
+      );
+    }
+
+    // ============================================
     // NOTIFICACIONES COLLECTION
     // ============================================
     match /notificaciones/{notificacionId} {

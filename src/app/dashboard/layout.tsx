@@ -126,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -138,7 +138,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (user && !initWorkspaceReady) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-50">
-        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
         <p className="text-slate-600">Cargando tu espacio…</p>
       </div>
     )
@@ -249,7 +249,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   ) : (
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
-                      currentWorkspace.owner_id === user.uid ? 'bg-indigo-500' : 'bg-purple-500'
+                      currentWorkspace.owner_id === user.uid ? 'bg-primary-500' : 'bg-purple-500'
                     }`}>
                       {currentWorkspace.name.charAt(0).toUpperCase()}
                     </div>
@@ -346,12 +346,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       }}
                       className={`
                         w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between
-                        ${currentWorkspace?.id === workspace.id ? (isOwner ? 'bg-indigo-50' : 'bg-purple-50') : ''}
+                        ${currentWorkspace?.id === workspace.id ? (isOwner ? 'bg-primary-50' : 'bg-purple-50') : ''}
                       `}
                     >
                       <div className="flex items-center gap-3 overflow-hidden">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${
-                          workspace.logo || workspace.icono ? 'bg-transparent' : (isOwner ? 'bg-indigo-500' : 'bg-purple-500')
+                          workspace.logo || workspace.icono ? 'bg-transparent' : (isOwner ? 'bg-primary-500' : 'bg-purple-500')
                         }`}>
                           {workspace.logo ? (
                             <img src={workspace.logo} alt="Logo" className="w-full h-full object-cover border border-slate-200 rounded-lg" />
@@ -363,13 +363,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </div>
                         <div className="overflow-hidden">
                           <div className="text-sm font-medium text-slate-900 truncate">{workspace.name}</div>
-                          <div className={`text-[10px] font-bold uppercase ${isOwner ? 'text-indigo-600' : 'text-purple-600'}`}>
+                          <div className={`text-[10px] font-bold uppercase ${isOwner ? 'text-primary' : 'text-purple-600'}`}>
                             {isOwner ? 'Propietario' : 'Colaborador'}
                           </div>
                         </div>
                       </div>
                       {currentWorkspace?.id === workspace.id && (
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${isOwner ? 'bg-indigo-600' : 'bg-purple-600'}`} />
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${isOwner ? 'bg-primary-600' : 'bg-purple-600'}`} />
                       )}
                     </button>
                   )

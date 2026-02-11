@@ -104,7 +104,7 @@ export function TransactionImportConfirmModal({
               <div className="text-sm text-slate-900">
                 {accountName}
                 {accountIsSuggested && (
-                  <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">
+                  <span className="ml-2 text-xs bg-primary-100 text-primary-600 px-2 py-0.5 rounded">
                     (sugerida)
                   </span>
                 )}

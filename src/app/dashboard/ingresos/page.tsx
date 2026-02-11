@@ -1476,13 +1476,13 @@ export default function IngresosPage() {
 
         {/* Acciones masivas */}
         {selectedIngresos.size > 0 && (
-          <div className="p-4 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between flex-wrap gap-2">
-            <span className="text-sm font-semibold text-indigo-900">
+          <div className="p-4 bg-primary-50 border-b border-primary-200 flex items-center justify-between flex-wrap gap-2">
+            <span className="text-sm font-semibold text-primary-900">
               {selectedIngresos.size} ingreso{selectedIngresos.size !== 1 ? 's' : ''} seleccionado{selectedIngresos.size !== 1 ? 's' : ''}
             </span>
             <div className="flex gap-2 items-center flex-wrap">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-indigo-900">Cambiar categoría:</label>
+                <label className="text-xs font-semibold text-primary-900">Cambiar categoría:</label>
                 <select
                   onChange={async (e) => {
                     const categoriaId = e.target.value || null
@@ -1576,7 +1576,7 @@ export default function IngresosPage() {
                           }
                           setSelectedIngresos(newSelected)
                         }}
-                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                        className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
@@ -1766,7 +1766,7 @@ export default function IngresosPage() {
             <div className="p-4 space-y-4">
               {/* Botón para subir imagen con IA - Solo mostrar si NO está editando */}
               {!editing && (
-                <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
+                <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg border-2 border-purple-200">
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-purple-600" />
                     <div className="flex-1">
@@ -1969,7 +1969,7 @@ export default function IngresosPage() {
                     id="es_fijo"
                     checked={form.es_fijo}
                     onChange={e => setForm(f => ({ ...f, es_fijo: e.target.checked }))}
-                    className="w-5 h-5 text-indigo-600 rounded border-slate-300"
+                    className="w-5 h-5 text-primary rounded border-slate-300"
                   />
                   <label htmlFor="es_fijo" className="font-semibold text-slate-700 cursor-pointer">
                     📌 Ingreso fijo mensual
@@ -2023,7 +2023,7 @@ export default function IngresosPage() {
                           id="notificar_correo"
                           checked={form.notificar_correo !== undefined ? form.notificar_correo : true}
                           onChange={e => setForm(f => ({ ...f, notificar_correo: e.target.checked }))}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 mt-0.5"
+                          className="w-4 h-4 text-primary rounded border-slate-300 mt-0.5"
                         />
                         <div>
                           <span className="text-sm font-medium text-slate-700">Generar un recordatorio</span>
@@ -2062,7 +2062,7 @@ export default function IngresosPage() {
                     <a
                       href={(editing as any).comprobante_url}
                       download={(editing as any).comprobante_nombre}
-                      className="text-xs text-indigo-600 hover:underline"
+                      className="text-xs text-primary hover:underline"
                     >
                       Descargar
                     </a>
@@ -2083,8 +2083,8 @@ export default function IngresosPage() {
               </div>
 
               {editing && (editing as any).es_fijo && (
-                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <p className="text-xs text-indigo-700">
+                <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
+                  <p className="text-xs text-primary-700">
                     📌 Este es un ingreso fijo. Los cambios se aplicarán automáticamente a todos los meses.
                   </p>
                 </div>
@@ -2248,7 +2248,7 @@ export default function IngresosPage() {
                         onClick={() => setUseGlobalDate(!useGlobalDate)}
                         className={`text-xs px-2 py-1 rounded ${
                           useGlobalDate 
-                            ? 'bg-indigo-100 text-indigo-700' 
+                            ? 'bg-primary-100 text-primary-700' 
                             : 'bg-slate-200 text-slate-600'
                         }`}
                       >
@@ -2269,8 +2269,8 @@ export default function IngresosPage() {
 
                   {/* Selección de cuenta/tarjeta si fue detectada */}
                   {detectedCuenta && (
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                      <div className="text-sm font-semibold text-indigo-900 mb-2">
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+                      <div className="text-sm font-semibold text-primary-900 mb-2">
                         💳 Cuenta/Tarjeta detectada: {buildDetectedCuentaName(detectedCuenta)}
                       </div>
                       <div className="space-y-2">
@@ -2321,9 +2321,9 @@ export default function IngresosPage() {
                           <option value="__new__">➕ Crear nueva cuenta/tarjeta (manual)</option>
                         </select>
                         {(selectedCuentaId === '__new_suggested__' || selectedCuentaId === '__new__') && (
-                          <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-2">
+                          <div className="p-3 bg-white rounded-lg border border-primary-200 space-y-2">
                             {selectedCuentaId === '__new_suggested__' && (
-                              <div className="text-xs text-indigo-700 bg-indigo-50 p-2 rounded">
+                              <div className="text-xs text-primary-700 bg-primary-50 p-2 rounded">
                                 💡 La cuenta se creará automáticamente al confirmar la importación
                               </div>
                             )}
@@ -2752,14 +2752,14 @@ export default function IngresosPage() {
                     <button
                       type="button"
                       onClick={() => setAiShowNewCategoriaInput(true)}
-                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                      className="w-full px-3 py-2 bg-primary-50 text-primary-700 border-2 border-primary-200 rounded-lg text-sm font-bold hover:bg-primary-100 transition"
                     >
                       + Crear nueva categoría
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
-                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-primary-50 to-purple-50 rounded-xl border-2 border-primary-300 shadow-sm">
+                    <div className="text-sm font-bold text-primary-900">✨ Nueva Categoría</div>
                     <div>
                       <input
                         type="text"
@@ -2771,7 +2771,7 @@ export default function IngresosPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <div className="text-xs font-bold text-primary-900 mb-1.5">Icono</div>
                       <EmojiPickerField
                         value={aiNewCategoria.icono}
                         onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
@@ -2781,7 +2781,7 @@ export default function IngresosPage() {
                     </div>
                     <div className="flex gap-2 items-center">
                       <div>
-                        <div className="text-xs font-bold text-indigo-900 mb-1">Color</div>
+                        <div className="text-xs font-bold text-primary-900 mb-1">Color</div>
                         <input
                           type="color"
                           className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
@@ -2919,7 +2919,7 @@ export default function IngresosPage() {
                           id="ai_notificar_correo"
                           checked={aiTransactionForm.notificar_correo}
                           onChange={e => setAiTransactionForm(f => ({ ...f, notificar_correo: e.target.checked }))}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 mt-0.5"
+                          className="w-4 h-4 text-primary rounded border-slate-300 mt-0.5"
                         />
                         <div>
                           <span className="text-sm font-medium text-slate-700">Generar un recordatorio</span>
