@@ -155,7 +155,7 @@ export default function TarjetasPage() {
     console.log('💳 [TarjetasPage] SHOWING LOADING SPINNER - loading is TRUE')
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -298,7 +298,7 @@ export default function TarjetasPage() {
                     onClick={() => setForm(f => ({ ...f, esCuenta: false, tipo: 'visa' }))}
                     className={`p-4 rounded-xl border-2 transition ${
                       !form.esCuenta
-                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                        ? 'bg-primary-50 border-primary-500 text-primary-700'
                         : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
                     }`}
                   >
@@ -410,7 +410,7 @@ export default function TarjetasPage() {
                       type="checkbox"
                       checked={form.notificar_cierre}
                       onChange={e => setForm(f => ({ ...f, notificar_cierre: e.target.checked }))}
-                      className="w-4 h-4 accent-indigo-500 rounded"
+                      className="w-4 h-4 accent-primary rounded"
                     />
                     <div>
                       <span className="text-sm font-medium">Recordar cierre</span>
@@ -422,7 +422,7 @@ export default function TarjetasPage() {
                       type="checkbox"
                       checked={form.notificar_vencimiento}
                       onChange={e => setForm(f => ({ ...f, notificar_vencimiento: e.target.checked }))}
-                      className="w-4 h-4 accent-indigo-500 rounded"
+                      className="w-4 h-4 accent-primary rounded"
                     />
                     <div>
                       <span className="text-sm font-medium">Recordar vencimiento</span>

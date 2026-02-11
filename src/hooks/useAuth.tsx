@@ -275,100 +275,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Listener adicional para restaurar sesión cuando la app vuelve a estar visible
-  // Esto es especialmente importante en iOS cuando la PWA se cierra y se vuelve a abrir
+  // Keep a ref so the visibility handler always sees the latest user/loading
+  const userRef = useRef<User | null>(null)
+  const loadingRef = useRef(true)
+  useEffect(() => { userRef.current = user }, [user])
+  useEffect(() => { loadingRef.current = loading }, [loading])
+
+  // Session revalidation when the app becomes visible again.
+  // Critical for iOS PWA where killing the app from the switcher may
+  // cause auth.currentUser to be null in React state while Firebase
+  // persistence still holds the session in IndexedDB.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     let isRestoring = false
 
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && !isRestoring) {
-        console.log('🔐 [Firebase useAuth] App visible - verificando sesión')
-        
-        // Primero intentar restaurar desde auth.currentUser (si Firebase mantuvo la sesión)
-        if (auth.currentUser && !user) {
-          isRestoring = true
-          console.log('🔐 [Firebase useAuth] Restaurando sesión desde auth.currentUser')
+      if (document.visibilityState !== 'visible') return
+      if (isRestoring || loadingRef.current) return
+      isRestoring = true
+
+      try {
+        const currentUser = auth.currentUser
+        if (currentUser) {
+          // Validate the token with a force-refresh. This also extends the
+          // session lifetime which prevents silent expiration on iOS.
           try {
-            // Recargar el usuario para obtener el estado más reciente
-            await auth.currentUser.reload()
-            setUser(auth.currentUser)
-            await backupSession(auth.currentUser)
-            
-            // Cargar el perfil si el correo está verificado
-            if (auth.currentUser.emailVerified) {
-              const profileData = await fetchProfile(auth.currentUser.uid)
+            await currentUser.getIdToken(true)
+          } catch {
+            // Token refresh failed → session truly expired
+            isRestoring = false
+            return
+          }
+
+          // If Firebase still has the user but React state lost it
+          // (can happen when iOS kills the WebView then restores it)
+          if (!userRef.current) {
+            await currentUser.reload()
+            setUser(currentUser)
+            if (currentUser.emailVerified) {
+              const profileData = await fetchProfile(currentUser.uid)
               setProfile(profileData)
             }
-          } catch (error) {
-            console.error('🔐 [Firebase useAuth] Error restaurando sesión desde auth.currentUser:', error)
-            // Si falla, intentar desde el respaldo
-            tryRestoreFromBackup()
-          } finally {
-            isRestoring = false
           }
-        } else if (!auth.currentUser && !user) {
-          // Si no hay usuario en Firebase ni en el estado, intentar restaurar desde respaldo
-          tryRestoreFromBackup()
+
+          // Refresh the localStorage backup token
+          await backupSession(currentUser)
         }
+      } catch {
+        // Silently fail – next onAuthStateChanged will reconcile
+      } finally {
+        isRestoring = false
       }
     }
 
-    // Función para intentar restaurar desde el respaldo de localStorage
-    const tryRestoreFromBackup = async () => {
-      try {
-        const backupData = localStorage.getItem(SESSION_BACKUP_KEY)
-        const backupTimestamp = localStorage.getItem(SESSION_BACKUP_TIMESTAMP_KEY)
-        
-        if (!backupData || !backupTimestamp) {
-          return // No hay respaldo
-        }
-
-        // Verificar que el respaldo no sea muy antiguo (máximo 7 días)
-        const timestamp = Number(backupTimestamp)
-        const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 días
-        if (Date.now() - timestamp > maxAge) {
-          console.log('🔐 [Firebase useAuth] Respaldo de sesión muy antiguo, descartando')
-          clearSessionBackup()
-          return
-        }
-
-        const sessionData = JSON.parse(backupData)
-        console.log('💾 [Firebase useAuth] Respaldo de sesión encontrado, verificando...')
-        
-        // Verificar que el token aún sea válido haciendo una petición a Firebase
-        // Nota: No podemos restaurar la sesión directamente desde el token,
-        // pero podemos mostrar un mensaje al usuario o redirigir al login
-        // Firebase Auth no permite restaurar sesiones desde tokens almacenados
-        
-        // Por ahora, solo logueamos que encontramos el respaldo
-        // El usuario necesitará iniciar sesión nuevamente, pero al menos sabemos que había una sesión
-        console.log('💾 [Firebase useAuth] Respaldo encontrado para:', sessionData.email)
-        
-      } catch (error) {
-        console.error('❌ [Firebase useAuth] Error restaurando desde respaldo:', error)
-        clearSessionBackup()
-      }
-    }
-
-    // Intentar restaurar al cargar la página
-    if (!user && !auth.currentUser) {
-      tryRestoreFromBackup()
-    }
-
-    // Escuchar cambios de visibilidad
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    // También escuchar cuando la página se vuelve a enfocar (útil para PWAs)
     window.addEventListener('focus', handleVisibilityChange)
+
+    // Periodic token refresh while visible (every 20 min).
+    // Keeps the Firebase session alive in long PWA usage on iOS.
+    const tokenRefreshInterval = setInterval(async () => {
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        try {
+          await auth.currentUser.getIdToken(true)
+          await backupSession(auth.currentUser)
+        } catch { /* noop */ }
+      }
+    }, 20 * 60 * 1000)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleVisibilityChange)
+      clearInterval(tokenRefreshInterval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]) // fetchProfile está definido en el mismo componente, no necesita estar en dependencias
+  }, [])
 
   const signIn = async (email: string, password: string) => {
     console.log('🔐 [Firebase useAuth] signIn called')

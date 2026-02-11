@@ -362,7 +362,7 @@ export default function ImportPage() {
             {progress.map(p => (
               <div key={p.collection} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                 <div className="flex items-center gap-3">
-                  {p.status === 'loading' && <Loader className="w-5 h-5 animate-spin text-indigo-600" />}
+                  {p.status === 'loading' && <Loader className="w-5 h-5 animate-spin text-primary" />}
                   {p.status === 'success' && <CheckCircle className="w-5 h-5 text-emerald-600" />}
                   {p.status === 'error' && <AlertCircle className="w-5 h-5 text-red-600" />}
                   {p.status === 'pending' && <div className="w-5 h-5 rounded-full bg-slate-300" />}

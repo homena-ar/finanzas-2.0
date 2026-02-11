@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2, ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
+import { Save, Plus, X, Edit2, Users, Mail, Trash2, Shield, UserCheck, CheckCircle2, HelpCircle, Info, Lock, Eye, EyeOff, Loader2, ChevronDown, ChevronUp, CheckSquare, Square, TrendingUp, Tag, FolderOpen } from 'lucide-react'
 import { AlertModal, ConfirmModal } from '@/components/Modal'
 import { EmojiPickerField } from '@/components/EmojiPickerField'
 import type { WorkspacePermissions } from '@/types'
@@ -74,7 +74,7 @@ export default function ConfigPage() {
   // Categoría modal states (gastos)
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [editingCategoria, setEditingCategoria] = useState<any>(null)
-  const [categoriaForm, setCategoriaForm] = useState({ nombre: '', icono: '', color: '#6366f1' })
+  const [categoriaForm, setCategoriaForm] = useState({ nombre: '', icono: '', color: '#0d9488' })
   
   // Categoría modal states (ingresos)
   const [showCategoriaIngresoModal, setShowCategoriaIngresoModal] = useState(false)
@@ -381,7 +381,7 @@ export default function ConfigPage() {
 
     setShowAlert(true)
     setShowCategoriaModal(false)
-    setCategoriaForm({ nombre: '', icono: '', color: '#6366f1' })
+    setCategoriaForm({ nombre: '', icono: '', color: '#0d9488' })
     setEditingCategoria(null)
   }
 
@@ -1148,17 +1148,22 @@ export default function ConfigPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 animate-fade-in">
       <div className="order-0">
         <h1 className="page-title">Configuración</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Personalizá tu experiencia</p>
+        <p className="text-sm text-slate-500 mt-0.5">Personalizá tu experiencia y gestioná tus espacios de trabajo</p>
       </div>
 
       {/* Espacios de trabajo - Unificado */}
-      <div className="card p-5 order-1 mb-8">
-        <div className="mb-6">
-          <h3 className="section-title mb-2">Espacios de trabajo</h3>
-          <p className="text-slate-500 text-sm">Gestioná tus finanzas personales y compartidas</p>
+      <div className="card p-5 order-1">
+        <div className="mb-6 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+            <Users className="w-5 h-5 text-primary-600" />
+          </div>
+          <div>
+            <h3 className="section-title mb-0.5">Espacios de trabajo</h3>
+            <p className="text-slate-500 text-sm">Tu espacio personal y los workspaces compartidos con otros usuarios</p>
+          </div>
         </div>
 
         {/* Espacio Personal */}
@@ -1356,10 +1361,10 @@ export default function ConfigPage() {
               <>
                 {/* INFORMACIÓN Y ACCIÓN PARA COLABORADORES DEL ESPACIO PERSONAL */}
                 {!isPersonalOwner && personalWorkspace && (
-                  <div className="mt-4 pt-4 border-t border-indigo-200">
-                    <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-                      <h5 className="font-semibold mb-2 text-sm text-indigo-900">Tu acceso a este espacio</h5>
-                      <p className="text-xs text-indigo-700 mb-4">
+                  <div className="mt-4 pt-4 border-t border-primary-200">
+                    <div className="bg-primary-50 rounded-lg p-4 border border-primary-200">
+                      <h5 className="font-semibold mb-2 text-sm text-primary-900">Tu acceso a este espacio</h5>
+                      <p className="text-xs text-primary-700 mb-4">
                         Sos colaborador de <strong>{personalWorkspace.name}</strong>. Podés salir del espacio en cualquier momento.
                       </p>
                       <button
@@ -1677,7 +1682,7 @@ export default function ConfigPage() {
         {/* Workspaces Colaborativos */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-base">🏢 Workspaces Colaborativos</h4>
+            <h4 className="font-semibold text-base text-slate-800">Workspaces colaborativos</h4>
             <button
               onClick={() => setShowWorkspaceModal(true)}
               disabled={workspaces.filter(w => w.owner_id === user?.uid && w.type !== 'personal').length >= 3}
@@ -1696,7 +1701,7 @@ export default function ConfigPage() {
               const workspaceMembers = members.filter(m => m.workspace_id === ws.id)
 
               return (
-                <div key={ws.id} className={`rounded-xl p-4 border ${isOwner ? 'bg-slate-50 border-slate-200' : 'bg-indigo-50 border-indigo-200'}`}>
+                <div key={ws.id} className={`rounded-xl p-4 border ${isOwner ? 'bg-slate-50 border-slate-200' : 'bg-primary-50 border-primary-200'}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       {editingWorkspaceId === ws.id ? (
@@ -1801,7 +1806,7 @@ export default function ConfigPage() {
                                 <Shield className="w-3 h-3" /> PROPIETARIO
                               </span>
                             ) : (
-                              <span className="bg-indigo-200 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
+                              <span className="bg-primary-100 text-primary-800 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
                                 <UserCheck className="w-3 h-3" /> COLABORADOR
                               </span>
                             )}
@@ -1993,10 +1998,10 @@ export default function ConfigPage() {
 
                   {/* INFORMACIÓN Y ACCIÓN PARA COLABORADORES - Solo visible para no-owners */}
                   {!isOwner && isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-indigo-200">
-                      <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-                        <h5 className="font-semibold mb-2 text-sm text-indigo-900">Tu acceso a este espacio</h5>
-                        <p className="text-xs text-indigo-700 mb-4">
+                    <div className="mt-4 pt-4 border-t border-primary-200">
+                      <div className="bg-primary-50 rounded-lg p-4 border border-primary-200">
+                        <h5 className="font-semibold mb-2 text-sm text-primary-900">Tu acceso a este espacio</h5>
+                        <p className="text-xs text-primary-700 mb-4">
                           Sos colaborador de <strong>{ws.name}</strong>. Podés salir del espacio en cualquier momento.
                         </p>
                         <button
@@ -2104,7 +2109,7 @@ export default function ConfigPage() {
                                             setDisplayNames(prev => ({ ...prev, [member.id]: member.display_name || '' }))
                                             setEditingNames(prev => ({ ...prev, [member.id]: true }))
                                           }}
-                                          className="text-indigo-600 hover:text-indigo-700 p-1"
+                                          className="text-primary-600 hover:text-primary-700 p-1"
                                           title="Editar nombre"
                                         >
                                           <Edit2 className="w-3 h-3" />
@@ -2142,7 +2147,7 @@ export default function ConfigPage() {
                                     <div key={section} className="flex flex-col">
                                       <label className="text-[10px] uppercase font-bold text-slate-500 mb-1">{section}</label>
                                       <select
-                                        className={`input input-sm text-xs w-full ${hasChange ? 'border-indigo-500 bg-indigo-50' : ''}`}
+                                        className={`input input-sm text-xs w-full ${hasChange ? 'border-primary-500 bg-primary-50' : ''}`}
                                         value={pendingValue || currentValue}
                                         onChange={(e) => {
                                           console.log('🔍 [Config] onChange - member.id:', member.id, 'member.id type:', typeof member.id, 'section:', section, 'value:', e.target.value, 'key será:', `${member.id}|||${section}`)
@@ -2196,28 +2201,28 @@ export default function ConfigPage() {
         {/* Invitaciones Pendientes - MEJORADO */}
         {invitations.length > 0 && (
           <div className="mt-6 pt-6 border-t border-slate-200">
-            <h4 className="font-semibold mb-3">📬 Invitaciones Pendientes</h4>
+            <h4 className="font-semibold mb-3 text-slate-800">Invitaciones pendientes</h4>
             <div className="space-y-2">
               {invitations.map(inv => {
                 const isAccepting = acceptingInvitationId === inv.id
                 const isRejecting = rejectingInvitationId === inv.id
                 const isBusy = isAccepting || isRejecting
                 return (
-                  <div key={inv.id} className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-between">
+                  <div key={inv.id} className="bg-primary-50 rounded-xl p-4 border border-primary-100 flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-indigo-900">
+                      <p className="text-sm text-primary-900">
                         <strong>{inv.inviter_email || 'Alguien'}</strong> te invitó a unirte a:
                       </p>
-                      <p className="text-lg font-bold text-indigo-700">{inv.workspace_name || 'Un Workspace'}</p>
+                      <p className="text-lg font-bold text-primary-700">{inv.workspace_name || 'Un Workspace'}</p>
                     </div>
                     <div className="flex gap-2 items-center min-w-[140px] justify-end">
                       {isBusy ? (
-                        <span className="text-sm text-indigo-600 font-medium animate-pulse">Procesando…</span>
+                        <span className="text-sm text-primary-600 font-medium animate-pulse">Procesando…</span>
                       ) : (
                         <>
                           <button
                             onClick={() => handleAcceptInvitation(inv.id)}
-                            className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700"
+                            className="btn btn-primary btn-sm bg-primary-600 hover:bg-primary-700"
                           >
                             Aceptar
                           </button>
@@ -2239,19 +2244,27 @@ export default function ConfigPage() {
       </div>
 
       {/* Configuración financiera mensual */}
-      <div className="card p-5 order-2 mb-8">
-        <h3 className="section-title mb-6">Configuración financiera mensual</h3>
-        
+      <div className="card p-5 order-2">
+        <div className="mb-6 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <TrendingUp className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="section-title mb-0.5">Configuración financiera</h3>
+            <p className="text-slate-500 text-sm">Activá módulos e indicá tu presupuesto mensual</p>
+          </div>
+        </div>
+
         {/* Gestión de Ingresos */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-base">💰 Gestión de Ingresos</h4>
+            <h4 className="font-semibold text-base text-slate-800">Gestión de ingresos</h4>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={ingresosEnabled}
                 onChange={e => setIngresosEnabled(e.target.checked)}
-                className="w-5 h-5 accent-indigo-500"
+                className="w-5 h-5 accent-primary"
               />
               <span className="text-sm font-medium">Activar registro de ingresos</span>
             </label>
@@ -2264,13 +2277,13 @@ export default function ConfigPage() {
         {/* Presupuesto Mensual */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-base">📊 Presupuesto Mensual</h4>
+            <h4 className="font-semibold text-base text-slate-800">Presupuesto mensual</h4>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={budgetEnabled}
                 onChange={e => setBudgetEnabled(e.target.checked)}
-                className="w-5 h-5 accent-indigo-500"
+                className="w-5 h-5 accent-primary"
               />
               <span className="text-sm font-medium">Activar presupuesto</span>
             </label>
@@ -2320,13 +2333,19 @@ export default function ConfigPage() {
       </div>
 
       {/* Categorías y Etiquetas - Unificadas */}
-      <div className="card p-5 order-3 mb-8">
+      <div className="card p-5 order-3">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => setExpandedCategoriasEtiquetas(!expandedCategoriasEtiquetas)}
-            className="flex items-center gap-2 text-left flex-1 group"
+            className="flex items-center gap-3 text-left flex-1 group"
           >
-            <h3 className="section-title">Categorías y etiquetas</h3>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <Tag className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="section-title mb-0">Categorías y etiquetas</h3>
+              <p className="text-slate-500 text-xs font-normal">Organizá gastos e ingresos con categorías y etiquetas personalizadas</p>
+            </div>
             {expandedCategoriasEtiquetas ? (
               <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
             ) : (
@@ -2343,7 +2362,7 @@ export default function ConfigPage() {
                 onClick={() => setExpandedGastos(!expandedGastos)}
                 className="flex items-center justify-between w-full mb-3 group"
               >
-                <h4 className="font-semibold text-base text-slate-700">📂 Gastos</h4>
+                <h4 className="font-semibold text-base text-slate-700">Gastos</h4>
                 {expandedGastos ? (
                   <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
                 ) : (
@@ -2368,7 +2387,7 @@ export default function ConfigPage() {
                     <button
                       onClick={() => {
                         setEditingCategoria(null)
-                        setCategoriaForm({ nombre: '', icono: '', color: '#6366f1' })
+                        setCategoriaForm({ nombre: '', icono: '', color: '#0d9488' })
                         setShowCategoriaModal(true)
                       }}
                       className="btn btn-primary btn-sm"
@@ -2414,7 +2433,7 @@ export default function ConfigPage() {
                               }
                               setSelectedCategoriasGastos(newSelected)
                             }}
-                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                            className="w-4 h-4 text-primary-600 rounded border-slate-300 cursor-pointer"
                             onClick={(e) => e.stopPropagation()}
                           />
                           <div
@@ -2488,7 +2507,7 @@ export default function ConfigPage() {
                 onClick={() => setExpandedIngresos(!expandedIngresos)}
                 className="flex items-center justify-between w-full mb-3 group"
               >
-                <h4 className="font-semibold text-base text-slate-700">💰 Ingresos</h4>
+                <h4 className="font-semibold text-base text-slate-700">Ingresos</h4>
                 {expandedIngresos ? (
                   <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
                 ) : (
@@ -2559,7 +2578,7 @@ export default function ConfigPage() {
                               }
                               setSelectedCategoriasIngresos(newSelected)
                             }}
-                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                            className="w-4 h-4 text-primary-600 rounded border-slate-300 cursor-pointer"
                             onClick={(e) => e.stopPropagation()}
                           />
                           <div
@@ -2631,8 +2650,16 @@ export default function ConfigPage() {
       </div>
 
       {/* Sección Cambio de Contraseña */}
-      <div className="card p-5 order-4 mb-8">
-        <h3 className="section-title mb-4">Seguridad</h3>
+      <div className="card p-5 order-4">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <Lock className="w-5 h-5 text-slate-600" />
+          </div>
+          <div>
+            <h3 className="section-title mb-0.5">Seguridad</h3>
+            <p className="text-slate-500 text-sm">Cambiá tu contraseña de acceso</p>
+          </div>
+        </div>
         {!showPasswordChange ? (
           <button
             onClick={() => setShowPasswordChange(true)}
@@ -2736,12 +2763,20 @@ export default function ConfigPage() {
       </div>
 
       {/* Info */}
-      <div className="card p-5 bg-slate-50 order-5 mb-8">
-        <h3 className="section-title mb-2">Información</h3>
-        <div className="text-sm text-slate-600 space-y-1">
-          <p><strong>Email:</strong> {profile?.email}</p>
-          <p><strong>Usuario:</strong> {profile?.nombre}</p>
-          <p><strong>Versión:</strong> 2.0.0</p>
+      <div className="card p-5 bg-slate-50/50 order-5">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <Info className="w-5 h-5 text-slate-500" />
+          </div>
+          <div>
+            <h3 className="section-title mb-0.5">Información</h3>
+            <p className="text-slate-500 text-sm">Datos de tu cuenta</p>
+          </div>
+        </div>
+        <div className="text-sm text-slate-600 space-y-1.5 ml-[52px]">
+          <p><span className="text-stat-label">EMAIL</span> <span className="ml-2">{profile?.email}</span></p>
+          <p><span className="text-stat-label">USUARIO</span> <span className="ml-2">{profile?.nombre}</span></p>
+          <p><span className="text-stat-label">VERSIÓN</span> <span className="ml-2">2.0.0</span></p>
         </div>
       </div>
 
@@ -2862,7 +2897,7 @@ export default function ConfigPage() {
                     <input
                       type="text"
                       className="input"
-                      placeholder="#6366f1"
+                      placeholder="#0d9488"
                       value={categoriaForm.color}
                       onChange={e => setCategoriaForm(f => ({ ...f, color: e.target.value }))}
                     />

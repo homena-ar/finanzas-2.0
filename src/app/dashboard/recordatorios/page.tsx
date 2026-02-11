@@ -38,14 +38,14 @@ export default function RecordatoriosPage() {
   })
 
   const fetchRecordatorios = useCallback(async () => {
-    if (!user) return
+    if (!user || !currentWorkspace?.id) return
     setLoading(true)
     try {
-      const constraints: any[] = [where('user_id', '==', user.uid)]
-      if (currentWorkspace?.id) {
-        constraints.push(where('workspace_id', '==', currentWorkspace.id))
-      }
-      constraints.push(orderBy('fecha', 'asc'))
+      const constraints: any[] = [
+        where('user_id', '==', user.uid),
+        where('workspace_id', '==', currentWorkspace.id),
+        orderBy('fecha', 'asc'),
+      ]
 
       const snap = await getDocs(query(collection(db, 'recordatorios'), ...constraints))
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Recordatorio))
@@ -90,6 +90,10 @@ export default function RecordatoriosPage() {
 
   const handleSave = async () => {
     if (!user || !form.titulo.trim() || !form.fecha) return
+    if (!currentWorkspace?.id) {
+      console.error('[Recordatorios] No workspace available - cannot save')
+      return
+    }
     setSaving(true)
 
     const data: any = {
@@ -99,12 +103,9 @@ export default function RecordatoriosPage() {
       dias_antes: form.dias_antes,
       canales: form.canales,
       user_id: user.uid,
+      workspace_id: currentWorkspace.id,
+      created_by: user.uid,
       updated_at: serverTimestamp(),
-    }
-
-    if (currentWorkspace?.id) {
-      data.workspace_id = currentWorkspace.id
-      data.created_by = user.uid
     }
 
     try {

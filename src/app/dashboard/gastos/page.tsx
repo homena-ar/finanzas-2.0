@@ -1940,13 +1940,13 @@ export default function GastosPage() {
 
         {/* Acciones masivas */}
         {selectedGastos.size > 0 && (
-          <div className="p-3 sm:p-4 bg-indigo-50 border-b border-indigo-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <span className="text-sm font-semibold text-indigo-900">
+          <div className="p-3 sm:p-4 bg-primary-50 border-b border-primary-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span className="text-sm font-semibold text-primary-900">
               {selectedGastos.size} gasto{selectedGastos.size !== 1 ? 's' : ''} seleccionado{selectedGastos.size !== 1 ? 's' : ''}
             </span>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto sm:flex-shrink-0">
-                <label className="text-xs font-semibold text-indigo-900 whitespace-nowrap">Cambiar cuenta:</label>
+                <label className="text-xs font-semibold text-primary-900 whitespace-nowrap">Cambiar cuenta:</label>
                 <select
                   onChange={async (e) => {
                     const tarjetaId = e.target.value || null
@@ -2014,7 +2014,7 @@ export default function GastosPage() {
                           setSelectedGastos(new Set())
                         }
                       }}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                      className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                     />
                   </th>
                   <th className="text-left p-3 sm:p-4 text-xs font-bold text-slate-500 uppercase min-w-[200px]">Descripción</th>
@@ -2059,7 +2059,7 @@ export default function GastosPage() {
                           }
                           setSelectedGastos(newSelected)
                         }}
-                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                        className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
@@ -2142,7 +2142,7 @@ export default function GastosPage() {
                     </td>
                     <td className="p-4">
                       {g.cuotas > 1 ? (
-                        <span className="tag bg-indigo-100 text-indigo-700">
+                        <span className="tag bg-primary-100 text-primary-700">
                           {cuotaActual}/{g.cuotas}
                         </span>
                       ) : '-'}
@@ -2172,7 +2172,7 @@ export default function GastosPage() {
                           <>
                             <button
                               onClick={() => togglePagado(g)}
-                              className="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1"
+                              className="px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg text-xs font-bold hover:bg-primary-100 transition flex items-center gap-1"
                               title={g.fecha_pago ? `Pagado el ${new Date(g.fecha_pago).toLocaleDateString()}` : 'Ver detalles de pago'}
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2183,7 +2183,7 @@ export default function GastosPage() {
                             {g.comprobante_url && (
                               <button
                                 onClick={() => downloadComprobante(g)}
-                                className="p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-600 border border-indigo-200"
+                                className="p-1.5 hover:bg-primary-50 rounded-lg text-primary border border-primary-200"
                                 title="Descargar comprobante"
                               >
                                 <Download className="w-4 h-4" />
@@ -2293,7 +2293,7 @@ export default function GastosPage() {
                         setSelectedImpuestosGastos(new Set())
                       }
                     }}
-                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                    className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                   />
                 </th>
                 <th className="text-left p-4 text-xs font-bold text-slate-500 uppercase">Descripción</th>
@@ -2314,7 +2314,7 @@ export default function GastosPage() {
                   {impuestosMes.map(i => {
                     const authorLabel = getUserLabel((i as any).created_by || i.user_id)
                     return (
-                      <tr key={i.id} className={`border-b border-slate-100 hover:bg-slate-50 transition ${i.pagado ? 'opacity-50' : ''} ${selectedImpuestosGastos.has(i.id) ? 'bg-indigo-50' : ''}`}>
+                      <tr key={i.id} className={`border-b border-slate-100 hover:bg-slate-50 transition ${i.pagado ? 'opacity-50' : ''} ${selectedImpuestosGastos.has(i.id) ? 'bg-primary-50' : ''}`}>
                         <td className="p-4">
                           <input
                             type="checkbox"
@@ -2328,7 +2328,7 @@ export default function GastosPage() {
                               }
                               setSelectedImpuestosGastos(newSelected)
                             }}
-                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                            className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                             onClick={(e) => e.stopPropagation()}
                           />
                         </td>
@@ -2454,7 +2454,7 @@ export default function GastosPage() {
                                     })
                                     setShowPagoModal(true)
                                   }}
-                                  className="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg text-xs font-bold hover:bg-primary-100 transition flex items-center gap-1"
                                   title={i.fecha_pago ? `Pagado el ${new Date(i.fecha_pago).toLocaleDateString()}` : 'Ver detalles de pago'}
                                 >
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2472,7 +2472,7 @@ export default function GastosPage() {
                                         link.click()
                                       }
                                     }}
-                                    className="p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-600 border border-indigo-200"
+                                    className="p-1.5 hover:bg-primary-50 rounded-lg text-primary border border-primary-200"
                                     title="Descargar comprobante"
                                   >
                                     <Download className="w-4 h-4" />
@@ -2524,7 +2524,7 @@ export default function GastosPage() {
             <div className="p-4 space-y-4">
               {/* Botón para subir imagen con IA - Solo mostrar si NO está editando */}
               {!editingGasto && (
-                <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-200">
+                <div className="flex flex-col gap-2 p-3 bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg border-2 border-purple-200">
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-purple-600" />
                     <div className="flex-1">
@@ -2586,14 +2586,14 @@ export default function GastosPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewCategoriaInput(true)}
-                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                      className="w-full px-3 py-2 bg-primary-50 text-primary-700 border-2 border-primary-200 rounded-lg text-sm font-bold hover:bg-primary-100 transition"
                     >
                       + Crear nueva categoría
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
-                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-primary-50 to-purple-50 rounded-xl border-2 border-primary-300 shadow-sm">
+                    <div className="text-sm font-bold text-primary-900">✨ Nueva Categoría</div>
                     <div>
                       <input
                         type="text"
@@ -2605,7 +2605,7 @@ export default function GastosPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <div className="text-xs font-bold text-primary-900 mb-1.5">Icono</div>
                       <EmojiPickerField
                         value={newCategoria.icono}
                         onChange={v => setNewCategoria(c => ({ ...c, icono: v }))}
@@ -2831,7 +2831,7 @@ export default function GastosPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewTagInput(true)}
-                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 transition"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-primary-100 text-primary-700 border border-primary-200 hover:bg-primary-200 transition"
                     >
                       + Nueva etiqueta
                     </button>
@@ -2872,7 +2872,7 @@ export default function GastosPage() {
                   type="checkbox"
                   checked={gastoForm.es_fijo}
                   onChange={e => setGastoForm(f => ({ ...f, es_fijo: e.target.checked }))}
-                  className="w-5 h-5 accent-indigo-500"
+                  className="w-5 h-5 accent-primary"
                 />
                 <span className="font-semibold">Gasto fijo mensual</span>
               </label>
@@ -2885,20 +2885,20 @@ export default function GastosPage() {
               )}
 
               {editingGasto && editingGasto.es_fijo && (
-                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id="editingAllMonthsGasto"
                       checked={editingAllMonths}
                       onChange={e => setEditingAllMonths(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300"
+                      className="w-4 h-4 text-primary rounded border-slate-300"
                     />
-                    <label htmlFor="editingAllMonthsGasto" className="text-sm font-semibold text-indigo-900 cursor-pointer">
+                    <label htmlFor="editingAllMonthsGasto" className="text-sm font-semibold text-primary-900 cursor-pointer">
                       Aplicar cambios a todos los meses siguientes
                     </label>
                   </div>
-                  <p className="text-xs text-indigo-700 mt-1">
+                  <p className="text-xs text-primary-700 mt-1">
                     Si no marcas esta opción, solo se actualizará el gasto de este mes.
                   </p>
                 </div>
@@ -2955,14 +2955,14 @@ export default function GastosPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewCategoriaInput(true)}
-                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                      className="w-full px-3 py-2 bg-primary-50 text-primary-700 border-2 border-primary-200 rounded-lg text-sm font-bold hover:bg-primary-100 transition"
                     >
                       + Crear nueva categoría
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
-                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-primary-50 to-purple-50 rounded-xl border-2 border-primary-300 shadow-sm">
+                    <div className="text-sm font-bold text-primary-900">✨ Nueva Categoría</div>
                     <div>
                       <input
                         type="text"
@@ -2974,7 +2974,7 @@ export default function GastosPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <div className="text-xs font-bold text-primary-900 mb-1.5">Icono</div>
                       <EmojiPickerField
                         value={newCategoria.icono}
                         onChange={v => setNewCategoria(c => ({ ...c, icono: v }))}
@@ -3151,7 +3151,7 @@ export default function GastosPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewTagInput(true)}
-                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 transition"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-primary-100 text-primary-700 border border-primary-200 hover:bg-primary-200 transition"
                     >
                       + Nueva etiqueta
                     </button>
@@ -3200,7 +3200,7 @@ export default function GastosPage() {
                   id="impEsFijo"
                   checked={impForm.es_fijo}
                   onChange={e => setImpForm(f => ({ ...f, es_fijo: e.target.checked }))}
-                  className="w-5 h-5 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                  className="w-5 h-5 text-primary rounded border-slate-300 cursor-pointer"
                 />
                 <label htmlFor="impEsFijo" className="text-sm font-semibold text-slate-700 cursor-pointer">
                   Impuesto fijo (se repite mensualmente)
@@ -3228,11 +3228,11 @@ export default function GastosPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
-              <div className="bg-indigo-50 p-3 rounded-lg">
-                <div className="font-semibold text-indigo-900">
+              <div className="bg-primary-50 p-3 rounded-lg">
+                <div className="font-semibold text-primary-900">
                   {gastoToMarkPaid?.descripcion || impuestoToMarkPaid?.descripcion}
                 </div>
-                <div className="text-indigo-700 font-bold mt-1">
+                <div className="text-primary-700 font-bold mt-1">
                   {formatMoney(
                     gastoToMarkPaid?.monto || impuestoToMarkPaid?.monto || 0,
                     (gastoToMarkPaid as any)?.moneda || (impuestoToMarkPaid as any)?.moneda || 'ARS'
@@ -3440,7 +3440,7 @@ export default function GastosPage() {
           <div className="modal max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shrink-0">
               <h3 className="font-bold text-base flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-indigo-600" />
+                <ImageIcon className="w-4 h-4 text-primary" />
                 <span>
                   {extractedData.transacciones && Array.isArray(extractedData.transacciones)
                     ? `Confirmar Transacciones (${extractedData.transacciones.length} encontradas)`
@@ -3507,8 +3507,8 @@ export default function GastosPage() {
 
                   {/* Selección de cuenta/tarjeta si fue detectada */}
                   {detectedTarjeta && (
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                      <div className="text-sm font-semibold text-indigo-900 mb-2">
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+                      <div className="text-sm font-semibold text-primary-900 mb-2">
                         💳 Cuenta/Tarjeta detectada: {buildDetectedTarjetaName({ tarjeta: detectedTarjeta, accountSuggestion: detectedTarjeta.accountSuggestion || null })}
                       </div>
                       <div className="space-y-2">
@@ -3561,9 +3561,9 @@ export default function GastosPage() {
                           <option value="__new__">➕ Crear nueva cuenta/tarjeta (manual)</option>
                         </select>
                         {(selectedTarjetaId === '__new_suggested__' || selectedTarjetaId === '__new__') && (
-                          <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-2">
+                          <div className="p-3 bg-white rounded-lg border border-primary-200 space-y-2">
                             {selectedTarjetaId === '__new_suggested__' && (
-                              <div className="text-xs text-indigo-700 bg-indigo-50 p-2 rounded">
+                              <div className="text-xs text-primary-700 bg-primary-50 p-2 rounded">
                                 💡 La cuenta se creará automáticamente al confirmar la importación
                               </div>
                             )}
@@ -3698,7 +3698,7 @@ export default function GastosPage() {
                         onClick={() => setUseGlobalDate(!useGlobalDate)}
                         className={`text-xs px-2 py-1 rounded ${
                           useGlobalDate 
-                            ? 'bg-indigo-100 text-indigo-700' 
+                            ? 'bg-primary-100 text-primary-700' 
                             : 'bg-slate-200 text-slate-600'
                         }`}
                       >
@@ -3741,7 +3741,7 @@ export default function GastosPage() {
                                     setSelectedTransactions(new Set())
                                   }
                                 }}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                                className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                               />
                             </th>
                             <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
@@ -3770,7 +3770,7 @@ export default function GastosPage() {
                               <tr 
                                 key={index}
                                 className={`border-b border-slate-100 hover:bg-slate-50 transition ${
-                                  selectedTransactions.has(index) ? 'bg-indigo-50' : ''
+                                  selectedTransactions.has(index) ? 'bg-primary-50' : ''
                                 }`}
                               >
                                 <td className="p-3">
@@ -3789,7 +3789,7 @@ export default function GastosPage() {
                                       }
                                       setSelectedTransactions(newSelected)
                                     }}
-                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                                    className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                                   />
                                 </td>
                                 <td className="p-3">
@@ -3856,7 +3856,7 @@ export default function GastosPage() {
                                 </td>
                                 <td className="p-3">
                                   {cuotas && cuotas > 1 ? (
-                                    <span className="tag bg-indigo-100 text-indigo-700">
+                                    <span className="tag bg-primary-100 text-primary-700">
                                       {cuotas} cuotas
                                     </span>
                                   ) : (
@@ -3922,7 +3922,7 @@ export default function GastosPage() {
                                       setSelectedImpuestos(new Set())
                                     }
                                   }}
-                                  className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                                  className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                                 />
                               </th>
                               <th className="text-left p-3 text-xs font-bold text-slate-500 uppercase">Descripción</th>
@@ -3943,7 +3943,7 @@ export default function GastosPage() {
                                 <tr 
                                   key={index}
                                   className={`border-b border-slate-100 hover:bg-slate-50 transition ${
-                                    selectedImpuestos.has(index) ? 'bg-indigo-50' : ''
+                                    selectedImpuestos.has(index) ? 'bg-primary-50' : ''
                                   }`}
                                 >
                                   <td className="p-3">
@@ -3959,7 +3959,7 @@ export default function GastosPage() {
                                         }
                                         setSelectedImpuestos(newSelected)
                                       }}
-                                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer"
+                                      className="w-4 h-4 text-primary rounded border-slate-300 cursor-pointer"
                                     />
                                   </td>
                                   <td className="p-3">
@@ -4395,14 +4395,14 @@ export default function GastosPage() {
                     <button
                       type="button"
                       onClick={() => setAiShowNewCategoriaInput(true)}
-                      className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                      className="w-full px-3 py-2 bg-primary-50 text-primary-700 border-2 border-primary-200 rounded-lg text-sm font-bold hover:bg-primary-100 transition"
                     >
                       + Crear nueva categoría
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300 shadow-sm">
-                    <div className="text-sm font-bold text-indigo-900">✨ Nueva Categoría</div>
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-primary-50 to-purple-50 rounded-xl border-2 border-primary-300 shadow-sm">
+                    <div className="text-sm font-bold text-primary-900">✨ Nueva Categoría</div>
                     <div>
                       <input
                         type="text"
@@ -4414,7 +4414,7 @@ export default function GastosPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-indigo-900 mb-1.5">Icono</div>
+                      <div className="text-xs font-bold text-primary-900 mb-1.5">Icono</div>
                       <EmojiPickerField
                         value={aiNewCategoria.icono}
                         onChange={v => setAiNewCategoria(c => ({ ...c, icono: v }))}
@@ -4566,7 +4566,7 @@ export default function GastosPage() {
                     <button
                       type="button"
                       onClick={() => setAiShowNewTagInput(true)}
-                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 transition"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-primary-100 text-primary-700 border border-primary-200 hover:bg-primary-200 transition"
                     >
                       + Nueva etiqueta
                     </button>
@@ -4606,7 +4606,7 @@ export default function GastosPage() {
                   type="checkbox"
                   checked={aiTransactionForm.es_fijo}
                   onChange={e => setAiTransactionForm(f => ({ ...f, es_fijo: e.target.checked }))}
-                  className="w-5 h-5 accent-indigo-500"
+                  className="w-5 h-5 accent-primary"
                 />
                 <span className="font-semibold">Gasto fijo mensual</span>
               </label>

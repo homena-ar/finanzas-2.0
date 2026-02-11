@@ -464,7 +464,7 @@ export default function AhorrosPage() {
         <div className="card p-5">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-lg flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              <TrendingUp className="w-5 h-5 text-primary" />
               Evolución de Ahorros
             </h3>
             <button
@@ -523,7 +523,7 @@ export default function AhorrosPage() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <div className="font-bold">Pesos</div>
-              <div className="text-2xl font-bold text-indigo-600 mt-1">{formatMoney(ahorroPesos)}</div>
+              <div className="text-2xl font-bold text-primary mt-1">{formatMoney(ahorroPesos)}</div>
             </div>
             <span className="text-3xl">💵</span>
           </div>
@@ -561,7 +561,7 @@ export default function AhorrosPage() {
               <span className="text-xs text-slate-500 font-semibold">HISTORIAL</span>
               <button
                 onClick={() => { setCurrentTipo('pesos'); setShowMovimientosModal(true) }}
-                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                className="text-xs text-primary hover:text-primary-700 font-medium"
               >
                 {movimientos.filter(m => {
                   const matchesTipo = m.tipo === 'pesos'
@@ -650,7 +650,7 @@ export default function AhorrosPage() {
               <span className="text-xs text-slate-500 font-semibold">HISTORIAL</span>
               <button
                 onClick={() => { setCurrentTipo('usd'); setShowMovimientosModal(true) }}
-                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                className="text-xs text-primary hover:text-primary-700 font-medium"
               >
                 {movimientos.filter(m => {
                   const matchesTipo = m.tipo === 'usd'
@@ -756,18 +756,18 @@ export default function AhorrosPage() {
                   {/* Progress bar */}
                   <div className="bg-slate-200 h-3 rounded-full overflow-hidden mb-2">
                     <div
-                      className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
+                      className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-primary-500 to-primary-400'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
                   <div className="flex justify-between text-sm mb-3">
-                    <span className="text-indigo-600 font-bold">{formatMoney(m.progreso, m.moneda)}</span>
+                    <span className="text-primary font-bold">{formatMoney(m.progreso, m.moneda)}</span>
                     <span className="font-bold">{pct.toFixed(0)}%</span>
                   </div>
 
                   {/* Desafío de ahorro */}
                   {!isDone && desafio && (
-                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-3 mb-3 border border-purple-200">
+                    <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg p-3 mb-3 border border-purple-200">
                       <div className="text-xs font-bold text-purple-900 mb-2">
                         💰 DESAFÍO DE AHORRO · Faltan {desafio.diasRestantes} días
                       </div>
@@ -855,7 +855,7 @@ export default function AhorrosPage() {
                       key={icon}
                       type="button"
                       onClick={() => setMetaForm(f => ({ ...f, icono: icon }))}
-                      className={`w-10 h-10 rounded-lg text-xl ${metaForm.icono === icon ? 'bg-indigo-100 ring-2 ring-indigo-500' : 'bg-slate-100'}`}
+                      className={`w-10 h-10 rounded-lg text-xl ${metaForm.icono === icon ? 'bg-primary-100 ring-2 ring-primary-500' : 'bg-slate-100'}`}
                     >
                       {icon}
                     </button>
