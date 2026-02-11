@@ -93,6 +93,8 @@ function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_T
 // Claves para almacenamiento de respaldo de sesión (iOS Safari puede perder IndexedDB)
 const SESSION_BACKUP_KEY = 'fincontrol:auth_session_backup'
 const SESSION_BACKUP_TIMESTAMP_KEY = 'fincontrol:auth_session_timestamp'
+// Maximum age for session backup to be considered valid (7 days)
+const SESSION_BACKUP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 // Guardar sesión en localStorage como respaldo (para iOS)
 async function backupSession(user: User) {
@@ -114,7 +116,27 @@ async function backupSession(user: User) {
   }
 }
 
-// Limpiar respaldo de sesión
+// Verificar si existe un respaldo de sesión válido (no expirado)
+function hasValidSessionBackup(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const timestamp = localStorage.getItem(SESSION_BACKUP_TIMESTAMP_KEY)
+    if (!timestamp) return false
+    const age = Date.now() - Number(timestamp)
+    if (age > SESSION_BACKUP_MAX_AGE_MS) return false
+    const data = localStorage.getItem(SESSION_BACKUP_KEY)
+    if (!data) return false
+    const parsed = JSON.parse(data)
+    return !!(parsed.uid && parsed.email)
+  } catch {
+    return false
+  }
+}
+
+// Limpiar respaldo de sesión.
+// IMPORTANT: Only call on EXPLICIT sign-out, never when onAuthStateChanged fires null.
+// On iOS PWA, persistence can briefly report null when the app is restored from background
+// and we must NOT destroy the backup in that scenario.
 function clearSessionBackup() {
   if (typeof window === 'undefined') return
   try {
@@ -171,30 +193,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let previousEmailVerified: boolean | null = null
 
+    // Track whether this is the very first onAuthStateChanged callback (initial hydration)
+    let isFirstCallback = true
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔐 [Firebase useAuth] Auth state changed:', firebaseUser ? 'USER LOGGED IN' : 'NO USER')
 
       if (firebaseUser) {
         // Recargar el usuario para obtener el estado más reciente de emailVerified
         await firebaseUser.reload()
-        
+
         // Guardar sesión en respaldo (especialmente importante para iOS)
         await backupSession(firebaseUser)
-        
+
         // Verificar si el correo se acaba de verificar (cambió de false a true)
         // previousEmailVerified === null significa primera carga, no contar como verificación nueva
         const emailJustVerified = previousEmailVerified === false && firebaseUser.emailVerified
-        
+
         // Verificar si el correo está verificado
         // NOTA: No cerramos la sesión aquí para permitir acceso a /verificar-email
         // El bloqueo de acceso al dashboard se hace en el layout
         setUser(firebaseUser)
-        
+
         // Solo cargar el perfil si el correo está verificado
         if (firebaseUser.emailVerified) {
           const profileData = await fetchProfile(firebaseUser.uid)
           setProfile(profileData)
-          
+
           const welcomeAlreadySent = !!profileData?.welcome_email_sent
           const shouldAttemptWelcome =
             !!firebaseUser.email &&
@@ -223,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   userId: firebaseUser.uid
                 })
               })
-              
+
               if (welcomeResponse.ok) {
                 const result = await welcomeResponse.json()
                 if (result.alreadySent) {
@@ -255,15 +280,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Si no está verificado, no cargar el perfil pero mantener el usuario
           setProfile(null)
         }
-        
+
         // Actualizar el estado previo
         previousEmailVerified = firebaseUser.emailVerified
+        isFirstCallback = false
       } else {
+        // iOS PWA recovery: when the app is killed from the app switcher and relaunched,
+        // Firebase persistence may be slow to hydrate (especially if IndexedDB was evicted).
+        // If this is the first callback and we have a valid session backup, wait briefly
+        // for Firebase to catch up before declaring "no user".
+        if (isFirstCallback && hasValidSessionBackup()) {
+          console.log('🔄 [Firebase useAuth] No user on first callback but backup exists - waiting for persistence hydration...')
+          isFirstCallback = false
+
+          // Give Firebase persistence a moment to hydrate from localStorage/IndexedDB
+          await new Promise(resolve => setTimeout(resolve, 1500))
+
+          // Check again after the delay
+          const recoveredUser = auth.currentUser
+          if (recoveredUser) {
+            console.log('✅ [Firebase useAuth] Session recovered after persistence hydration delay')
+            await recoveredUser.reload()
+            await backupSession(recoveredUser)
+            setUser(recoveredUser)
+            if (recoveredUser.emailVerified) {
+              const profileData = await fetchProfile(recoveredUser.uid)
+              setProfile(profileData)
+            }
+            previousEmailVerified = recoveredUser.emailVerified
+            setLoading(false)
+            return // Skip the null state - session was recovered
+          }
+
+          console.log('⚠️ [Firebase useAuth] Session could not be recovered - user is truly logged out')
+        }
+
+        isFirstCallback = false
         setUser(null)
         setProfile(null)
         previousEmailVerified = null
-        // Limpiar respaldo cuando no hay usuario
-        clearSessionBackup()
+        // IMPORTANT: Do NOT clear session backup here.
+        // Only clear on explicit signOut(). On iOS, onAuthStateChanged can fire
+        // with null temporarily during app restore, and we must preserve the backup
+        // so the visibility handler can attempt recovery.
       }
 
       setLoading(false)
@@ -284,7 +343,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Session revalidation when the app becomes visible again.
   // Critical for iOS PWA where killing the app from the switcher may
   // cause auth.currentUser to be null in React state while Firebase
-  // persistence still holds the session in IndexedDB.
+  // persistence still holds the session in localStorage/IndexedDB.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -321,6 +380,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Refresh the localStorage backup token
           await backupSession(currentUser)
+        } else if (!userRef.current && hasValidSessionBackup()) {
+          // Firebase has no currentUser AND React state has no user,
+          // but we have a valid session backup. This typically happens on iOS
+          // when the app is restored after being killed from the app switcher.
+          // Wait briefly for Firebase persistence to potentially catch up.
+          console.log('🔄 [Firebase useAuth] Visibility: no user but backup exists, waiting for persistence...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+
+          const recoveredUser = auth.currentUser
+          if (recoveredUser) {
+            console.log('✅ [Firebase useAuth] Session recovered on visibility change')
+            await recoveredUser.reload()
+            setUser(recoveredUser)
+            if (recoveredUser.emailVerified) {
+              const profileData = await fetchProfile(recoveredUser.uid)
+              setProfile(profileData)
+            }
+            await backupSession(recoveredUser)
+          }
         }
       } catch {
         // Silently fail – next onAuthStateChanged will reconcile
@@ -329,8 +407,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Save session state before iOS kills the PWA.
+    // pagehide fires reliably on iOS (unlike beforeunload).
+    const handlePageHide = () => {
+      if (auth.currentUser) {
+        try {
+          const sessionData = {
+            uid: auth.currentUser.uid,
+            email: auth.currentUser.email,
+            emailVerified: auth.currentUser.emailVerified,
+            timestamp: Date.now()
+          }
+          localStorage.setItem(SESSION_BACKUP_KEY, JSON.stringify(sessionData))
+          localStorage.setItem(SESSION_BACKUP_TIMESTAMP_KEY, String(Date.now()))
+        } catch { /* sync-only, best-effort */ }
+      }
+    }
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('focus', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
 
     // Periodic token refresh while visible (every 20 min).
     // Keeps the Firebase session alive in long PWA usage on iOS.
@@ -346,6 +442,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
       clearInterval(tokenRefreshInterval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

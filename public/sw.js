@@ -1,9 +1,22 @@
 // Service Worker para FinControl PWA con Push Notifications
-const CACHE_NAME = 'fincontrol-v2'
+const CACHE_NAME = 'fincontrol-v3'
 const urlsToCache = [
   '/',
   '/dashboard',
   '/dashboard/gastos',
+]
+
+// Assets that must NEVER be cached by the service worker.
+// These include branding assets (favicon, icons, OG images) that may change
+// on deploy, and manifest.json which references icon paths.
+// Caching them causes stale favicons and social preview images.
+const NEVER_CACHE_PATTERNS = [
+  '/favicon',
+  '/icon-',
+  '/apple-touch-icon',
+  '/og-image',
+  '/twitter-image',
+  '/opengraph-image',
   '/manifest.json',
 ]
 
@@ -141,6 +154,13 @@ self.addEventListener('fetch', (event) => {
   // Solo cachear requests del mismo origen
   if (url.origin !== self.location.origin) {
     return
+  }
+
+  // Never cache branding/OG assets - they must always be fresh from the server
+  // so that favicon and social preview updates propagate immediately on deploy.
+  const shouldNeverCache = NEVER_CACHE_PATTERNS.some(p => url.pathname.includes(p))
+  if (shouldNeverCache) {
+    return // Let the browser fetch directly from the network
   }
 
   event.respondWith(
