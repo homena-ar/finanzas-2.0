@@ -19,13 +19,14 @@ const DIAS_ANTES_OPTIONS = [
 
 export default function RecordatoriosPage() {
   const { user } = useAuth()
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, initWorkspaceReady } = useWorkspace()
 
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Recordatorio | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
 
@@ -98,9 +99,10 @@ export default function RecordatoriosPage() {
   const handleSave = async () => {
     if (!user || !form.titulo.trim() || !form.fecha) return
     if (!currentWorkspace?.id) {
-      console.error('[Recordatorios] No workspace available - cannot save')
+      setSaveError('El espacio de trabajo aún no está listo. Esperá un momento e intentá de nuevo.')
       return
     }
+    setSaveError('')
     setSaving(true)
 
     const data: any = {
@@ -416,17 +418,24 @@ export default function RecordatoriosPage() {
               </div>
             </div>
 
-            <div className="p-5 border-t border-slate-100 flex gap-3">
-              <button onClick={() => setShowModal(false)} className="btn btn-secondary flex-1">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !form.titulo.trim() || !form.fecha}
-                className="btn btn-primary flex-1"
-              >
-                {saving ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear recordatorio'}
-              </button>
+            <div className="p-5 border-t border-slate-100 space-y-3">
+              {saveError && (
+                <div className="bg-red-50 text-red-600 px-4 py-2.5 rounded-xl text-sm">
+                  {saveError}
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => { setShowModal(false); setSaveError('') }} className="btn btn-secondary flex-1">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !form.titulo.trim() || !form.fecha || !initWorkspaceReady}
+                  className="btn btn-primary flex-1"
+                >
+                  {saving ? 'Guardando...' : !initWorkspaceReady ? 'Cargando...' : editing ? 'Guardar cambios' : 'Crear recordatorio'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
