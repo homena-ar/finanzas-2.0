@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        // Next.js auto-generated this route in older deploys; social-media
+        // crawlers may still have it cached.  Redirect to the real static image.
+        source: '/opengraph-image',
+        destination: '/og-image.png',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {
