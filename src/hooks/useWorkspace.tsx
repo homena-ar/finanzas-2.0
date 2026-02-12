@@ -779,8 +779,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setInitWorkspaceReady(true)
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Si el efecto fue cancelado antes de seleccionar el workspace personal
+      // (p.ej. porque updateProfile cambió profile?.personal_workspace_id),
+      // permitir que la próxima ejecución reintente la inicialización completa.
+      if (!initialPersonalSelectionRef.current) {
+        initAttemptedForUserRef.current = null
+      }
+    }
   }, [user?.uid, profile?.personal_workspace_id, fetchAll, updateProfile])
+
+  // Safety net: si initWorkspaceReady es true pero currentWorkspace quedó null
+  // (p.ej. el init effect fue cancelado por un cambio de deps), auto-seleccionar
+  // el workspace personal de la lista ya cargada por fetchAll.
+  useEffect(() => {
+    if (initWorkspaceReady && !currentWorkspace && user && workspaces.length > 0) {
+      const personalWs = workspaces.find(w => w.type === 'personal' && w.owner_id === user.uid)
+      if (personalWs) {
+        console.log('[useWorkspace] Recovery: auto-selecting personal workspace', personalWs.id)
+        setCurrentWorkspace(personalWs)
+        initialPersonalSelectionRef.current = true
+      }
+    }
+  }, [initWorkspaceReady, currentWorkspace, user, workspaces])
 
   const inviteUser = useCallback(async (workspaceId: string, email: string, permissions: WorkspacePermissions, options?: { workspaceDisplayName?: string }) => {
     if (!user) return { error: new Error('No user') }

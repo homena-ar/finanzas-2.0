@@ -406,10 +406,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isFirstCallback) {
           isFirstCallback = false
 
-          // Strategy 1: Wait for Firebase persistence hydration (localStorage may be slow)
+          // Start cookie recovery fetch in background immediately so the
+          // network request runs in parallel with persistence polling.
+          const cookieRecoveryPromise = recoverSessionFromCookie().catch(() => null)
+
+          // Strategy 1: Poll for Firebase persistence hydration instead of a
+          // fixed 1.5 s wait.  Check every 100 ms; bail after 800 ms.
           if (hasValidSessionBackup()) {
-            remoteLog('info', 'Recovery strategy 1: waiting 1.5s for persistence hydration...')
-            await new Promise(resolve => setTimeout(resolve, 1500))
+            remoteLog('info', 'Recovery strategy 1: polling for persistence hydration...')
+            const POLL_INTERVAL = 100
+            const MAX_WAIT = 800
+            for (let elapsed = 0; elapsed < MAX_WAIT; elapsed += POLL_INTERVAL) {
+              await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL))
+              if (auth.currentUser) break
+            }
             const recoveredUser = auth.currentUser
             if (recoveredUser) {
               remoteLog('info', `Strategy 1 SUCCESS: uid=${recoveredUser.uid.substring(0, 8)}`)
@@ -426,12 +436,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setLoading(false)
               return
             }
-            remoteLog('warn', 'Strategy 1 failed: still null after delay')
+            remoteLog('warn', 'Strategy 1 failed: still null after polling')
           }
 
-          // Strategy 2: Recover from HTTP-only session cookie (survives iOS storage eviction)
+          // Strategy 2: Recover from HTTP-only session cookie (survives iOS
+          // storage eviction).  The fetch was already started above, so we just
+          // await the result — no extra network latency.
           remoteLog('info', 'Recovery strategy 2: cookie-based session recovery...')
-          const cookieUser = await recoverSessionFromCookie()
+          const cookieUser = await cookieRecoveryPromise
           if (cookieUser) {
             remoteLog('info', `Strategy 2 SUCCESS: uid=${cookieUser.uid.substring(0, 8)}`)
             lastRecoverySuccessTime = Date.now()
@@ -515,11 +527,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // No Firebase user and no React user — try cookie recovery
           remoteLog('info', `Visibility: no user. backup=${hasValidSessionBackup()}, trying cookie recovery...`)
 
-          // Strategy 1: wait for Firebase persistence
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Start cookie recovery in parallel with persistence polling
+          const visCookiePromise = recoverSessionFromCookie().catch(() => null)
+
+          // Strategy 1: poll for Firebase persistence (up to 600ms)
+          for (let i = 0; i < 6; i++) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+            if (auth.currentUser) break
+          }
           let recoveredUser = auth.currentUser
           if (recoveredUser) {
-            remoteLog('info', 'Visibility: recovered from persistence delay')
+            remoteLog('info', 'Visibility: recovered from persistence')
             await recoveredUser.reload()
             setUser(recoveredUser)
             if (recoveredUser.emailVerified) {
@@ -528,8 +546,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             await backupSession(recoveredUser)
           } else {
-            // Strategy 2: cookie-based recovery
-            recoveredUser = await recoverSessionFromCookie()
+            // Strategy 2: cookie-based recovery (already in flight)
+            recoveredUser = await visCookiePromise
             if (recoveredUser) {
               remoteLog('info', 'Visibility: recovered from cookie')
               await backupSession(recoveredUser)
