@@ -2,7 +2,7 @@
 // COMMAND BAR - INTENT EXECUTOR
 // ============================================
 // Maps parsed intents to actual app operations.
-// Uses useData hook methods + direct Firestore for shopping lists/reminders.
+// Supports single actions, queries, navigation, and multi_action.
 
 import type { ParsedCommand, CommandResult, UndoAction } from './types'
 import { formatMoney } from '@/lib/utils'
@@ -54,6 +54,11 @@ export async function executeCommand(
   command: ParsedCommand,
   ctx: ExecutorContext
 ): Promise<CommandResult> {
+  // Handle multi_action: execute sub-commands sequentially
+  if (command.type === 'multi_action' && command.actions && command.actions.length > 0) {
+    return await executeMultiAction(command, ctx)
+  }
+
   // Don't execute if confidence too low or needs clarification
   if (command.confidence < 0.75 || command.needs_clarification.length > 0) {
     return {
@@ -64,27 +69,19 @@ export async function executeCommand(
 
   try {
     switch (command.intent) {
-      // =====================================
       // GASTOS
-      // =====================================
       case 'create_expense':
         return await executeCreateExpense(command, ctx)
 
-      // =====================================
       // INGRESOS
-      // =====================================
       case 'create_income':
         return await executeCreateIncome(command, ctx)
 
-      // =====================================
       // AHORROS
-      // =====================================
       case 'add_saving':
         return await executeAddSaving(command, ctx)
 
-      // =====================================
       // METAS
-      // =====================================
       case 'create_goal':
         return await executeCreateGoal(command, ctx)
       case 'contribute_goal':
@@ -92,17 +89,13 @@ export async function executeCommand(
       case 'goal_status':
         return executeGoalStatus(command, ctx)
 
-      // =====================================
       // RECORDATORIOS
-      // =====================================
       case 'create_reminder':
         return await executeCreateReminder(command, ctx)
       case 'list_reminders':
         return executeListReminders(command, ctx)
 
-      // =====================================
       // LISTAS DE COMPRAS
-      // =====================================
       case 'create_shopping_list':
         return await executeCreateShoppingList(command, ctx)
       case 'add_shopping_items':
@@ -110,9 +103,7 @@ export async function executeCommand(
       case 'clear_completed_items':
         return await executeClearCompleted(command, ctx)
 
-      // =====================================
       // CONSULTAS
-      // =====================================
       case 'query_expense_total':
         return executeQueryExpenseTotal(command, ctx)
       case 'query_income_total':
@@ -126,9 +117,7 @@ export async function executeCommand(
       case 'query_reminders_count':
         return executeQueryRemindersCount(command, ctx)
 
-      // =====================================
       // NAVIGATION
-      // =====================================
       case 'navigate':
         return executeNavigation(command, ctx)
 
@@ -147,11 +136,63 @@ export async function executeCommand(
   }
 }
 
+// --- Multi-Action Executor ---
+
+async function executeMultiAction(
+  command: ParsedCommand,
+  ctx: ExecutorContext
+): Promise<CommandResult> {
+  const results: CommandResult[] = []
+  let lastListCreated: { id: string; nombre: string } | null = null
+
+  for (const action of command.actions!) {
+    // If a previous action created a shopping list, make it available for subsequent actions
+    if (lastListCreated && action.intent === 'add_shopping_items') {
+      const origFind = ctx.findShoppingList
+      ctx = {
+        ...ctx,
+        findShoppingList: (name: string) => {
+          // Check if the name matches the just-created list
+          const lower = name.toLowerCase()
+          if (lastListCreated && (
+            lastListCreated.nombre.toLowerCase().includes(lower) ||
+            lower.includes(lastListCreated.nombre.toLowerCase())
+          )) {
+            return lastListCreated
+          }
+          return origFind(name)
+        },
+      }
+    }
+
+    const result = await executeCommand(action, ctx)
+    results.push(result)
+
+    // Track created lists for subsequent actions
+    if (action.intent === 'create_shopping_list' && result.success && result.data?.listId) {
+      lastListCreated = { id: result.data.listId, nombre: action.params.list_name }
+    }
+
+    if (!result.success) break
+  }
+
+  const allSuccess = results.every(r => r.success)
+  const messages = results.map(r => r.message).filter(Boolean)
+  const lastUndo = results.filter(r => r.undo_action).pop()?.undo_action
+  const lastNavigate = results.filter(r => r.navigate_to).pop()?.navigate_to
+
+  return {
+    success: allSuccess,
+    message: messages.join('\n'),
+    undo_action: lastUndo,
+    navigate_to: lastNavigate,
+  }
+}
+
 // --- Individual Intent Executors ---
 
 async function executeCreateExpense(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { amount, currency = 'ARS', date, merchant, payment_method } = command.params
-
   const monthKey = date ? date.substring(0, 7) : ctx.monthKey
 
   const gastoData: any = {
@@ -171,7 +212,6 @@ async function executeCreateExpense(command: ParsedCommand, ctx: ExecutorContext
 
   if (payment_method) gastoData.medio_pago = payment_method
 
-  // Try to match category
   if (merchant) {
     const matchedCat = ctx.categorias.find(c =>
       c.nombre.toLowerCase() === merchant.toLowerCase()
@@ -186,10 +226,7 @@ async function executeCreateExpense(command: ParsedCommand, ctx: ExecutorContext
 
   const gastoId = result.data?.id
   const undo: UndoAction | undefined = gastoId
-    ? {
-        label: 'Deshacer gasto',
-        execute: async () => { await ctx.deleteGasto(gastoId) },
-      }
+    ? { label: 'Deshacer gasto', execute: async () => { await ctx.deleteGasto(gastoId) } }
     : undefined
 
   return {
@@ -201,7 +238,6 @@ async function executeCreateExpense(command: ParsedCommand, ctx: ExecutorContext
 
 async function executeCreateIncome(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { amount, currency = 'ARS', date, description } = command.params
-
   const monthKey = date ? date.substring(0, 7) : ctx.monthKey
 
   const ingresoData: any = {
@@ -222,10 +258,7 @@ async function executeCreateIncome(command: ParsedCommand, ctx: ExecutorContext)
 
   const ingresoId = result.data?.id
   const undo: UndoAction | undefined = ingresoId
-    ? {
-        label: 'Deshacer ingreso',
-        execute: async () => { await ctx.deleteIngreso(ingresoId) },
-      }
+    ? { label: 'Deshacer ingreso', execute: async () => { await ctx.deleteIngreso(ingresoId) } }
     : undefined
 
   return {
@@ -237,12 +270,10 @@ async function executeCreateIncome(command: ParsedCommand, ctx: ExecutorContext)
 
 async function executeAddSaving(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { amount, tipo = 'pesos', description } = command.params
-
   const result = await ctx.addMovimiento(tipo, amount, description)
   if (result.error) {
     return { success: false, message: 'No se pudo registrar el ahorro. Intentá de nuevo.' }
   }
-
   const currencyLabel = tipo === 'usd' ? 'USD' : 'ARS'
   return {
     success: true,
@@ -252,7 +283,6 @@ async function executeAddSaving(command: ParsedCommand, ctx: ExecutorContext): P
 
 async function executeCreateGoal(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { nombre, objetivo, currency = 'ARS' } = command.params
-
   const result = await ctx.addMeta({
     nombre,
     objetivo,
@@ -260,11 +290,9 @@ async function executeCreateGoal(command: ParsedCommand, ctx: ExecutorContext): 
     moneda: currency,
     icono: '🎯',
   })
-
   if (result.error) {
     return { success: false, message: 'No se pudo crear la meta. Intentá de nuevo.' }
   }
-
   return {
     success: true,
     message: `Meta "${nombre}" creada con objetivo de ${formatMoney(objetivo, currency)}`,
@@ -274,26 +302,17 @@ async function executeCreateGoal(command: ParsedCommand, ctx: ExecutorContext): 
 
 async function executeContributeGoal(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { amount, goal_name } = command.params
-
-  // Find the goal by name (fuzzy)
   const goal = ctx.metas.find(m =>
     m.nombre.toLowerCase().includes(goal_name.toLowerCase())
   )
-
   if (!goal) {
-    return {
-      success: false,
-      message: `No encontré una meta con el nombre "${goal_name}"`,
-    }
+    return { success: false, message: `No encontré una meta con el nombre "${goal_name}"` }
   }
-
   const newProgress = goal.progreso + amount
   const result = await ctx.updateMeta(goal.id, { progreso: newProgress })
-
   if (result.error) {
     return { success: false, message: 'No se pudo actualizar la meta.' }
   }
-
   const remaining = Math.max(0, goal.objetivo - newProgress)
   return {
     success: true,
@@ -303,15 +322,11 @@ async function executeContributeGoal(command: ParsedCommand, ctx: ExecutorContex
 
 function executeGoalStatus(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
   const { goal_name } = command.params
-
   if (goal_name) {
     const goal = ctx.metas.find(m =>
       m.nombre.toLowerCase().includes(goal_name.toLowerCase())
     )
-    if (!goal) {
-      return { success: false, message: `No encontré una meta con el nombre "${goal_name}"` }
-    }
-
+    if (!goal) return { success: false, message: `No encontré una meta con el nombre "${goal_name}"` }
     const pct = goal.objetivo > 0 ? Math.round((goal.progreso / goal.objetivo) * 100) : 0
     const remaining = Math.max(0, goal.objetivo - goal.progreso)
     return {
@@ -320,27 +335,18 @@ function executeGoalStatus(command: ParsedCommand, ctx: ExecutorContext): Comman
       navigate_to: '/dashboard/ahorros',
     }
   }
-
-  // Show all goals
   if (ctx.metas.length === 0) {
     return { success: true, message: 'No tenés metas creadas todavía.' }
   }
-
   const lines = ctx.metas.map(m => {
     const pct = m.objetivo > 0 ? Math.round((m.progreso / m.objetivo) * 100) : 0
     return `${m.icono} ${m.nombre}: ${pct}% (${formatMoney(m.progreso, m.moneda)} / ${formatMoney(m.objetivo, m.moneda)})`
   })
-
-  return {
-    success: true,
-    message: lines.join('\n'),
-    navigate_to: '/dashboard/ahorros',
-  }
+  return { success: true, message: lines.join('\n'), navigate_to: '/dashboard/ahorros' }
 }
 
 async function executeCreateReminder(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
-  const { title, date, time, recurrence } = command.params
-
+  const { title, date, time } = command.params
   const reminderData: any = {
     titulo: title,
     descripcion: '',
@@ -349,57 +355,42 @@ async function executeCreateReminder(command: ParsedCommand, ctx: ExecutorContex
     canales: ['push'],
     status: 'activo',
   }
-
   const result = await ctx.addReminder(reminderData)
   if (!result) {
     return { success: false, message: 'No se pudo crear el recordatorio. Intentá de nuevo.' }
   }
-
   let msg = `Recordatorio "${title}" creado`
   if (date) {
     const d = new Date(date + 'T12:00:00')
     msg += ` para el ${d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}`
   }
   if (time) msg += ` a las ${time}`
-
-  return {
-    success: true,
-    message: msg,
-    navigate_to: '/dashboard/recordatorios',
-  }
+  return { success: true, message: msg, navigate_to: '/dashboard/recordatorios' }
 }
 
 function executeListReminders(_command: ParsedCommand, ctx: ExecutorContext): CommandResult {
   const reminders = ctx.getActiveReminders()
-
   if (reminders.length === 0) {
     return { success: true, message: 'No tenés recordatorios activos.' }
   }
-
   const lines = reminders.slice(0, 5).map((r: any) => {
     const d = new Date(r.fecha + 'T12:00:00')
     return `${r.titulo} — ${d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`
   })
-
   const suffix = reminders.length > 5 ? `\n...y ${reminders.length - 5} más` : ''
-  return {
-    success: true,
-    message: lines.join('\n') + suffix,
-    navigate_to: '/dashboard/recordatorios',
-  }
+  return { success: true, message: lines.join('\n') + suffix, navigate_to: '/dashboard/recordatorios' }
 }
 
 async function executeCreateShoppingList(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
-  const { list_name } = command.params
-
-  const result = await ctx.addShoppingList(list_name, '🛒')
+  const { list_name, icon } = command.params
+  const result = await ctx.addShoppingList(list_name, icon || '🛒')
   if (!result) {
     return { success: false, message: 'No se pudo crear la lista. Intentá de nuevo.' }
   }
-
   return {
     success: true,
     message: `Lista de compras "${list_name}" creada`,
+    data: { listId: result.id },
     navigate_to: '/dashboard/listas',
   }
 }
@@ -407,20 +398,17 @@ async function executeCreateShoppingList(command: ParsedCommand, ctx: ExecutorCo
 async function executeAddShoppingItems(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { list_name, items } = command.params
 
-  // Find the list
   const list = ctx.findShoppingList(list_name)
   if (!list) {
-    // Auto-create list
+    // Auto-create list if not found
     const newList = await ctx.addShoppingList(list_name, '🛒')
     if (!newList) {
       return { success: false, message: `No se pudo crear la lista "${list_name}"` }
     }
-
     const success = await ctx.addShoppingItems(newList.id, items)
     if (!success) {
       return { success: false, message: 'No se pudieron agregar los items.' }
     }
-
     const itemNames = items.map((i: any) => i.name).join(', ')
     return {
       success: true,
@@ -433,7 +421,6 @@ async function executeAddShoppingItems(command: ParsedCommand, ctx: ExecutorCont
   if (!success) {
     return { success: false, message: 'No se pudieron agregar los items.' }
   }
-
   const itemNames = items.map((i: any) => i.name).join(', ')
   return {
     success: true,
@@ -444,21 +431,11 @@ async function executeAddShoppingItems(command: ParsedCommand, ctx: ExecutorCont
 
 async function executeClearCompleted(command: ParsedCommand, ctx: ExecutorContext): Promise<CommandResult> {
   const { list_name } = command.params
-
   const list = ctx.findShoppingList(list_name)
-  if (!list) {
-    return { success: false, message: `No encontré la lista "${list_name}"` }
-  }
-
+  if (!list) return { success: false, message: `No encontré la lista "${list_name}"` }
   const success = await ctx.clearCompletedItems(list.id)
-  if (!success) {
-    return { success: false, message: 'No se pudieron limpiar los items completados.' }
-  }
-
-  return {
-    success: true,
-    message: `Items completados eliminados de "${list.nombre}"`,
-  }
+  if (!success) return { success: false, message: 'No se pudieron limpiar los items completados.' }
+  return { success: true, message: `Items completados eliminados de "${list.nombre}"` }
 }
 
 // =====================================
@@ -466,66 +443,38 @@ async function executeClearCompleted(command: ParsedCommand, ctx: ExecutorContex
 // =====================================
 
 function executeQueryExpenseTotal(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
-  const { period, currency, category } = command.params
-
+  const { period, category } = command.params
   const monthKey = getMonthKeyForPeriod(period, ctx.monthKey)
   let expenses = ctx.getGastosMes(monthKey)
 
   if (category) {
     const cat = ctx.categorias.find((c: any) => c.nombre.toLowerCase() === category.toLowerCase())
-    if (cat) {
-      expenses = expenses.filter((g: any) => g.categoria_id === cat.id)
-    }
+    if (cat) expenses = expenses.filter((g: any) => g.categoria_id === cat.id)
   }
 
-  const totalARS = expenses
-    .filter((g: any) => g.moneda === 'ARS')
-    .reduce((sum: number, g: any) => sum + g.monto, 0)
-
-  const totalUSD = expenses
-    .filter((g: any) => g.moneda === 'USD')
-    .reduce((sum: number, g: any) => sum + g.monto, 0)
-
+  const totalARS = expenses.filter((g: any) => g.moneda === 'ARS').reduce((sum: number, g: any) => sum + g.monto, 0)
+  const totalUSD = expenses.filter((g: any) => g.moneda === 'USD').reduce((sum: number, g: any) => sum + g.monto, 0)
   const periodLabel = getPeriodLabel(period)
   let message = `Gastos ${category ? `en ${category} ` : ''}${periodLabel}:`
-
   if (totalARS > 0) message += `\n${formatMoney(totalARS, 'ARS')}`
   if (totalUSD > 0) message += `\n${formatMoney(totalUSD, 'USD')}`
   if (totalARS === 0 && totalUSD === 0) message += '\nSin gastos registrados'
 
-  return {
-    success: true,
-    message,
-    data: { totalARS, totalUSD, count: expenses.length },
-    navigate_to: '/dashboard/gastos',
-  }
+  return { success: true, message, data: { totalARS, totalUSD, count: expenses.length }, navigate_to: '/dashboard/gastos' }
 }
 
 function executeQueryIncomeTotal(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
   const { period } = command.params
   const monthKey = getMonthKeyForPeriod(period, ctx.monthKey)
   const incomes = ctx.getIngresosMes(monthKey)
-
-  const totalARS = incomes
-    .filter((i: any) => i.moneda === 'ARS')
-    .reduce((sum: number, i: any) => sum + i.monto, 0)
-
-  const totalUSD = incomes
-    .filter((i: any) => i.moneda === 'USD')
-    .reduce((sum: number, i: any) => sum + i.monto, 0)
-
+  const totalARS = incomes.filter((i: any) => i.moneda === 'ARS').reduce((sum: number, i: any) => sum + i.monto, 0)
+  const totalUSD = incomes.filter((i: any) => i.moneda === 'USD').reduce((sum: number, i: any) => sum + i.monto, 0)
   const periodLabel = getPeriodLabel(period)
   let message = `Ingresos ${periodLabel}:`
   if (totalARS > 0) message += `\n${formatMoney(totalARS, 'ARS')}`
   if (totalUSD > 0) message += `\n${formatMoney(totalUSD, 'USD')}`
   if (totalARS === 0 && totalUSD === 0) message += '\nSin ingresos registrados'
-
-  return {
-    success: true,
-    message,
-    data: { totalARS, totalUSD, count: incomes.length },
-    navigate_to: '/dashboard/ingresos',
-  }
+  return { success: true, message, data: { totalARS, totalUSD, count: incomes.length }, navigate_to: '/dashboard/ingresos' }
 }
 
 function executeQueryBalance(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
@@ -533,104 +482,57 @@ function executeQueryBalance(command: ParsedCommand, ctx: ExecutorContext): Comm
   const monthKey = getMonthKeyForPeriod(period, ctx.monthKey)
   const expenses = ctx.getGastosMes(monthKey)
   const incomes = ctx.getIngresosMes(monthKey)
-
   const expARS = expenses.filter((g: any) => g.moneda === 'ARS').reduce((s: number, g: any) => s + g.monto, 0)
   const expUSD = expenses.filter((g: any) => g.moneda === 'USD').reduce((s: number, g: any) => s + g.monto, 0)
   const incARS = incomes.filter((i: any) => i.moneda === 'ARS').reduce((s: number, i: any) => s + i.monto, 0)
   const incUSD = incomes.filter((i: any) => i.moneda === 'USD').reduce((s: number, i: any) => s + i.monto, 0)
-
   const balARS = incARS - expARS
   const balUSD = incUSD - expUSD
-
   const periodLabel = getPeriodLabel(period)
   let message = `Balance ${periodLabel}:`
   message += `\nIngresos: ${formatMoney(incARS, 'ARS')}${incUSD > 0 ? ` + ${formatMoney(incUSD, 'USD')}` : ''}`
   message += `\nGastos: ${formatMoney(expARS, 'ARS')}${expUSD > 0 ? ` + ${formatMoney(expUSD, 'USD')}` : ''}`
   message += `\nSaldo: ${formatMoney(balARS, 'ARS')}${balUSD !== 0 ? ` / ${formatMoney(balUSD, 'USD')}` : ''}`
-
-  return {
-    success: true,
-    message,
-    data: { balARS, balUSD, incARS, incUSD, expARS, expUSD },
-    navigate_to: '/dashboard',
-  }
+  return { success: true, message, data: { balARS, balUSD }, navigate_to: '/dashboard' }
 }
 
 function executeQueryTopExpenses(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
   const { period, limit = 5 } = command.params
   const monthKey = getMonthKeyForPeriod(period, ctx.monthKey)
   const expenses = ctx.getGastosMes(monthKey)
-
   const sorted = [...expenses].sort((a: any, b: any) => b.monto - a.monto).slice(0, limit)
-
   const periodLabel = getPeriodLabel(period)
-  if (sorted.length === 0) {
-    return { success: true, message: `Sin gastos ${periodLabel}` }
-  }
-
-  const lines = sorted.map((g: any, i: number) =>
-    `${i + 1}. ${g.descripcion} — ${formatMoney(g.monto, g.moneda)}`
-  )
-
-  return {
-    success: true,
-    message: `Top ${sorted.length} gastos ${periodLabel}:\n${lines.join('\n')}`,
-    navigate_to: '/dashboard/gastos',
-  }
+  if (sorted.length === 0) return { success: true, message: `Sin gastos ${periodLabel}` }
+  const lines = sorted.map((g: any, i: number) => `${i + 1}. ${g.descripcion} — ${formatMoney(g.monto, g.moneda)}`)
+  return { success: true, message: `Top ${sorted.length} gastos ${periodLabel}:\n${lines.join('\n')}`, navigate_to: '/dashboard/gastos' }
 }
 
 function executeQuerySavingsTotal(_command: ParsedCommand, ctx: ExecutorContext): CommandResult {
-  const totalPesos = ctx.movimientos
-    .filter((m: any) => m.tipo === 'pesos')
-    .reduce((s: number, m: any) => s + m.monto, 0)
-
-  const totalUSD = ctx.movimientos
-    .filter((m: any) => m.tipo === 'usd')
-    .reduce((s: number, m: any) => s + m.monto, 0)
-
+  const totalPesos = ctx.movimientos.filter((m: any) => m.tipo === 'pesos').reduce((s: number, m: any) => s + m.monto, 0)
+  const totalUSD = ctx.movimientos.filter((m: any) => m.tipo === 'usd').reduce((s: number, m: any) => s + m.monto, 0)
   let message = 'Total de ahorros:'
   message += `\n${formatMoney(totalPesos, 'ARS')}`
   if (totalUSD > 0) message += `\n${formatMoney(totalUSD, 'USD')}`
-
-  return {
-    success: true,
-    message,
-    data: { totalPesos, totalUSD },
-    navigate_to: '/dashboard/ahorros',
-  }
+  return { success: true, message, data: { totalPesos, totalUSD }, navigate_to: '/dashboard/ahorros' }
 }
 
 function executeQueryRemindersCount(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
   const reminders = ctx.getActiveReminders()
   const { date } = command.params
-
   if (date) {
     const filtered = reminders.filter((r: any) => r.fecha === date)
     const d = new Date(date + 'T12:00:00')
     const dateLabel = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
-    return {
-      success: true,
-      message: `Tenés ${filtered.length} recordatorio${filtered.length !== 1 ? 's' : ''} para ${dateLabel}`,
-      navigate_to: '/dashboard/recordatorios',
-    }
+    return { success: true, message: `Tenés ${filtered.length} recordatorio${filtered.length !== 1 ? 's' : ''} para ${dateLabel}`, navigate_to: '/dashboard/recordatorios' }
   }
-
-  return {
-    success: true,
-    message: `Tenés ${reminders.length} recordatorio${reminders.length !== 1 ? 's' : ''} activo${reminders.length !== 1 ? 's' : ''}`,
-    navigate_to: '/dashboard/recordatorios',
-  }
+  return { success: true, message: `Tenés ${reminders.length} recordatorio${reminders.length !== 1 ? 's' : ''} activo${reminders.length !== 1 ? 's' : ''}`, navigate_to: '/dashboard/recordatorios' }
 }
 
 function executeNavigation(command: ParsedCommand, ctx: ExecutorContext): CommandResult {
   const { route, label } = command.params
   if (route) {
     ctx.navigate(route)
-    return {
-      success: true,
-      message: `Navegando a ${label || route}`,
-      navigate_to: route,
-    }
+    return { success: true, message: `Navegando a ${label || route}`, navigate_to: route }
   }
   return { success: false, message: 'No pude determinar a dónde navegar.' }
 }
@@ -648,15 +550,9 @@ function getMonthKeyForPeriod(period: string, currentMonthKey: string): string {
 
 function getPeriodLabel(period: string): string {
   const labels: Record<string, string> = {
-    today: 'de hoy',
-    yesterday: 'de ayer',
-    this_week: 'de esta semana',
-    last_week: 'de la semana pasada',
-    this_month: 'del mes',
-    last_month: 'del mes pasado',
-    this_year: 'del año',
-    last_year: 'del año pasado',
-    all: 'totales',
+    today: 'de hoy', yesterday: 'de ayer', this_week: 'de esta semana',
+    last_week: 'de la semana pasada', this_month: 'del mes', last_month: 'del mes pasado',
+    this_year: 'del año', last_year: 'del año pasado', all: 'totales',
   }
   return labels[period] || 'del mes'
 }

@@ -779,8 +779,11 @@ export default function IngresosPage() {
     setShowConfirmDelete(true)
   }
 
+  const [deleting, setDeleting] = useState(false)
+
   const confirmDelete = async () => {
-    if (!deleteTargetId) return
+    if (!deleteTargetId || deleting) return
+    setDeleting(true)
 
     const { error } = await deleteIngreso(deleteTargetId)
     if (error) {
@@ -793,7 +796,9 @@ export default function IngresosPage() {
       setShowAlert(true)
     }
 
+    setShowConfirmDelete(false)
     setDeleteTargetId(null)
+    setDeleting(false)
   }
 
   const handleAddNewTag = async () => {
@@ -2136,8 +2141,9 @@ export default function IngresosPage() {
               <button
                 onClick={confirmDelete}
                 className="btn btn-danger"
+                disabled={deleting}
               >
-                Eliminar
+                {deleting ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
           </div>

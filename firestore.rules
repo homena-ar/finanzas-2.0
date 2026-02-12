@@ -530,10 +530,12 @@ service cloud.firestore {
           isWorkspaceMember(resource.data.workspace_id)))
       );
 
+      // Allow delete for creator, workspace owner, or workspace member
       allow delete: if request.auth != null && (
         resource.data.user_id == request.auth.uid ||
         (resource.data.keys().hasAll(['workspace_id']) &&
-         isWorkspaceOwner(resource.data.workspace_id))
+         (isWorkspaceOwner(resource.data.workspace_id) ||
+          isWorkspaceMember(resource.data.workspace_id)))
       );
     }
 

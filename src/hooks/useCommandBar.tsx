@@ -4,14 +4,15 @@
 // COMMAND BAR - CONTEXT + STATE MANAGEMENT
 // ============================================
 // Uses React Context so layout and CommandBar component share the SAME state.
-// Pipeline: Input -> Preprocess -> Parse -> Execute -> Result
+// Pipeline: Input -> AI Parse (Gemini) -> Execute -> Result
+// Fallback: Local regex parser when AI is unavailable.
 
 import { useState, useCallback, useRef, useEffect, createContext, useContext, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useData } from './useData'
 import { useAuth } from './useAuth'
 import { useWorkspace } from './useWorkspace'
-import { parseCommand } from '@/lib/commandbar/parser'
+import { parseCommandAI, parseCommandLocal } from '@/lib/commandbar/parser'
 import { executeCommand, type ExecutorContext } from '@/lib/commandbar/executor'
 import type {
   CommandHistoryEntry,
@@ -84,6 +85,7 @@ interface CommandBarContextValue {
   pendingCommand: ParsedCommand | null
   undoAction: UndoAction | null
   undoTimeout: number | null
+  activeInput: string | null
   metrics: CommandMetrics
   setInput: (v: string) => void
   execute: (rawInput: string, extraContext?: Partial<ExecutorContext>) => Promise<void>
@@ -115,6 +117,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
   const [pendingCommand, setPendingCommand] = useState<ParsedCommand | null>(null)
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null)
   const [undoTimeout, setUndoTimeoutState] = useState<number | null>(null)
+  const [activeInput, setActiveInput] = useState<string | null>(null)
 
   const metricsRef = useRef<CommandMetrics>(loadMetrics())
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,6 +135,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
         setClarification(null)
         setPendingCommand(null)
         setLastResult(null)
+        setActiveInput(null)
       }
     }
     document.addEventListener('keydown', handler)
@@ -142,6 +146,15 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveHistory(history)
   }, [history])
+
+  // --- Build AI parser context ---
+  const buildParserContext = useCallback(() => {
+    return {
+      categories: data.categorias?.map((c: any) => c.nombre) || [],
+      shoppingLists: [], // Will be enriched by CommandBar component
+      goals: data.metas?.map((m: any) => m.nombre) || [],
+    }
+  }, [data.categorias, data.metas])
 
   // --- Build executor context ---
   const buildContext = useCallback((): ExecutorContext => {
@@ -183,7 +196,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     }
 
     const findShoppingList = (_name: string) => {
-      return null // Will be overridden by extraContext from CommandBar
+      return null // Overridden by extraContext from CommandBar
     }
 
     const clearCompletedItems = async (listId: string) => {
@@ -277,17 +290,39 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     setHistory(prev => [entry, ...prev].slice(0, MAX_HISTORY))
   }, [])
 
-  // --- Execute a command ---
+  // --- Execute a command (AI-first, local fallback) ---
   const execute = useCallback(async (rawInput: string, extraContext?: Partial<ExecutorContext>) => {
     if (!rawInput.trim()) return
 
+    // Show the user's input as a chat bubble immediately
+    setActiveInput(rawInput)
+    setInput('')
     setLoading(true)
     setClarification(null)
     setLastResult(null)
 
     metricsRef.current.totalCommands++
 
-    const parsed = parseCommand(rawInput)
+    // Try AI parser first, fallback to local
+    let parsed: ParsedCommand | null = null
+    let usedAI = false
+
+    try {
+      const parserContext = buildParserContext()
+      // Merge shopping lists from extraContext if available
+      if (extraContext && 'findShoppingList' in extraContext) {
+        // The CommandBar component passes shopping list names via extraContext
+      }
+      parsed = await parseCommandAI(rawInput, parserContext)
+      if (parsed) usedAI = true
+    } catch {
+      console.warn('[CommandBar] AI parser failed, using local fallback')
+    }
+
+    // Fallback to local parser
+    if (!parsed) {
+      parsed = parseCommandLocal(rawInput)
+    }
 
     if (!parsed) {
       metricsRef.current.failedCommands++
@@ -295,19 +330,22 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
 
       const result: CommandResult = {
         success: false,
-        message: 'No entendi el comando. Proba con algo como "gasto 2000 Carrefour" o "balance del mes".',
+        message: 'No entendí el comando. Probá con algo como "gasto 2000 Carrefour" o "balance del mes".',
       }
       setLastResult(result)
       addToHistory(rawInput, null, result)
       setLoading(false)
+      setActiveInput(null)
       return
     }
 
-    if (parsed.needs_clarification.length > 0 || parsed.confidence < 0.75) {
+    // Check if clarification is needed
+    if (parsed.needs_clarification.length > 0 || (parsed.confidence < 0.75 && parsed.type !== 'multi_action')) {
       setClarification(parsed.needs_clarification)
       setPendingCommand(parsed)
       setLoading(false)
-      metricsRef.current.resolvedLocally++
+      if (usedAI) metricsRef.current.resolvedByAI++
+      else metricsRef.current.resolvedLocally++
       saveMetrics(metricsRef.current)
       return
     }
@@ -315,8 +353,11 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     const ctx = { ...buildContext(), ...extraContext }
     const result = await executeCommand(parsed, ctx)
 
-    metricsRef.current.resolvedLocally++
-    metricsRef.current.intentCounts[parsed.intent] = (metricsRef.current.intentCounts[parsed.intent] || 0) + 1
+    if (usedAI) metricsRef.current.resolvedByAI++
+    else metricsRef.current.resolvedLocally++
+    if (parsed.intent !== 'multi_action') {
+      metricsRef.current.intentCounts[parsed.intent] = (metricsRef.current.intentCounts[parsed.intent] || 0) + 1
+    }
     saveMetrics(metricsRef.current)
 
     if (result.undo_action) {
@@ -325,9 +366,9 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
 
     setLastResult(result)
     addToHistory(rawInput, parsed, result)
-    setInput('')
     setLoading(false)
-  }, [buildContext, addToHistory])
+    setActiveInput(null)
+  }, [buildContext, buildParserContext, addToHistory])
 
   // --- Resolve clarification ---
   const resolveClarification = useCallback(async (field: string, value: any, extraContext?: Partial<ExecutorContext>) => {
@@ -336,6 +377,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     if (value === 'cancel') {
       setClarification(null)
       setPendingCommand(null)
+      setActiveInput(null)
       return
     }
 
@@ -364,6 +406,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
         setPendingCommand(null)
         setInput('')
         setLoading(false)
+        setActiveInput(null)
         return
       }
 
@@ -374,7 +417,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
           ...pendingCommand,
           intent: 'create_expense',
           confidence: 0.70,
-          needs_clarification: [{ field: 'amount', message: `Cuanto fue "${itemName}"?` }],
+          needs_clarification: [{ field: 'amount', message: `¿Cuánto fue "${itemName}"?` }],
           params: { merchant: itemName, currency: 'ARS', date: new Date().toISOString().split('T')[0] },
         }
         setClarification(updatedCommand.needs_clarification)
@@ -410,6 +453,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     setPendingCommand(null)
     setInput('')
     setLoading(false)
+    setActiveInput(null)
   }, [pendingCommand, buildContext, addToHistory])
 
   // --- Undo ---
@@ -430,9 +474,9 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
     try {
       await undoAction.execute()
-      setLastResult({ success: true, message: 'Accion deshecha' })
+      setLastResult({ success: true, message: 'Acción deshecha' })
     } catch {
-      setLastResult({ success: false, message: 'No se pudo deshacer la accion' })
+      setLastResult({ success: false, message: 'No se pudo deshacer la acción' })
     }
     setUndoAction(null)
     setUndoTimeoutState(null)
@@ -443,6 +487,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     setIsOpen(true)
     setClarification(null)
     setLastResult(null)
+    setActiveInput(null)
   }, [])
 
   const close = useCallback(() => {
@@ -451,6 +496,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
     setClarification(null)
     setPendingCommand(null)
     setLastResult(null)
+    setActiveInput(null)
   }, [])
 
   const toggle = useCallback(() => {
@@ -470,6 +516,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
   const value: CommandBarContextValue = {
     isOpen, input, loading, history, lastResult,
     clarification, pendingCommand, undoAction, undoTimeout,
+    activeInput,
     metrics: metricsRef.current,
     setInput, execute, resolveClarification, performUndo,
     open, close, toggle, clearHistory, repeatCommand,
