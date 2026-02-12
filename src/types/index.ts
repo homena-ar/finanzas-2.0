@@ -279,3 +279,32 @@ export interface Notificacion {
   created_at: string
   workspace_id?: string
 }
+
+// ============================================
+// LISTAS DE COMPRAS (SHOPPING LISTS)
+// ============================================
+
+export interface ListaCompra {
+  id: string
+  user_id: string
+  workspace_id: string
+  created_by: string
+  nombre: string
+  icono: string
+  created_at: string
+}
+
+export interface ItemLista {
+  id: string
+  user_id: string
+  workspace_id: string
+  created_by: string
+  lista_id: string
+  nombre: string
+  cantidad: number
+  unidad: string
+  precio_estimado: number | null
+  moneda: 'ARS' | 'USD'
+  comprado: boolean
+  created_at: string
+}

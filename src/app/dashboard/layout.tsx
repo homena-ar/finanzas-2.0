@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, TrendingUp,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell, ShoppingCart
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -92,6 +92,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(hasAccess('ahorros') ? [{ href: '/dashboard/ahorros', icon: PiggyBank, label: 'Ahorros' }] : []),
 
     { href: '/dashboard/recordatorios', icon: Bell, label: 'Recordatorios' },
+
+    { href: '/dashboard/listas', icon: ShoppingCart, label: 'Listas' },
 
     { href: '/dashboard/config', icon: Settings, label: 'Config' },
   ]
