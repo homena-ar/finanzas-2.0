@@ -40,10 +40,12 @@ export default function RecordatoriosPage() {
 
   const fetchRecordatorios = useCallback(async () => {
     if (!user || !currentWorkspace?.id) {
-      // Dependencies not ready yet. Set loading to false to avoid infinite
-      // "Cargando..." state when this runs before workspace is initialized.
-      // When user/workspace become available, the useCallback ref changes and
-      // the useEffect below re-triggers the fetch with loading=true.
+      // If workspace init hasn't completed yet, keep the loading spinner.
+      // Once initWorkspaceReady flips to true (and currentWorkspace gets set),
+      // the useCallback ref changes and the useEffect below re-triggers.
+      if (!initWorkspaceReady) return
+      // Workspace init finished but currentWorkspace is still null (shouldn't
+      // normally happen). Stop loading to avoid infinite spinner.
       setLoading(false)
       return
     }
@@ -62,7 +64,7 @@ export default function RecordatoriosPage() {
       console.error('[Recordatorios] Error fetching:', e)
     }
     setLoading(false)
-  }, [user, currentWorkspace?.id])
+  }, [user, currentWorkspace?.id, initWorkspaceReady])
 
   useEffect(() => {
     fetchRecordatorios()
@@ -430,10 +432,10 @@ export default function RecordatoriosPage() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !form.titulo.trim() || !form.fecha || !initWorkspaceReady}
+                  disabled={saving || !form.titulo.trim() || !form.fecha || !currentWorkspace?.id}
                   className="btn btn-primary flex-1"
                 >
-                  {saving ? 'Guardando...' : !initWorkspaceReady ? 'Cargando...' : editing ? 'Guardar cambios' : 'Crear recordatorio'}
+                  {saving ? 'Guardando...' : !currentWorkspace?.id ? 'Cargando espacio...' : editing ? 'Guardar cambios' : 'Crear recordatorio'}
                 </button>
               </div>
             </div>

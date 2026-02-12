@@ -131,9 +131,12 @@ export default function LoginPage() {
     setForgotPasswordLoading(false)
   }
 
-  // While auth is loading (initial hydration or session recovery), show a
-  // loading screen instead of the login form to prevent a confusing flash.
-  if (authLoading) {
+  // While auth is loading OR user is already set (redirect pending via
+  // useEffect), show a loading screen instead of the login form.
+  // The redirect runs in a useEffect (after render), so without this guard
+  // the login form would flash for one frame when user is set but the
+  // navigation hasn't happened yet.
+  if (authLoading || user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-600 to-primary-400 flex items-center justify-center p-4">
         <div className="text-center">
