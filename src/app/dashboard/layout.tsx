@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, TrendingUp,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell, ShoppingCart
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell, ShoppingCart, Command
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -14,6 +14,9 @@ import { useData } from '@/hooks/useData'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { Workspace, WorkspacePermissions } from '@/types'
 import { NotificationsBell } from '@/components/NotificationsBell'
+import { CommandBar, CommandBarTrigger } from '@/components/CommandBar'
+import { useCommandBar } from '@/hooks/useCommandBar'
+import { AnimatePresence } from 'framer-motion'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
@@ -24,6 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false)
   const [dolar, setDolar] = useState(0)
+  const commandBar = useCommandBar()
 
   // --- LÓGICA DE PERMISOS MEJORADA ---
   const hasAccess = (section: keyof WorkspacePermissions) => {
@@ -445,10 +449,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Desktop Header */}
-      <header className="hidden lg:flex fixed top-0 left-64 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-100 z-30 items-center justify-end px-6 gap-3">
-        <NotificationsBell />
-        <div className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-xs font-semibold border border-emerald-100">
-          USD {formatMoney(dolar)}
+      <header className="hidden lg:flex fixed top-0 left-64 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-100 z-30 items-center justify-between px-6">
+        {/* Command Bar Trigger (Desktop) */}
+        <button
+          onClick={commandBar.open}
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors group"
+        >
+          <Command className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+          <span className="text-sm text-slate-400 group-hover:text-slate-500">Comando...</span>
+          <div className="flex items-center gap-0.5 ml-2">
+            <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono font-medium text-slate-400 shadow-sm">Ctrl</kbd>
+            <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono font-medium text-slate-400 shadow-sm">K</kbd>
+          </div>
+        </button>
+        <div className="flex items-center gap-3">
+          <NotificationsBell />
+          <div className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-xs font-semibold border border-emerald-100">
+            USD {formatMoney(dolar)}
+          </div>
         </div>
       </header>
 
@@ -458,6 +476,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </div>
       </main>
+
+      {/* Global Command Bar */}
+      <AnimatePresence>
+        {commandBar.isOpen && <CommandBar />}
+      </AnimatePresence>
+
+      {/* Mobile FAB trigger */}
+      {!commandBar.isOpen && (
+        <CommandBarTrigger onClick={commandBar.open} />
+      )}
     </div>
   )
 }
