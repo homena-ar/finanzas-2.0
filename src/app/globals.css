@@ -237,17 +237,51 @@ body {
     @apply text-slate-500 hover:text-slate-700;
   }
 
-  /* ===== COMMAND BAR ===== */
+  /* ===== COMMAND BAR / ASISTENTE ===== */
   .commandbar-overlay {
     @apply fixed inset-0 bg-black/25 backdrop-blur-[2px] z-[60];
   }
 
-  .commandbar-panel {
-    @apply fixed top-[10%] left-1/2 -translate-x-1/2 w-[94%] max-w-xl bg-white rounded-2xl shadow-2xl z-[61] overflow-hidden border border-slate-200/60;
+  /* Chat panel — centered card */
+  .commandbar-chat-panel {
+    @apply fixed top-[5%] left-1/2 -translate-x-1/2 w-[94%] max-w-md bg-white rounded-2xl shadow-2xl z-[61]
+           flex flex-col border border-slate-200/60;
+    max-height: 80vh;
   }
 
-  .commandbar-input-row {
-    @apply flex items-center gap-2 px-4 py-3 border-b border-slate-100;
+  /* Header bar */
+  .commandbar-chat-header {
+    @apply flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0;
+  }
+
+  /* Scrollable messages area */
+  .commandbar-chat-messages {
+    @apply flex-1 overflow-y-auto px-4 py-3 space-y-3;
+    min-height: 200px;
+  }
+
+  /* User message bubble (right-aligned) */
+  .commandbar-msg-user {
+    @apply max-w-[85%] px-3 py-2 rounded-2xl rounded-br-md bg-primary text-white;
+  }
+
+  /* Assistant message bubble (left-aligned) */
+  .commandbar-msg-assistant {
+    @apply max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-slate-50 border border-slate-100;
+  }
+
+  /* Error variant of assistant bubble */
+  .commandbar-msg-error {
+    @apply bg-red-50/60 border-red-100;
+  }
+
+  /* Input area at the bottom */
+  .commandbar-chat-input-area {
+    @apply border-t border-slate-100 shrink-0;
+  }
+
+  .commandbar-chat-input-row {
+    @apply flex items-center gap-2 px-4 py-3;
   }
 
   .commandbar-input {
@@ -259,28 +293,8 @@ body {
     box-shadow: none;
   }
 
-  .commandbar-content {
-    @apply max-h-[50vh] overflow-y-auto;
-  }
-
-  .commandbar-section {
-    @apply px-4 py-3 border-b border-slate-50;
-  }
-
-  .commandbar-section:last-child {
-    @apply border-b-0;
-  }
-
-  .commandbar-result {
-    @apply rounded-xl p-3;
-  }
-
-  .commandbar-result-success {
-    @apply bg-emerald-50/60 border border-emerald-100;
-  }
-
-  .commandbar-result-error {
-    @apply bg-red-50/60 border border-red-100;
+  .commandbar-chat-footer {
+    @apply flex items-center gap-3 px-4 py-2 bg-slate-50/50;
   }
 
   .commandbar-option-btn {
@@ -297,15 +311,6 @@ body {
   .commandbar-suggestion {
     @apply flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50
            transition-colors duration-100 cursor-pointer;
-  }
-
-  .commandbar-history-item {
-    @apply flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-slate-50
-           transition-colors duration-100 text-left;
-  }
-
-  .commandbar-footer {
-    @apply flex items-center justify-between px-4 py-2 bg-slate-50/50 border-t border-slate-100;
   }
 
   .commandbar-kbd {
@@ -365,18 +370,18 @@ body {
     height: 44px; /* Touch-friendly height on mobile */
   }
 
-  /* Command Bar mobile adjustments */
-  .commandbar-panel {
+  /* Chat panel mobile adjustments */
+  .commandbar-chat-panel {
     @apply top-auto bottom-0 left-0 right-0 translate-x-0 w-full max-w-none rounded-b-none rounded-t-2xl;
-    max-height: 80vh;
+    max-height: 85vh;
   }
 
   .commandbar-input {
     font-size: 16px; /* Prevent iOS zoom */
   }
 
-  .commandbar-content {
-    max-height: 60vh;
+  .commandbar-chat-messages {
+    min-height: 180px;
   }
 
   .commandbar-fab {

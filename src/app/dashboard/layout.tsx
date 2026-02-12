@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, TrendingUp,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell, ShoppingCart, Command
+  PiggyBank, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, ArrowDownCircle, ArrowUpCircle, Building2, ChevronDown, Shield, UserCheck, Bell, ShoppingCart, MessageCircle, Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -461,10 +461,10 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         {/* Command Bar Trigger (Desktop) */}
         <button
           onClick={commandBar.open}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors group"
+          className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-primary-50 to-accent/5 hover:from-primary-100 hover:to-accent/10 border border-primary-200/60 rounded-lg transition-colors group"
         >
-          <Command className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
-          <span className="text-sm text-slate-400 group-hover:text-slate-500">Comando...</span>
+          <Sparkles className="w-3.5 h-3.5 text-primary group-hover:text-primary-700" />
+          <span className="text-sm text-primary/70 group-hover:text-primary-700">Asistente...</span>
           <div className="flex items-center gap-0.5 ml-2">
             <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono font-medium text-slate-400 shadow-sm">Ctrl</kbd>
             <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono font-medium text-slate-400 shadow-sm">K</kbd>

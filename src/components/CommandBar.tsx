@@ -1,20 +1,20 @@
 'use client'
 
 // ============================================
-// COMMAND BAR - GLOBAL UI COMPONENT
+// ASISTENTE - CHAT-STYLE UI COMPONENT
 // ============================================
-// Floating command bar accessible from anywhere in the dashboard.
-// Supports: text input, chip suggestions, clarification dialogs,
-// confirmation toasts with undo, history, and keyboard navigation.
+// Chat-style assistant accessible from anywhere in the dashboard.
+// User messages on the right, assistant responses on the left.
+// Input at the bottom, suggestions, clarification, and undo support.
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Command, X, Send, RotateCcw, ChevronRight,
-  CheckCircle2, AlertCircle, Clock, Loader2,
+  X, Send, RotateCcw, ChevronRight,
+  CheckCircle2, AlertCircle, Loader2,
   ArrowDownCircle, ArrowUpCircle, PiggyBank,
-  Bell, ShoppingCart, BarChart3, Navigation,
-  Sparkles,
+  Bell, ShoppingCart, BarChart3,
+  Sparkles, MessageCircle,
 } from 'lucide-react'
 import { useCommandBar } from '@/hooks/useCommandBar'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -34,24 +34,13 @@ const SUGGESTION_CHIPS = [
   { label: 'Total de gastos', example: 'cuanto gaste este mes', icon: BarChart3 },
 ]
 
-// --- Intent Icon Map ---
-function getIntentIcon(intent: string) {
-  if (intent.includes('expense') || intent.includes('gasto')) return ArrowDownCircle
-  if (intent.includes('income') || intent.includes('ingreso')) return ArrowUpCircle
-  if (intent.includes('saving') || intent.includes('goal') || intent.includes('ahorro') || intent.includes('meta')) return PiggyBank
-  if (intent.includes('reminder') || intent.includes('recordatorio')) return Bell
-  if (intent.includes('shopping') || intent.includes('lista')) return ShoppingCart
-  if (intent.includes('query') || intent.includes('balance') || intent.includes('top')) return BarChart3
-  if (intent.includes('navigate')) return Navigation
-  return Sparkles
-}
-
 // --- Component ---
 
 export function CommandBar() {
   const {
     isOpen, input, loading, history, lastResult,
     clarification, pendingCommand, undoAction, undoTimeout,
+    activeInput,
     setInput, execute, resolveClarification, performUndo,
     open, close, toggle, repeatCommand,
   } = useCommandBar()
@@ -60,7 +49,7 @@ export function CommandBar() {
   const { currentWorkspace } = useWorkspace()
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [showHistory, setShowHistory] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const [undoProgress, setUndoProgress] = useState(100)
 
   // Pre-load shopping lists and reminders for context
@@ -103,25 +92,25 @@ export function CommandBar() {
     }
   }, [isOpen])
 
+  // Auto-scroll to bottom when new messages appear
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [history, lastResult, loading, activeInput, clarification])
+
   // Undo progress countdown
   useEffect(() => {
     if (!undoTimeout || !undoAction) {
       setUndoProgress(100)
       return
     }
-
     const startTime = undoTimeout - 6000
     const interval = setInterval(() => {
       const now = Date.now()
       const elapsed = now - startTime
       const remaining = Math.max(0, 100 - (elapsed / 6000) * 100)
       setUndoProgress(remaining)
-
-      if (remaining <= 0) {
-        clearInterval(interval)
-      }
+      if (remaining <= 0) clearInterval(interval)
     }, 50)
-
     return () => clearInterval(interval)
   }, [undoTimeout, undoAction])
 
@@ -171,6 +160,12 @@ export function CommandBar() {
     close()
   }
 
+  // Get recent history entries in oldest-first order for chat display
+  const recentHistory = [...history].slice(0, 10).reverse()
+
+  // Determine if we should show the welcome screen
+  const showWelcome = !activeInput && !loading && !lastResult && !clarification && recentHistory.length === 0
+
   return (
     <>
       {/* Backdrop */}
@@ -183,143 +178,154 @@ export function CommandBar() {
         onClick={close}
       />
 
-      {/* Main Panel */}
+      {/* Main Chat Panel */}
       <motion.div
-        initial={{ opacity: 0, y: -20, scale: 0.98 }}
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20, scale: 0.98 }}
+        exit={{ opacity: 0, y: 20, scale: 0.98 }}
         transition={{ type: 'spring', duration: 0.3, bounce: 0.1 }}
-        className="commandbar-panel"
+        className="commandbar-chat-panel"
         onClick={e => e.stopPropagation()}
       >
-        {/* Input Row */}
-        <div className="commandbar-input-row">
-          <Command className="w-4 h-4 text-slate-400 shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            className="commandbar-input"
-            placeholder="Escribi un comando... ej: 'gasto 2000 Carrefour'"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={loading}
-          />
-          {loading ? (
-            <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
-          ) : input.trim() ? (
-            <button
-              onClick={handleSubmit}
-              className="p-1 hover:bg-primary-50 rounded-md transition-colors shrink-0"
-              title="Ejecutar"
-            >
-              <Send className="w-4 h-4 text-primary" />
-            </button>
-          ) : null}
+        {/* Header */}
+        <div className="commandbar-chat-header">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Asistente</h3>
+              <p className="text-[10px] text-slate-400">FinControl AI</p>
+            </div>
+          </div>
           <button
             onClick={close}
-            className="p-1 hover:bg-slate-100 rounded-md transition-colors shrink-0 ml-1"
+            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
             title="Cerrar (Esc)"
           >
-            <X className="w-3.5 h-3.5 text-slate-400" />
+            <X className="w-4 h-4 text-slate-400" />
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className="commandbar-content">
-          {/* Clarification UI */}
-          {clarification && clarification.length > 0 && (
-            <div className="commandbar-section">
-              {clarification.map((c, idx) => (
-                <div key={idx} className="space-y-2">
-                  <p className="text-sm text-slate-600">{c.message}</p>
-                  {c.options && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {c.options.map((opt, optIdx) => (
-                        <button
-                          key={optIdx}
-                          onClick={() => handleClarificationSelect(c.field, opt.value)}
-                          className="commandbar-option-btn"
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {!c.options && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        className="input text-sm flex-1"
-                        placeholder={c.message}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            handleClarificationSelect(c.field, (e.target as HTMLInputElement).value)
-                          }
-                        }}
-                        autoFocus={idx === 0}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+        {/* Messages Area */}
+        <div className="commandbar-chat-messages">
+          {/* Welcome state */}
+          {showWelcome && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-primary" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-slate-700">¡Hola! Soy tu asistente financiero</p>
+                <p className="text-xs text-slate-400 mt-1">Decime qué necesitás o elegí una sugerencia</p>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 w-full max-w-sm">
+                {SUGGESTION_CHIPS.map((chip, idx) => {
+                  const Icon = chip.icon
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleChipClick(chip.example)}
+                      className="commandbar-suggestion"
+                    >
+                      <Icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="text-xs text-slate-600 text-left truncate">{chip.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
-          {/* Result */}
-          <AnimatePresence mode="wait">
-            {lastResult && !clarification && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="commandbar-section"
-              >
-                <div className={`commandbar-result ${lastResult.success ? 'commandbar-result-success' : 'commandbar-result-error'}`}>
-                  <div className="flex items-start gap-2.5">
-                    {lastResult.success ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-700 whitespace-pre-line">{lastResult.message}</p>
+          {/* Past conversation history */}
+          {recentHistory.map(h => (
+            <div key={h.id} className="space-y-2">
+              {/* User message */}
+              <div className="flex justify-end">
+                <div className="commandbar-msg-user">
+                  <p className="text-sm">{h.input}</p>
+                </div>
+              </div>
+              {/* Assistant response */}
+              {h.result && (
+                <div className="flex justify-start">
+                  <div className={`commandbar-msg-assistant ${h.result.success ? '' : 'commandbar-msg-error'}`}>
+                    <div className="flex items-start gap-2">
+                      {h.result.success ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                      )}
+                      <p className="text-sm text-slate-700 whitespace-pre-line">{h.result.message}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
 
-                      {/* Action buttons row */}
-                      <div className="flex items-center gap-2 mt-2">
-                        {/* Undo button */}
-                        {undoAction && (
-                          <button
-                            onClick={performUndo}
-                            className="commandbar-undo-btn"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            Deshacer
-                            <div
-                              className="commandbar-undo-progress"
-                              style={{ width: `${undoProgress}%` }}
-                            />
-                          </button>
-                        )}
+          {/* Active user input (being processed) */}
+          {activeInput && (
+            <div className="flex justify-end">
+              <div className="commandbar-msg-user">
+                <p className="text-sm">{activeInput}</p>
+              </div>
+            </div>
+          )}
 
-                        {/* Navigate button */}
-                        {lastResult.navigate_to && (
-                          <button
-                            onClick={() => handleNavigate(lastResult.navigate_to!)}
-                            className="commandbar-detail-btn"
-                          >
-                            Ver detalle
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
+          {/* Loading indicator */}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="commandbar-msg-assistant">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                  <span className="text-sm text-slate-400">Procesando...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Current result (most recent, shown separately for undo/navigate) */}
+          {lastResult && !clarification && (
+            <div className="flex justify-start">
+              <div className={`commandbar-msg-assistant ${lastResult.success ? '' : 'commandbar-msg-error'}`}>
+                <div className="flex items-start gap-2">
+                  {lastResult.success ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-700 whitespace-pre-line">{lastResult.message}</p>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2 mt-2">
+                      {undoAction && (
+                        <button onClick={performUndo} className="commandbar-undo-btn">
+                          <RotateCcw className="w-3 h-3" />
+                          Deshacer
+                          <div
+                            className="commandbar-undo-progress"
+                            style={{ width: `${undoProgress}%` }}
+                          />
+                        </button>
+                      )}
+                      {lastResult.navigate_to && (
+                        <button
+                          onClick={() => handleNavigate(lastResult.navigate_to!)}
+                          className="commandbar-detail-btn"
+                        >
+                          Ver detalle
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Suggested followups */}
                 {lastResult.success && pendingCommand?.suggested_followups && pendingCommand.suggested_followups.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-100">
                     {pendingCommand.suggested_followups.map((f, idx) => (
                       <button
                         key={idx}
@@ -331,78 +337,103 @@ export function CommandBar() {
                     ))}
                   </div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Suggestions (when input is empty and no result) */}
-          {!input.trim() && !lastResult && !clarification && (
-            <div className="commandbar-section">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sugerencias</span>
-                {history.length > 0 && (
-                  <button
-                    onClick={() => setShowHistory(!showHistory)}
-                    className="text-[10px] font-medium text-primary hover:text-primary-700 transition-colors"
-                  >
-                    {showHistory ? 'Ver sugerencias' : 'Historial reciente'}
-                  </button>
-                )}
               </div>
-
-              {showHistory ? (
-                <div className="space-y-1">
-                  {history.slice(0, 6).map(h => (
-                    <button
-                      key={h.id}
-                      onClick={() => {
-                        repeatCommand(h)
-                        setInput(h.input)
-                        setShowHistory(false)
-                      }}
-                      className="commandbar-history-item"
-                    >
-                      <Clock className="w-3 h-3 text-slate-300 shrink-0" />
-                      <span className="text-sm text-slate-600 truncate">{h.input}</span>
-                      {h.result?.success !== undefined && (
-                        h.result.success
-                          ? <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                          : <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-1.5">
-                  {SUGGESTION_CHIPS.map((chip, idx) => {
-                    const Icon = chip.icon
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleChipClick(chip.example)}
-                        className="commandbar-suggestion"
-                      >
-                        <Icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="text-xs text-slate-600 text-left truncate">{chip.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
             </div>
           )}
 
-          {/* Keyboard hint */}
-          <div className="commandbar-footer">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-slate-400">
-                <kbd className="commandbar-kbd">Enter</kbd> ejecutar
-              </span>
-              <span className="text-[10px] text-slate-400">
-                <kbd className="commandbar-kbd">Esc</kbd> cerrar
-              </span>
+          {/* Clarification UI */}
+          {clarification && clarification.length > 0 && (
+            <div className="flex justify-start">
+              <div className="commandbar-msg-assistant">
+                {clarification.map((c, idx) => (
+                  <div key={idx} className="space-y-2">
+                    <p className="text-sm text-slate-600">{c.message}</p>
+                    {c.options && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {c.options.map((opt, optIdx) => (
+                          <button
+                            key={optIdx}
+                            onClick={() => handleClarificationSelect(c.field, opt.value)}
+                            className="commandbar-option-btn"
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {!c.options && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          className="input text-sm flex-1"
+                          placeholder={c.message}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              handleClarificationSelect(c.field, (e.target as HTMLInputElement).value)
+                            }
+                          }}
+                          autoFocus={idx === 0}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-            <span className="text-[10px] text-slate-300">
+          )}
+
+          {/* Scroll anchor */}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area (at bottom) */}
+        <div className="commandbar-chat-input-area">
+          {/* Suggestion chips after results (when input is empty) */}
+          {!input.trim() && !loading && lastResult?.success && history.length > 0 && history[0]?.parsed?.suggested_followups && history[0].parsed.suggested_followups.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-4 pb-2">
+              {history[0].parsed.suggested_followups.map((f, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => { setInput(f); inputRef.current?.focus() }}
+                  className="commandbar-chip text-xs"
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="commandbar-chat-input-row">
+            <input
+              ref={inputRef}
+              type="text"
+              className="commandbar-input"
+              placeholder="Escribí un comando..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+            />
+            {loading ? (
+              <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+            ) : input.trim() ? (
+              <button
+                onClick={handleSubmit}
+                className="p-1.5 bg-primary hover:bg-primary-700 rounded-lg transition-colors shrink-0"
+                title="Enviar"
+              >
+                <Send className="w-3.5 h-3.5 text-white" />
+              </button>
+            ) : null}
+          </div>
+          <div className="commandbar-chat-footer">
+            <span className="text-[10px] text-slate-400">
+              <kbd className="commandbar-kbd">Enter</kbd> enviar
+            </span>
+            <span className="text-[10px] text-slate-400">
+              <kbd className="commandbar-kbd">Esc</kbd> cerrar
+            </span>
+            <span className="text-[10px] text-slate-300 ml-auto">
               <kbd className="commandbar-kbd">Ctrl</kbd>+<kbd className="commandbar-kbd">K</kbd>
             </span>
           </div>
@@ -419,10 +450,10 @@ export function CommandBarTrigger({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       className="commandbar-fab"
-      title="Abrir Command Bar (Ctrl+K)"
-      aria-label="Abrir Command Bar"
+      title="Abrir Asistente (Ctrl+K)"
+      aria-label="Abrir Asistente"
     >
-      <Command className="w-5 h-5" />
+      <MessageCircle className="w-5 h-5" />
     </button>
   )
 }

@@ -55,7 +55,7 @@ export type CommandIntent =
 
 // --- Parsed Result ---
 
-export type CommandType = 'action' | 'query' | 'navigation'
+export type CommandType = 'action' | 'query' | 'navigation' | 'multi_action'
 
 export interface ParsedCommand {
   type: CommandType
@@ -65,6 +65,7 @@ export interface ParsedCommand {
   needs_clarification: ClarificationField[]
   suggested_followups: string[]
   raw_input: string
+  actions?: ParsedCommand[] // For multi_action: sub-commands to execute sequentially
 }
 
 export interface ClarificationField {
