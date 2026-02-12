@@ -355,7 +355,7 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
 
     if (usedAI) metricsRef.current.resolvedByAI++
     else metricsRef.current.resolvedLocally++
-    if (parsed.intent !== 'multi_action') {
+    if (parsed.type !== 'multi_action') {
       metricsRef.current.intentCounts[parsed.intent] = (metricsRef.current.intentCounts[parsed.intent] || 0) + 1
     }
     saveMetrics(metricsRef.current)
