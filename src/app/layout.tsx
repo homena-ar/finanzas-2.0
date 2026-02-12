@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'FinControl - Controlá tus Finanzas',
     description: 'Plataforma profesional para el control y seguimiento de tus finanzas personales y familiares.',
-    images: [`${baseUrl}/twitter-image.png`],
+    images: [`${baseUrl}/og-image.png`],
   },
   appleWebApp: {
     capable: true,

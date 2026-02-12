@@ -131,6 +131,30 @@ export default function LoginPage() {
     setForgotPasswordLoading(false)
   }
 
+  // While auth is loading (initial hydration or session recovery), show a
+  // loading screen instead of the login form to prevent a confusing flash.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-600 to-primary-400 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl mb-4 shadow-lg shadow-black/10">
+            <svg className="w-9 h-9" viewBox="0 0 100 100" fill="none">
+              <g fill="white">
+                <rect x="25" y="45" width="10" height="30" rx="2"/>
+                <rect x="45" y="35" width="10" height="40" rx="2"/>
+                <rect x="65" y="25" width="10" height="50" rx="2"/>
+                <path d="M 22 55 L 38 45 L 52 35 L 72 20" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                <circle cx="72" cy="20" r="4" fill="white"/>
+              </g>
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-white">FinControl</h1>
+          <Loader2 className="w-6 h-6 animate-spin text-white/70 mx-auto mt-4" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-600 to-primary-400 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
