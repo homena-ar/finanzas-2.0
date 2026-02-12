@@ -52,10 +52,11 @@ export const metadata: Metadata = {
       },
     ],
   },
-  other: {
-    // Meta tags adicionales para Facebook
-    'fb:app_id': process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '',
-  },
+  // Only include fb:app_id when actually configured, otherwise Facebook
+  // Sharing Debugger complains about the empty required property.
+  ...(process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
+    ? { other: { 'fb:app_id': process.env.NEXT_PUBLIC_FACEBOOK_APP_ID } }
+    : {}),
   twitter: {
     card: 'summary_large_image',
     title: 'FinControl - Controlá tus Finanzas',
@@ -97,14 +98,6 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        {process.env.NEXT_PUBLIC_FACEBOOK_APP_ID && (
-          <meta property="fb:app_id" content={process.env.NEXT_PUBLIC_FACEBOOK_APP_ID} />
-        )}
-        {/* Meta tags adicionales para mejorar compatibilidad con Facebook/WhatsApp */}
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:type" content="image/png" />
-        <meta property="og:image:alt" content="FinControl - Plataforma de Control Financiero" />
       </head>
       <body className="font-sans antialiased">
         <ServiceWorkerRegistration />
