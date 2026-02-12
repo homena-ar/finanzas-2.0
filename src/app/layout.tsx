@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     siteName: 'FinControl',
     images: [
       // Absolute URL required for WhatsApp/Facebook/Telegram crawlers.
-      // The path /og-image.png is rewritten to the dynamic /opengraph-image endpoint.
+      // Served directly from public/og-image.png (static file).
       {
         url: `${baseUrl}/og-image.png`,
         width: 1200,
