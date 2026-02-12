@@ -141,10 +141,11 @@ export default function ListasPage() {
   }
 
   const handleDeleteList = async (listaId: string) => {
+    if (!user || !currentWorkspace?.id) return
     try {
       // Delete all items in the list first
       const itemsSnap = await getDocs(
-        query(collection(db, 'items_lista'), where('lista_id', '==', listaId))
+        query(collection(db, 'items_lista'), where('lista_id', '==', listaId), where('workspace_id', '==', currentWorkspace.id))
       )
       const batch = writeBatch(db)
       itemsSnap.docs.forEach(d => batch.delete(d.ref))
