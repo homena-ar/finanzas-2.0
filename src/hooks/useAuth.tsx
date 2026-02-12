@@ -295,6 +295,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Track whether this is the very first onAuthStateChanged callback (initial hydration)
     let isFirstCallback = true
+    // Guard: after a successful recovery via signInWithCustomToken, Firebase may
+    // fire an intermediate onAuthStateChanged(null) before the user callback.
+    // We ignore null callbacks for a short window after recovery to prevent
+    // the login form from flashing.
+    let lastRecoverySuccessTime = 0
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       remoteLog('info', `onAuthStateChanged: ${firebaseUser ? `USER uid=${firebaseUser.uid.substring(0, 8)}` : 'NULL'} (first=${isFirstCallback})`)
@@ -390,6 +395,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // ─── NULL user: attempt recovery ───
         remoteLog('info', `NULL user handler. isFirst=${isFirstCallback}, hasBackup=${hasValidSessionBackup()}`)
 
+        // After a successful signInWithCustomToken recovery, Firebase may fire
+        // an intermediate null callback before the real user callback arrives.
+        // Ignore null events for a short window after recovery.
+        if (lastRecoverySuccessTime && Date.now() - lastRecoverySuccessTime < 5000) {
+          remoteLog('info', `Ignoring null callback within 5s of recovery success`)
+          return
+        }
+
         if (isFirstCallback) {
           isFirstCallback = false
 
@@ -400,6 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const recoveredUser = auth.currentUser
             if (recoveredUser) {
               remoteLog('info', `Strategy 1 SUCCESS: uid=${recoveredUser.uid.substring(0, 8)}`)
+              lastRecoverySuccessTime = Date.now()
               await recoveredUser.reload()
               await backupSession(recoveredUser)
               await createSessionCookie(recoveredUser)
@@ -420,6 +434,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const cookieUser = await recoverSessionFromCookie()
           if (cookieUser) {
             remoteLog('info', `Strategy 2 SUCCESS: uid=${cookieUser.uid.substring(0, 8)}`)
+            lastRecoverySuccessTime = Date.now()
             await backupSession(cookieUser)
             setUser(cookieUser)
             if (cookieUser.emailVerified) {
