@@ -1,13 +1,12 @@
 'use client'
 
 // ============================================
-// COMMAND BAR - STATE MANAGEMENT HOOK
+// COMMAND BAR - CONTEXT + STATE MANAGEMENT
 // ============================================
-// Provides the full command bar pipeline:
-//   Input -> Preprocess -> Parse -> Execute -> Result
-// Also manages history, undo timers, clarification state, and metrics.
+// Uses React Context so layout and CommandBar component share the SAME state.
+// Pipeline: Input -> Preprocess -> Parse -> Execute -> Result
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, createContext, useContext, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useData } from './useData'
 import { useAuth } from './useAuth'
@@ -15,7 +14,6 @@ import { useWorkspace } from './useWorkspace'
 import { parseCommand } from '@/lib/commandbar/parser'
 import { executeCommand, type ExecutorContext } from '@/lib/commandbar/executor'
 import type {
-  CommandBarState,
   CommandHistoryEntry,
   CommandResult,
   ParsedCommand,
@@ -24,7 +22,7 @@ import type {
   UndoAction,
 } from '@/lib/commandbar/types'
 import {
-  collection, addDoc, getDocs, deleteDoc, doc,
+  collection, addDoc, getDocs,
   query, where, orderBy, serverTimestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -66,7 +64,6 @@ function loadHistory(): CommandHistoryEntry[] {
 function saveHistory(history: CommandHistoryEntry[]) {
   if (typeof window === 'undefined') return
   try {
-    // Only save last MAX_HISTORY entries, and strip undo_action (not serializable)
     const toSave = history.slice(0, MAX_HISTORY).map(h => ({
       ...h,
       result: h.result ? { ...h.result, undo_action: undefined } : null,
@@ -75,9 +72,35 @@ function saveHistory(history: CommandHistoryEntry[]) {
   } catch { /* ignore */ }
 }
 
-// --- Main Hook ---
+// --- Context type ---
 
-export function useCommandBar() {
+interface CommandBarContextValue {
+  isOpen: boolean
+  input: string
+  loading: boolean
+  history: CommandHistoryEntry[]
+  lastResult: CommandResult | null
+  clarification: ClarificationField[] | null
+  pendingCommand: ParsedCommand | null
+  undoAction: UndoAction | null
+  undoTimeout: number | null
+  metrics: CommandMetrics
+  setInput: (v: string) => void
+  execute: (rawInput: string, extraContext?: Partial<ExecutorContext>) => Promise<void>
+  resolveClarification: (field: string, value: any, extraContext?: Partial<ExecutorContext>) => Promise<void>
+  performUndo: () => Promise<void>
+  open: () => void
+  close: () => void
+  toggle: () => void
+  clearHistory: () => void
+  repeatCommand: (entry: CommandHistoryEntry) => void
+}
+
+const CommandBarContext = createContext<CommandBarContextValue | null>(null)
+
+// --- Provider ---
+
+export function CommandBarProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const { user } = useAuth()
   const { currentWorkspace } = useWorkspace()
@@ -105,6 +128,10 @@ export function useCommandBar() {
       }
       if (e.key === 'Escape' && isOpen) {
         setIsOpen(false)
+        setInput('')
+        setClarification(null)
+        setPendingCommand(null)
+        setLastResult(null)
       }
     }
     document.addEventListener('keydown', handler)
@@ -118,7 +145,6 @@ export function useCommandBar() {
 
   // --- Build executor context ---
   const buildContext = useCallback((): ExecutorContext => {
-    // Shopping list operations (direct Firestore)
     const addShoppingList = async (name: string, icon: string) => {
       if (!user || !currentWorkspace?.id) return null
       try {
@@ -156,10 +182,8 @@ export function useCommandBar() {
       } catch { return false }
     }
 
-    const findShoppingList = (name: string) => {
-      // This requires loading lists - we'll search from cached state
-      // The CommandBar component will pass pre-loaded lists
-      return null // Will be overridden in component
+    const findShoppingList = (_name: string) => {
+      return null // Will be overridden by extraContext from CommandBar
     }
 
     const clearCompletedItems = async (listId: string) => {
@@ -194,7 +218,6 @@ export function useCommandBar() {
       } catch { return { total: 0, completed: 0, estimated: 0 } }
     }
 
-    // Reminder operations
     const addReminder = async (reminderData: any) => {
       if (!user || !currentWorkspace?.id) return null
       try {
@@ -210,15 +233,8 @@ export function useCommandBar() {
       } catch { return null }
     }
 
-    const getRemindersForDate = (date: string) => {
-      // Will be populated from loaded reminders
-      return []
-    }
-
-    const getActiveReminders = () => {
-      // Will be populated from loaded reminders
-      return []
-    }
+    const getRemindersForDate = (_date: string) => [] as any[]
+    const getActiveReminders = () => [] as any[]
 
     return {
       addGasto: data.addGasto,
@@ -245,9 +261,21 @@ export function useCommandBar() {
       getRemindersForDate,
       getActiveReminders,
       navigate: (path: string) => router.push(path),
-      dolarRate: 0, // Will be set by component
+      dolarRate: 0,
     }
   }, [user, currentWorkspace, data, router])
+
+  // --- History helper ---
+  const addToHistory = useCallback((inputText: string, parsed: ParsedCommand | null, result: CommandResult) => {
+    const entry: CommandHistoryEntry = {
+      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+      input: inputText,
+      parsed,
+      result,
+      timestamp: Date.now(),
+    }
+    setHistory(prev => [entry, ...prev].slice(0, MAX_HISTORY))
+  }, [])
 
   // --- Execute a command ---
   const execute = useCallback(async (rawInput: string, extraContext?: Partial<ExecutorContext>) => {
@@ -257,20 +285,17 @@ export function useCommandBar() {
     setClarification(null)
     setLastResult(null)
 
-    // Track metrics
     metricsRef.current.totalCommands++
 
-    // Parse locally
     const parsed = parseCommand(rawInput)
 
     if (!parsed) {
-      // No local match - could call AI here, but for now show helpful message
       metricsRef.current.failedCommands++
       saveMetrics(metricsRef.current)
 
       const result: CommandResult = {
         success: false,
-        message: 'No entendí el comando. Probá con algo como "gasto 2000 Carrefour" o "balance del mes".',
+        message: 'No entendi el comando. Proba con algo como "gasto 2000 Carrefour" o "balance del mes".',
       }
       setLastResult(result)
       addToHistory(rawInput, null, result)
@@ -278,7 +303,6 @@ export function useCommandBar() {
       return
     }
 
-    // If needs clarification or low confidence
     if (parsed.needs_clarification.length > 0 || parsed.confidence < 0.75) {
       setClarification(parsed.needs_clarification)
       setPendingCommand(parsed)
@@ -288,16 +312,13 @@ export function useCommandBar() {
       return
     }
 
-    // Execute
     const ctx = { ...buildContext(), ...extraContext }
     const result = await executeCommand(parsed, ctx)
 
-    // Track intent
     metricsRef.current.resolvedLocally++
     metricsRef.current.intentCounts[parsed.intent] = (metricsRef.current.intentCounts[parsed.intent] || 0) + 1
     saveMetrics(metricsRef.current)
 
-    // Handle undo
     if (result.undo_action) {
       setupUndo(result.undo_action)
     }
@@ -306,38 +327,26 @@ export function useCommandBar() {
     addToHistory(rawInput, parsed, result)
     setInput('')
     setLoading(false)
-
-    // Navigate if needed
-    if (result.navigate_to && result.success) {
-      // Don't auto-navigate for queries, just show the result
-      // Only navigate for actions if explicitly requested
-    }
-  }, [buildContext])
+  }, [buildContext, addToHistory])
 
   // --- Resolve clarification ---
   const resolveClarification = useCallback(async (field: string, value: any, extraContext?: Partial<ExecutorContext>) => {
     if (!pendingCommand) return
 
-    // If the user cancelled
     if (value === 'cancel') {
       setClarification(null)
       setPendingCommand(null)
       return
     }
 
-    // If this is a domain clarification (ambiguous command)
     if (field === 'domain') {
       if (value === 'shopping_list') {
-        // Re-parse as shopping list command with first available list
         const updatedCommand: ParsedCommand = {
           ...pendingCommand,
           intent: 'add_shopping_items',
           confidence: 0.90,
           needs_clarification: pendingCommand.needs_clarification.filter(c => c.field !== 'domain'),
-          params: {
-            ...pendingCommand.params,
-            list_name: 'Supermercado', // Default
-          },
+          params: { ...pendingCommand.params, list_name: 'Supermercado' },
         }
 
         if (updatedCommand.needs_clarification.length > 0) {
@@ -359,14 +368,13 @@ export function useCommandBar() {
       }
 
       if (value === 'expense') {
-        // Re-parse as expense creation
         const items = pendingCommand.params.items
         const itemName = items?.[0]?.name || ''
         const updatedCommand: ParsedCommand = {
           ...pendingCommand,
           intent: 'create_expense',
           confidence: 0.70,
-          needs_clarification: [{ field: 'amount', message: `¿Cuánto fue "${itemName}"?` }],
+          needs_clarification: [{ field: 'amount', message: `Cuanto fue "${itemName}"?` }],
           params: { merchant: itemName, currency: 'ARS', date: new Date().toISOString().split('T')[0] },
         }
         setClarification(updatedCommand.needs_clarification)
@@ -375,7 +383,6 @@ export function useCommandBar() {
       }
     }
 
-    // Update the command params with the clarified value
     const updatedCommand: ParsedCommand = {
       ...pendingCommand,
       params: { ...pendingCommand.params, [field]: value },
@@ -383,14 +390,12 @@ export function useCommandBar() {
       confidence: Math.min(pendingCommand.confidence + 0.15, 0.95),
     }
 
-    // If still needs more clarification
     if (updatedCommand.needs_clarification.length > 0 || updatedCommand.confidence < 0.75) {
       setClarification(updatedCommand.needs_clarification)
       setPendingCommand(updatedCommand)
       return
     }
 
-    // Execute the now-complete command
     const ctx = { ...buildContext(), ...extraContext }
     setLoading(true)
     const result = await executeCommand(updatedCommand, ctx)
@@ -405,19 +410,15 @@ export function useCommandBar() {
     setPendingCommand(null)
     setInput('')
     setLoading(false)
-  }, [pendingCommand, buildContext])
+  }, [pendingCommand, buildContext, addToHistory])
 
   // --- Undo ---
   const setupUndo = useCallback((action: UndoAction) => {
-    // Clear previous undo timer
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current)
     }
-
     setUndoAction(action)
-    const startTime = Date.now()
-    setUndoTimeoutState(startTime + UNDO_TIMEOUT)
-
+    setUndoTimeoutState(Date.now() + UNDO_TIMEOUT)
     undoTimerRef.current = setTimeout(() => {
       setUndoAction(null)
       setUndoTimeoutState(null)
@@ -426,42 +427,18 @@ export function useCommandBar() {
 
   const performUndo = useCallback(async () => {
     if (!undoAction) return
-
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current)
-    }
-
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
     try {
       await undoAction.execute()
-      setLastResult({ success: true, message: 'Acción deshecha' })
+      setLastResult({ success: true, message: 'Accion deshecha' })
     } catch {
-      setLastResult({ success: false, message: 'No se pudo deshacer la acción' })
+      setLastResult({ success: false, message: 'No se pudo deshacer la accion' })
     }
-
     setUndoAction(null)
     setUndoTimeoutState(null)
   }, [undoAction])
 
-  // --- History ---
-  const addToHistory = useCallback((input: string, parsed: ParsedCommand | null, result: CommandResult) => {
-    const entry: CommandHistoryEntry = {
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-      input,
-      parsed,
-      result,
-      timestamp: Date.now(),
-    }
-    setHistory(prev => [entry, ...prev].slice(0, MAX_HISTORY))
-  }, [])
-
-  const clearHistory = useCallback(() => {
-    setHistory([])
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(HISTORY_KEY)
-    }
-  }, [])
-
-  // --- Open/Close ---
+  // --- Open / Close ---
   const open = useCallback(() => {
     setIsOpen(true)
     setClarification(null)
@@ -481,33 +458,36 @@ export function useCommandBar() {
     else open()
   }, [isOpen, open, close])
 
-  // --- Repeat from history ---
-  const repeatCommand = useCallback((historyEntry: CommandHistoryEntry) => {
-    setInput(historyEntry.input)
+  const clearHistory = useCallback(() => {
+    setHistory([])
+    if (typeof window !== 'undefined') localStorage.removeItem(HISTORY_KEY)
   }, [])
 
-  return {
-    // State
-    isOpen,
-    input,
-    loading,
-    history,
-    lastResult,
-    clarification,
-    pendingCommand,
-    undoAction,
-    undoTimeout,
-    metrics: metricsRef.current,
+  const repeatCommand = useCallback((entry: CommandHistoryEntry) => {
+    setInput(entry.input)
+  }, [])
 
-    // Actions
-    setInput,
-    execute,
-    resolveClarification,
-    performUndo,
-    open,
-    close,
-    toggle,
-    clearHistory,
-    repeatCommand,
+  const value: CommandBarContextValue = {
+    isOpen, input, loading, history, lastResult,
+    clarification, pendingCommand, undoAction, undoTimeout,
+    metrics: metricsRef.current,
+    setInput, execute, resolveClarification, performUndo,
+    open, close, toggle, clearHistory, repeatCommand,
   }
+
+  return (
+    <CommandBarContext.Provider value={value}>
+      {children}
+    </CommandBarContext.Provider>
+  )
+}
+
+// --- Consumer Hook ---
+
+export function useCommandBar(): CommandBarContextValue {
+  const ctx = useContext(CommandBarContext)
+  if (!ctx) {
+    throw new Error('useCommandBar debe usarse dentro de <CommandBarProvider>')
+  }
+  return ctx
 }

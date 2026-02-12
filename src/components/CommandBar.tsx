@@ -171,8 +171,6 @@ export function CommandBar() {
     close()
   }
 
-  if (!isOpen) return null
-
   return (
     <>
       {/* Backdrop */}

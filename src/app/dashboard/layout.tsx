@@ -15,10 +15,18 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import type { Workspace, WorkspacePermissions } from '@/types'
 import { NotificationsBell } from '@/components/NotificationsBell'
 import { CommandBar, CommandBarTrigger } from '@/components/CommandBar'
-import { useCommandBar } from '@/hooks/useCommandBar'
+import { CommandBarProvider, useCommandBar } from '@/hooks/useCommandBar'
 import { AnimatePresence } from 'framer-motion'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CommandBarProvider>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </CommandBarProvider>
+  )
+}
+
+function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   const { currentMonth, changeMonth } = useData()
   const { workspaces, currentWorkspace, setCurrentWorkspace, members, loading: workspaceLoading, initWorkspaceReady } = useWorkspace()
