@@ -478,14 +478,16 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="lg:ml-64 pt-16 lg:pt-16 min-h-screen">
+      {/* Main Content — se ajusta cuando el asistente está abierto en desktop */}
+      <main className={`lg:ml-64 pt-16 lg:pt-16 min-h-[100dvh] transition-all duration-300 ${
+        commandBar.isOpen ? 'lg:mr-[380px]' : ''
+      }`}>
         <div className="p-4 lg:p-6">
           {children}
         </div>
       </main>
 
-      {/* Global Command Bar */}
+      {/* Panel fijo del asistente (NO modal, NO overlay) */}
       <AnimatePresence>
         {commandBar.isOpen && <CommandBar />}
       </AnimatePresence>

@@ -292,6 +292,7 @@ export interface ListaCompra {
   nombre: string
   icono: string
   created_at: string
+  updated_at?: string
 }
 
 export interface ItemLista {
@@ -301,10 +302,44 @@ export interface ItemLista {
   created_by: string
   lista_id: string
   nombre: string
+  nombre_normalizado?: string
   cantidad: number
   unidad: string
   precio_estimado: number | null
   moneda: 'ARS' | 'USD'
   comprado: boolean
+  nota?: string
+  categoria?: string
+  tienda?: string
   created_at: string
+  updated_at?: string
+}
+
+/** Historial de precios por item normalizado */
+export interface PriceHistoryEntry {
+  precio: number
+  moneda: 'ARS' | 'USD'
+  fecha: string
+}
+
+/** Mapa de categorias para agrupacion visual */
+export const CATEGORY_MAP: Record<string, { label: string; icon: string; order: number }> = {
+  frutas_verduras: { label: 'Frutas y Verduras', icon: '🥬', order: 0 },
+  carnes: { label: 'Carnes', icon: '🥩', order: 1 },
+  lacteos: { label: 'Lacteos', icon: '🧀', order: 2 },
+  panaderia: { label: 'Panaderia', icon: '🍞', order: 3 },
+  bebidas: { label: 'Bebidas', icon: '🥤', order: 4 },
+  limpieza: { label: 'Limpieza', icon: '🧹', order: 5 },
+  higiene: { label: 'Higiene', icon: '🧴', order: 6 },
+  almacen: { label: 'Almacen', icon: '🏪', order: 7 },
+  congelados: { label: 'Congelados', icon: '🧊', order: 8 },
+  mascotas: { label: 'Mascotas', icon: '🐾', order: 9 },
+  otros: { label: 'Otros', icon: '📦', order: 10 },
+}
+
+/** Snapshot para undo de listas */
+export interface ListaSnapshot {
+  lista: ListaCompra
+  items: ItemLista[]
+  timestamp: number
 }

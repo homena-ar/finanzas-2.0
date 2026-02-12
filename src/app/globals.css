@@ -5,6 +5,8 @@
 :root {
   --foreground-rgb: 15, 23, 42;
   --background-rgb: 248, 250, 252;
+  --viewport-height: 100dvh;
+  --keyboard-height: 0px;
 }
 
 * {
@@ -23,7 +25,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  min-height: 100vh;
+  min-height: 100dvh;
   min-height: -webkit-fill-available;
 }
 
@@ -75,7 +77,6 @@ body {
   }
 
   /* ===== FORM ELEMENTS ===== */
-  /* Unified input system: same height, border, padding, font across entire app */
   .input {
     @apply w-full px-3 bg-white border border-slate-200/80 rounded-lg text-sm text-slate-700
            placeholder:text-slate-400
@@ -87,7 +88,6 @@ body {
     line-height: 1.5;
   }
 
-  /* Compact input variant for filters */
   .input-compact {
     @apply px-2.5 bg-slate-50/80 border border-slate-200/80 rounded-lg text-slate-600
            focus:outline-none focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100/60
@@ -97,7 +97,6 @@ body {
     line-height: 1.5;
   }
 
-  /* Textarea inherits .input but auto-heights */
   textarea.input {
     height: auto;
     min-height: 80px;
@@ -105,7 +104,6 @@ body {
     padding-bottom: 0.5rem;
   }
 
-  /* Estilos para selectores */
   select.input,
   select.input-compact,
   select {
@@ -181,7 +179,7 @@ body {
   }
 
   .modal {
-    @apply bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl;
+    @apply bg-white rounded-xl w-full max-w-md max-h-[90dvh] overflow-y-auto shadow-2xl;
     animation: scale-in-modal 0.2s ease-out;
   }
 
@@ -237,16 +235,14 @@ body {
     @apply text-slate-500 hover:text-slate-700;
   }
 
-  /* ===== COMMAND BAR / ASISTENTE ===== */
-  .commandbar-overlay {
-    @apply fixed inset-0 bg-black/25 backdrop-blur-[2px] z-[60];
-  }
+  /* ===== ASISTENTE — PANEL FIJO (Desktop: sidebar derecho, Mobile: bottom sheet) ===== */
 
-  /* Chat panel — centered card */
-  .commandbar-chat-panel {
-    @apply fixed top-[5%] left-1/2 -translate-x-1/2 w-[94%] max-w-md bg-white rounded-2xl shadow-2xl z-[61]
-           flex flex-col border border-slate-200/60;
-    max-height: 80vh;
+  /* Desktop: panel fijo a la derecha */
+  .assistant-panel {
+    @apply fixed top-0 right-0 bg-white shadow-2xl z-[60]
+           flex flex-col border-l border-slate-200/60;
+    width: 380px;
+    height: 100dvh;
   }
 
   /* Header bar */
@@ -257,7 +253,7 @@ body {
   /* Scrollable messages area */
   .commandbar-chat-messages {
     @apply flex-1 overflow-y-auto px-4 py-3 space-y-3;
-    min-height: 200px;
+    min-height: 0;
   }
 
   /* User message bubble (right-aligned) */
@@ -270,7 +266,6 @@ body {
     @apply max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-slate-50 border border-slate-100;
   }
 
-  /* Error variant of assistant bubble */
   .commandbar-msg-error {
     @apply bg-red-50/60 border-red-100;
   }
@@ -343,6 +338,40 @@ body {
     bottom: 24px;
     right: 24px;
   }
+
+  /* ===== TOAST UNDO GLOBAL ===== */
+  .toast-undo {
+    @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[70]
+           bg-slate-800 text-white px-4 py-3 rounded-xl shadow-2xl
+           flex items-center gap-3 text-sm;
+    animation: slide-up-toast 0.2s ease-out;
+  }
+
+  .toast-undo button {
+    @apply px-3 py-1 bg-amber-500 text-white rounded-lg text-xs font-bold
+           hover:bg-amber-400 transition-colors;
+  }
+
+  @keyframes slide-up-toast {
+    0% { opacity: 0; transform: translate(-50%, 20px); }
+    100% { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  /* ===== LIST MENU ===== */
+  .list-menu {
+    @apply absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30
+           py-1 min-w-[160px];
+    animation: scale-in-modal 0.15s ease-out;
+  }
+
+  .list-menu-item {
+    @apply w-full text-left px-3 py-2 text-sm flex items-center gap-2
+           hover:bg-slate-50 transition-colors;
+  }
+
+  .list-menu-item-danger {
+    @apply list-menu-item text-red-600 hover:bg-red-50;
+  }
 }
 
 /* Mejoras de responsive */
@@ -352,7 +381,8 @@ body {
   }
 
   .modal {
-    @apply rounded-t-xl rounded-b-none max-h-[95vh] shadow-2xl;
+    @apply rounded-t-xl rounded-b-none shadow-2xl;
+    max-height: 95dvh;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -366,18 +396,21 @@ body {
   }
 
   .input {
-    font-size: 16px; /* Evita zoom en iOS */
-    height: 44px; /* Touch-friendly height on mobile */
+    font-size: 16px;
+    height: 44px;
   }
 
-  /* Chat panel mobile adjustments */
-  .commandbar-chat-panel {
-    @apply top-auto bottom-0 left-0 right-0 translate-x-0 w-full max-w-none rounded-b-none rounded-t-2xl;
-    max-height: 85vh;
+  /* Asistente mobile: bottom sheet real */
+  .assistant-panel {
+    @apply top-auto bottom-0 left-0 right-0 border-l-0 border-t border-slate-200/60 rounded-t-2xl;
+    width: 100%;
+    height: auto;
+    max-height: var(--viewport-height, 100dvh);
+    min-height: 50dvh;
   }
 
   .commandbar-input {
-    font-size: 16px; /* Prevent iOS zoom */
+    font-size: 16px;
   }
 
   .commandbar-chat-messages {
