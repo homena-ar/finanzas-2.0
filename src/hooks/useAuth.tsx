@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import {
   User,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -148,6 +149,105 @@ function clearSessionBackup() {
   }
 }
 
+// ─── Remote logger: forwards client logs to Railway via /api/debug-log ───
+const _remoteLogQueue: Array<{level: string, message: string, platform: string}> = []
+let _remoteLogTimer: ReturnType<typeof setTimeout> | null = null
+
+function getPlatformTag(): string {
+  if (typeof window === 'undefined') return 'server'
+  const ua = navigator.userAgent
+  const standalone = (window.navigator as any).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches
+  if (/iPad|iPhone|iPod/.test(ua)) return standalone ? 'iOS-PWA' : 'iOS-Safari'
+  if (/Android/.test(ua)) return standalone ? 'Android-PWA' : 'Android-Browser'
+  return 'Desktop'
+}
+
+function remoteLog(level: 'info'|'warn'|'error', message: string) {
+  console.log(`[AUTH-DEBUG] ${message}`)
+  if (typeof window === 'undefined') return
+  _remoteLogQueue.push({ level, message, platform: getPlatformTag() })
+  if (!_remoteLogTimer) {
+    _remoteLogTimer = setTimeout(() => {
+      const batch = _remoteLogQueue.splice(0)
+      _remoteLogTimer = null
+      fetch('/api/debug-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logs: batch })
+      }).catch(() => {})
+    }, 500)
+  }
+}
+
+// ─── Cookie-based session: more reliable than localStorage on iOS PWA ───
+
+// Create server-side session cookie after successful login
+async function createSessionCookie(user: User): Promise<void> {
+  try {
+    const idToken = await getIdToken(user, true)
+    const res = await fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken })
+    })
+    if (res.ok) {
+      remoteLog('info', `Session cookie created for uid=${user.uid}`)
+    } else {
+      const body = await res.text()
+      remoteLog('warn', `Session cookie creation failed: ${res.status} ${body}`)
+    }
+  } catch (error: any) {
+    remoteLog('warn', `Session cookie creation error: ${error.message}`)
+  }
+}
+
+// Try to recover session from server-side cookie when Firebase persistence fails
+async function recoverSessionFromCookie(): Promise<User | null> {
+  try {
+    remoteLog('info', 'Attempting session recovery from cookie...')
+    const res = await fetch('/api/session', { method: 'GET' })
+    if (!res.ok) {
+      remoteLog('info', `Cookie recovery: no valid cookie (${res.status})`)
+      return null
+    }
+    const data = await res.json()
+    if (!data.customToken) {
+      remoteLog('warn', 'Cookie recovery: response missing customToken')
+      return null
+    }
+    remoteLog('info', `Cookie recovery: got custom token for uid=${data.uid}, signing in...`)
+    const cred = await signInWithCustomToken(auth, data.customToken)
+    remoteLog('info', `Cookie recovery: SUCCESS, uid=${cred.user.uid}`)
+    return cred.user
+  } catch (error: any) {
+    remoteLog('error', `Cookie recovery failed: ${error.message}`)
+    return null
+  }
+}
+
+// Clear server-side session cookie
+async function clearSessionCookie(): Promise<void> {
+  try {
+    await fetch('/api/session', { method: 'DELETE' })
+  } catch { /* best-effort */ }
+}
+
+// ─── Diagnostic: dump storage state ───
+function dumpStorageState(): string {
+  if (typeof window === 'undefined') return 'SSR'
+  try {
+    const backup = localStorage.getItem(SESSION_BACKUP_KEY)
+    const timestamp = localStorage.getItem(SESSION_BACKUP_TIMESTAMP_KEY)
+    const backupAge = timestamp ? `${Math.round((Date.now() - Number(timestamp)) / 1000)}s ago` : 'none'
+    const backupUid = backup ? JSON.parse(backup).uid?.substring(0, 8) : 'none'
+    const firebaseKeys = Object.keys(localStorage).filter(k => k.startsWith('firebase'))
+    return `backup=${backupUid}(${backupAge}), firebase_keys=${firebaseKeys.length}, auth.currentUser=${auth.currentUser?.uid?.substring(0, 8) || 'null'}`
+  } catch (e: any) {
+    return `error: ${e.message}`
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -189,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    console.log('🔐 [Firebase useAuth] Setting up auth listener')
+    remoteLog('info', `Auth listener setup. Storage: ${dumpStorageState()}`)
 
     let previousEmailVerified: boolean | null = null
 
@@ -197,14 +297,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let isFirstCallback = true
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('🔐 [Firebase useAuth] Auth state changed:', firebaseUser ? 'USER LOGGED IN' : 'NO USER')
+      remoteLog('info', `onAuthStateChanged: ${firebaseUser ? `USER uid=${firebaseUser.uid.substring(0, 8)}` : 'NULL'} (first=${isFirstCallback})`)
+      remoteLog('info', `Storage at callback: ${dumpStorageState()}`)
 
       if (firebaseUser) {
         // Recargar el usuario para obtener el estado más reciente de emailVerified
         await firebaseUser.reload()
 
-        // Guardar sesión en respaldo (especialmente importante para iOS)
+        // Guardar sesión en respaldo localStorage + cookie HTTP-only
         await backupSession(firebaseUser)
+        await createSessionCookie(firebaseUser)
 
         // Verificar si el correo se acaba de verificar (cambió de false a true)
         // previousEmailVerified === null significa primera carga, no contar como verificación nueva
@@ -285,44 +387,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         previousEmailVerified = firebaseUser.emailVerified
         isFirstCallback = false
       } else {
-        // iOS PWA recovery: when the app is killed from the app switcher and relaunched,
-        // Firebase persistence may be slow to hydrate (especially if IndexedDB was evicted).
-        // If this is the first callback and we have a valid session backup, wait briefly
-        // for Firebase to catch up before declaring "no user".
-        if (isFirstCallback && hasValidSessionBackup()) {
-          console.log('🔄 [Firebase useAuth] No user on first callback but backup exists - waiting for persistence hydration...')
+        // ─── NULL user: attempt recovery ───
+        remoteLog('info', `NULL user handler. isFirst=${isFirstCallback}, hasBackup=${hasValidSessionBackup()}`)
+
+        if (isFirstCallback) {
           isFirstCallback = false
 
-          // Give Firebase persistence a moment to hydrate from localStorage/IndexedDB
-          await new Promise(resolve => setTimeout(resolve, 1500))
-
-          // Check again after the delay
-          const recoveredUser = auth.currentUser
-          if (recoveredUser) {
-            console.log('✅ [Firebase useAuth] Session recovered after persistence hydration delay')
-            await recoveredUser.reload()
-            await backupSession(recoveredUser)
-            setUser(recoveredUser)
-            if (recoveredUser.emailVerified) {
-              const profileData = await fetchProfile(recoveredUser.uid)
-              setProfile(profileData)
+          // Strategy 1: Wait for Firebase persistence hydration (localStorage may be slow)
+          if (hasValidSessionBackup()) {
+            remoteLog('info', 'Recovery strategy 1: waiting 1.5s for persistence hydration...')
+            await new Promise(resolve => setTimeout(resolve, 1500))
+            const recoveredUser = auth.currentUser
+            if (recoveredUser) {
+              remoteLog('info', `Strategy 1 SUCCESS: uid=${recoveredUser.uid.substring(0, 8)}`)
+              await recoveredUser.reload()
+              await backupSession(recoveredUser)
+              await createSessionCookie(recoveredUser)
+              setUser(recoveredUser)
+              if (recoveredUser.emailVerified) {
+                const profileData = await fetchProfile(recoveredUser.uid)
+                setProfile(profileData)
+              }
+              previousEmailVerified = recoveredUser.emailVerified
+              setLoading(false)
+              return
             }
-            previousEmailVerified = recoveredUser.emailVerified
-            setLoading(false)
-            return // Skip the null state - session was recovered
+            remoteLog('warn', 'Strategy 1 failed: still null after delay')
           }
 
-          console.log('⚠️ [Firebase useAuth] Session could not be recovered - user is truly logged out')
+          // Strategy 2: Recover from HTTP-only session cookie (survives iOS storage eviction)
+          remoteLog('info', 'Recovery strategy 2: cookie-based session recovery...')
+          const cookieUser = await recoverSessionFromCookie()
+          if (cookieUser) {
+            remoteLog('info', `Strategy 2 SUCCESS: uid=${cookieUser.uid.substring(0, 8)}`)
+            await backupSession(cookieUser)
+            setUser(cookieUser)
+            if (cookieUser.emailVerified) {
+              const profileData = await fetchProfile(cookieUser.uid)
+              setProfile(profileData)
+            }
+            previousEmailVerified = cookieUser.emailVerified
+            setLoading(false)
+            return
+          }
+
+          remoteLog('warn', 'All recovery strategies failed — user is truly logged out')
         }
 
         isFirstCallback = false
         setUser(null)
         setProfile(null)
         previousEmailVerified = null
-        // IMPORTANT: Do NOT clear session backup here.
-        // Only clear on explicit signOut(). On iOS, onAuthStateChanged can fire
-        // with null temporarily during app restore, and we must preserve the backup
-        // so the visibility handler can attempt recovery.
+        // Do NOT clear session backup or cookie here — only on explicit signOut()
       }
 
       setLoading(false)
@@ -380,17 +496,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Refresh the localStorage backup token
           await backupSession(currentUser)
-        } else if (!userRef.current && hasValidSessionBackup()) {
-          // Firebase has no currentUser AND React state has no user,
-          // but we have a valid session backup. This typically happens on iOS
-          // when the app is restored after being killed from the app switcher.
-          // Wait briefly for Firebase persistence to potentially catch up.
-          console.log('🔄 [Firebase useAuth] Visibility: no user but backup exists, waiting for persistence...')
-          await new Promise(resolve => setTimeout(resolve, 1000))
+        } else if (!userRef.current) {
+          // No Firebase user and no React user — try cookie recovery
+          remoteLog('info', `Visibility: no user. backup=${hasValidSessionBackup()}, trying cookie recovery...`)
 
-          const recoveredUser = auth.currentUser
+          // Strategy 1: wait for Firebase persistence
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          let recoveredUser = auth.currentUser
           if (recoveredUser) {
-            console.log('✅ [Firebase useAuth] Session recovered on visibility change')
+            remoteLog('info', 'Visibility: recovered from persistence delay')
             await recoveredUser.reload()
             setUser(recoveredUser)
             if (recoveredUser.emailVerified) {
@@ -398,6 +512,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setProfile(profileData)
             }
             await backupSession(recoveredUser)
+          } else {
+            // Strategy 2: cookie-based recovery
+            recoveredUser = await recoverSessionFromCookie()
+            if (recoveredUser) {
+              remoteLog('info', 'Visibility: recovered from cookie')
+              await backupSession(recoveredUser)
+              setUser(recoveredUser)
+              if (recoveredUser.emailVerified) {
+                const profileData = await fetchProfile(recoveredUser.uid)
+                setProfile(profileData)
+              }
+            } else {
+              remoteLog('warn', 'Visibility: all recovery failed')
+            }
           }
         }
       } catch {
@@ -410,6 +538,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Save session state before iOS kills the PWA.
     // pagehide fires reliably on iOS (unlike beforeunload).
     const handlePageHide = () => {
+      const hasUser = !!auth.currentUser
+      // Sync log (can't await in pagehide)
+      console.log(`[AUTH-DEBUG] pagehide: hasUser=${hasUser}`)
       if (auth.currentUser) {
         try {
           const sessionData = {
@@ -621,12 +752,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    console.log('🔐 [Firebase useAuth] signOut called')
+    remoteLog('info', 'signOut called — clearing all session data')
     await firebaseSignOut(auth)
     setUser(null)
     setProfile(null)
     setLoading(false)
-    clearSessionBackup() // Limpiar respaldo al cerrar sesión
+    clearSessionBackup()
+    await clearSessionCookie()
   }
 
   const updateProfile = async (data: Partial<Profile>) => {

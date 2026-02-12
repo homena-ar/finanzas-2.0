@@ -51,9 +51,16 @@ if (typeof window !== 'undefined') {
     auth = initializeAuth(app, {
       persistence: [browserLocalPersistence, indexedDBLocalPersistence]
     })
+    console.log('[AUTH-DEBUG] initializeAuth OK with [browserLocal, indexedDB]. localStorage available:', typeof localStorage !== 'undefined')
+    // Dump what Firebase has stored in localStorage at init time
+    try {
+      const firebaseKeys = Object.keys(localStorage).filter(k => k.startsWith('firebase:'))
+      console.log(`[AUTH-DEBUG] Firebase localStorage keys at init: ${firebaseKeys.length > 0 ? firebaseKeys.join(', ') : 'NONE'}`)
+    } catch { /* noop */ }
   } catch {
     // Already initialized (HMR / fast refresh) - fall back to getAuth
     auth = getAuth(app)
+    console.log('[AUTH-DEBUG] getAuth fallback (already initialized)')
   }
 } else {
   auth = getAuth(app)
