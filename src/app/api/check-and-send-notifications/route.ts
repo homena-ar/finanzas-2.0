@@ -226,6 +226,9 @@ export async function GET(request: NextRequest) {
           else if (diffDays === 1) timeText = 'mañana'
           else timeText = `en ${diffDays} días`
 
+          // Debug: ver qué datos tiene el recordatorio para entender por qué fallan los canales
+          console.log(`🔍 [Cron] Datos del recordatorio "${data.titulo}":`, JSON.stringify(data))
+
           notificationsToSend.push({
             tipo: 'recordatorio',
             userId: data.user_id,
@@ -237,8 +240,9 @@ export async function GET(request: NextRequest) {
             mensaje: `${data.titulo} es ${timeText}`,
             targetDate: target,
             channels: {
-              email: data.notificar_email === true,
-              push: data.notificar_push === true
+              // Si no está definido (undefined/null), asumimos true por defecto para asegurar que llegue la notificación
+              email: data.notificar_email !== false,
+              push: data.notificar_push !== false
             }
           })
           console.log(`✅ [Cron] Agregado recordatorio personalizado: ${data.titulo} (${timeText})`)
