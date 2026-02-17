@@ -716,7 +716,7 @@ export default function ListasPage() {
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMin = Math.floor(diffMs / 60000)
-    if (diffMin < 1) return 'recien'
+    if (diffMin < 1) return 'recién'
     if (diffMin < 60) return `hace ${diffMin}min`
     const diffH = Math.floor(diffMin / 60)
     if (diffH < 24) return `hace ${diffH}h`
@@ -786,7 +786,7 @@ export default function ListasPage() {
       ) : listas.length === 0 ? (
         <div className="card p-12 text-center">
           <ShoppingCart className="w-16 h-16 mx-auto text-slate-200 mb-4" />
-          <p className="text-slate-500 mb-4">No tenes listas de compras todavia</p>
+          <p className="text-slate-500 mb-4">No tenés listas de compras todavía</p>
           <button onClick={openNewList} className="btn btn-primary">
             <Plus className="w-4 h-4" />
             Crear tu primera lista
@@ -1011,7 +1011,7 @@ export default function ListasPage() {
                                 value={newItemCategoria}
                                 onChange={e => setNewItemCategoria(e.target.value)}
                               >
-                                <option value="">Sin categoria</option>
+                                <option value="">Sin categoría</option>
                                 {Object.entries(CATEGORY_MAP).map(([key, val]) => (
                                   <option key={key} value={key}>{val.icon} {val.label}</option>
                                 ))}
@@ -1060,7 +1060,7 @@ export default function ListasPage() {
                     <div>
                       {sortedItems(lista.id).length === 0 ? (
                         <div className="p-6 text-center text-sm text-slate-400">
-                          Lista vacia. Agrega items arriba.
+                          Lista vacía. Agregá items arriba.
                         </div>
                       ) : groupByCategory ? (
                         // Grouped view
@@ -1152,7 +1152,7 @@ export default function ListasPage() {
                 <input
                   type="text"
                   className="input"
-                  placeholder="Ej: Supermercado, Ferreteria..."
+                  placeholder="Ej: Supermercado, Ferretería..."
                   maxLength={60}
                   value={listForm.nombre}
                   onChange={e => setListForm(prev => ({ ...prev, nombre: e.target.value }))}
@@ -1188,8 +1188,8 @@ export default function ListasPage() {
         title={deleteTarget?.type === 'list' ? 'Eliminar lista' : 'Eliminar item'}
         message={
           deleteTarget?.type === 'list'
-            ? 'Se eliminaran la lista y todos sus items.'
-            : 'Eliminar este item de la lista?'
+            ? 'Se eliminarán la lista y todos sus items.'
+            : '¿Eliminar este item de la lista?'
         }
         confirmText="Eliminar"
         variant="danger"

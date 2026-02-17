@@ -37,6 +37,16 @@ function initializeAdmin() {
 
 export async function GET(request: NextRequest) {
   try {
+    // 🛡️ Seguridad: Verificar autorización para Cron Jobs
+    // Si existe la variable CRON_SECRET, exigimos que el header Authorization coincida
+    const cronSecret = process.env.CRON_SECRET
+    const authHeader = request.headers.get('authorization')
+
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      console.warn('⚠️ [Ingresos Pendientes] Intento de acceso no autorizado al Cron Job')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     if (!initializeAdmin()) {
       return NextResponse.json(
         { error: 'Firebase Admin SDK no configurado' },
