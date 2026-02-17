@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY || '')
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fin.nexuno.com.ar'
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,23 +89,23 @@ export async function POST(request: NextRequest) {
       const msg = `Tu tarjeta <strong>${tarjetaNombre}</strong> cierra próximamente.`
       emailTemplate = {
         subject: `📅 Cierre de tarjeta: ${tarjetaNombre}`,
-        html: generateEmailHtml('Cierre de Tarjeta', msg, 'Fecha de cierre', fecha, 'Ver Tarjeta', 'https://fin.nexuno.com.ar/dashboard'),
-        text: `Hola ${userName},\n\n${msg.replace(/<[^>]*>?/gm, '')}\nFecha: ${fecha}\n\nIr a la App: https://fin.nexuno.com.ar/dashboard`
+        html: generateEmailHtml('Cierre de Tarjeta', msg, 'Fecha de cierre', fecha, 'Ver Tarjeta', `${baseUrl}/dashboard`),
+        text: `Hola ${userName},\n\n${msg.replace(/<[^>]*>?/gm, '')}\nFecha: ${fecha}\n\nIr a la App: ${baseUrl}/dashboard`
       }
     } else if (tipo === 'vencimiento') {
       const msg = `El pago de tu tarjeta <strong>${tarjetaNombre}</strong> vence próximamente.`
       emailTemplate = {
         subject: `💳 Vencimiento de tarjeta: ${tarjetaNombre}`,
-        html: generateEmailHtml('Vencimiento de Tarjeta', msg, 'Fecha de vencimiento', fecha, 'Ver Tarjeta', 'https://fin.nexuno.com.ar/dashboard'),
-        text: `Hola ${userName},\n\n${msg.replace(/<[^>]*>?/gm, '')}\nFecha: ${fecha}\n\nIr a la App: https://fin.nexuno.com.ar/dashboard`
+        html: generateEmailHtml('Vencimiento de Tarjeta', msg, 'Fecha de vencimiento', fecha, 'Ver Tarjeta', `${baseUrl}/dashboard`),
+        text: `Hola ${userName},\n\n${msg.replace(/<[^>]*>?/gm, '')}\nFecha: ${fecha}\n\nIr a la App: ${baseUrl}/dashboard`
       }
     } else if (tipo === 'recordatorio') {
       // Template simple para recordatorios personalizados
       const msg = mensaje || `Recordatorio: ${tarjetaNombre}`
       emailTemplate = {
         subject: `🔔 ${tarjetaNombre}`,
-        html: generateEmailHtml('Recordatorio', msg, 'Fecha del evento', fecha, 'Ir a la App', 'https://fin.nexuno.com.ar/dashboard'),
-        text: `Hola ${userName},\n\n${msg}\nFecha: ${fecha}\n\nIr a la App: https://fin.nexuno.com.ar/dashboard`
+        html: generateEmailHtml('Recordatorio', msg, 'Fecha del evento', fecha, 'Ir a la App', `${baseUrl}/dashboard`),
+        text: `Hola ${userName},\n\n${msg}\nFecha: ${fecha}\n\nIr a la App: ${baseUrl}/dashboard`
       }
     } else {
       console.error('❌ [Email] Tipo inválido', tipo)
