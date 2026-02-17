@@ -7,7 +7,7 @@ const resend = new Resend(process.env.RESEND_API_KEY || '')
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { tipo, userName, userEmail, tarjetaNombre, dia, fecha } = body
+    const { tipo, userName, userEmail, tarjetaNombre, dia, fecha, mensaje } = body
 
     if (!tipo || !userName || !userEmail || !tarjetaNombre || !dia || !fecha) {
       console.error('❌ [Email] Faltan campos', { tipo, userName, userEmail, tarjetaNombre, dia, fecha })
@@ -31,6 +31,23 @@ export async function POST(request: NextRequest) {
       emailTemplate = getCierreNotificationTemplate(userName, tarjetaNombre, dia, fecha)
     } else if (tipo === 'vencimiento') {
       emailTemplate = getVencimientoNotificationTemplate(userName, tarjetaNombre, dia, fecha)
+    } else if (tipo === 'recordatorio') {
+      // Template simple para recordatorios personalizados
+      const msg = mensaje || `Recordatorio: ${tarjetaNombre}`
+      emailTemplate = {
+        subject: `🔔 ${tarjetaNombre}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Hola ${userName},</h2>
+            <p style="font-size: 16px; color: #555;">${msg}</p>
+            <p style="color: #777;">Fecha: <strong>${fecha}</strong></p>
+            <div style="margin-top: 24px;">
+              <a href="https://fin.nexuno.com.ar/dashboard" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Ir a la App</a>
+            </div>
+          </div>
+        `,
+        text: `Hola ${userName},\n\n${msg}\nFecha: ${fecha}\n\nIr a la App: https://fin.nexuno.com.ar/dashboard`
+      }
     } else {
       console.error('❌ [Email] Tipo inválido', tipo)
       return NextResponse.json(
