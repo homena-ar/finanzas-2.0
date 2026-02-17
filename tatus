@@ -1,0 +1,49 @@
+[33mcb65904[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #38 from homena-ar/claude/refactor-chat-lists-qmZVe
+[33mbe232f4[m[33m ([m[1;31morigin/claude/refactor-chat-lists-qmZVe[m[33m)[m refactor: asistente como panel fijo + listas inteligentes completas
+[33mfcb4488[m Merge pull request #37 from homena-ar/claude/global-chat-command-bar-Gp933
+[33m7d798b3[m[33m ([m[1;31morigin/claude/global-chat-command-bar-Gp933[m[33m)[m fix: add workspace_id filter to items query in handleDeleteList
+[33meae90b8[m Merge pull request #36 from homena-ar/claude/global-chat-command-bar-Gp933
+[33m985feb6[m fix: use parsed.type instead of parsed.intent for multi_action check
+[33m26dc1b0[m Merge pull request #35 from homena-ar/claude/global-chat-command-bar-Gp933
+[33m53ff39d[m feat: transform Command Bar into chat-style AI assistant
+[33mf18843d[m Merge pull request #34 from homena-ar/claude/global-chat-command-bar-Gp933
+[33mfe71680[m Fix: refactorizar CommandBar a Context Provider para compartir estado
+[33m7a15f06[m Merge pull request #33 from homena-ar/claude/global-chat-command-bar-Gp933
+[33mba7c39c[m Add Global Command Bar (Chat/Command Bar) for controlling the entire platform
+[33m0ee3551[m Merge pull request #32 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33m99e3d45[m[33m ([m[1;31morigin/claude/fix-favicon-social-preview-MqJtE[m[33m)[m Add shopping lists feature (Listas de Compras)
+[33me6e90e8[m Merge pull request #31 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33mfa390b5[m Redirect stale /opengraph-image to /og-image.png & speed up session recovery
+[33m628ab37[m Fix personal workspace stuck on "Cargando espacio..." in recordatorios
+[33m78392dc[m Merge pull request #30 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33m0b2d1bd[m Show spinner on login page when user exists (redirect pending)
+[33mf21720b[m Fix recordatorios save when workspace loads async, fix stale comment
+[33m36d7ca8[m Merge pull request #29 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33mc664d06[m Fix login form flash after recovery and recordatorios workspace error
+[33m41af998[m Merge pull request #28 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33m642a773[m Fix login form flash during session recovery and OG image content type
+[33m61e54a6[m Merge pull request #27 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33mc22561e[m Add cookie-based session recovery and detailed auth logging for iOS PWA
+[33mdad69f1[m Fix empty fb:app_id meta tag and remove duplicate OG meta tags
+[33m742da4e[m Merge pull request #26 from homena-ar/claude/fix-favicon-social-preview-MqJtE
+[33m70f7bc8[m Regenerate all icon assets with teal brand colors (#0d9488)
+[33m227fa70[m Fix iOS session persistence, recordatorios loading, and OG/favicon cache
+[33m753a1fc[m Merge pull request #25 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33mc6897fa[m[33m ([m[1;31morigin/claude/improve-code-and-ui-5WVsl[m[33m)[m Fix recordatorios permissions, iOS session persistence, config redesign + global color migration
+[33mc9b9db3[m Merge pull request #24 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m339acda[m Add teal/amber design system, recordatorios module, fix profile totals and reduce log noise
+[33ma668c3e[m Merge pull request #23 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m8089eaa[m Fix infinite loop on workspace switch, cross-workspace data leak, and unify inputs
+[33m9ef05e2[m Merge pull request #22 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m4bed841[m Fix workspace_id orphans, modernize typography and filters, improve PWA persistence
+[33m98b0620[m Merge pull request #21 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m7b953a7[m Fix data persistence, align gastos/ingresos UI, improve notifications
+[33m8a10924[m Merge pull request #20 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m34c7879[m Fix ahorros workspace bug, redesign proyección, align gastos/ingresos
+[33mc583ac6[m Redesign login/registration with real-time password validation
+[33m3a4dad9[m Merge pull request #19 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m22da311[m Visual overhaul: consistent typography, clearer charts, professional design
+[33m41196af[m Merge pull request #18 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33m33d1411[m Improve error handling, accessibility, and cleanup
+[33m99fd0de[m Merge pull request #17 from homena-ar/claude/improve-code-and-ui-5WVsl
+[33md58ecba[m Fix critical bugs and performance issues

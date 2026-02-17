@@ -105,14 +105,20 @@ export async function GET(request: NextRequest) {
     console.log(`🔔 [Cron] Total de tarjetas encontradas: ${tarjetasSnap.size}`)
     
     const notificationsToSend: Array<{
-      tipo: 'cierre' | 'vencimiento'
+      tipo: 'cierre' | 'vencimiento' | 'recordatorio'
       userId: string
       tarjetaId: string
       tarjetaNombre: string
       dia: number
       fecha: string
       workspaceId?: string
+      mensaje: string
+      targetDate: Date
+      channels?: { email: boolean; push: boolean }
     }> = []
+
+    // Definir los días a verificar: 0 (Hoy), 1 (Mañana), 2 (Pasado mañana)
+    const offsets = [0, 1, 2]
 
     tarjetasSnap.docs.forEach(doc => {
       const data = doc.data() as Tarjeta & { workspace_id?: string }
@@ -125,36 +131,123 @@ export async function GET(request: NextRequest) {
         console.log(`🔔 [Cron] Tarjeta ${data.nombre}: cierre=${data.cierre}, vencimiento=${data.vencimiento}, notificar_cierre=${data.notificar_cierre}, notificar_vencimiento=${data.notificar_vencimiento}, targetDay=${targetDay}`)
       }
       
-      // Verificar cierre (si está habilitado y el día coincide)
-      if (data.notificar_cierre && data.cierre === targetDay) {
-        const fechaCierre = `${targetDay}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`
-        notificationsToSend.push({
-          tipo: 'cierre',
-          userId: data.user_id,
-          tarjetaId: doc.id,
-          tarjetaNombre: data.nombre,
-          dia: targetDay, // Usar el día calculado (targetDay) en lugar del día de la tarjeta
-          fecha: fechaCierre,
-          workspaceId: data.workspace_id // Incluir workspace_id si existe
-        })
-        console.log(`✅ [Cron] Agregada notificación de cierre para ${data.nombre} (día ${targetDay})`)
-      }
+      offsets.forEach(offset => {
+        // Calcular fecha objetivo para este offset
+        const targetDate = new Date(year, month, day + offset)
+        const targetDay = targetDate.getDate()
+        
+        let timeText = ''
+        if (offset === 0) timeText = 'hoy'
+        else if (offset === 1) timeText = 'mañana'
+        else timeText = `en ${offset} días`
 
-      // Verificar vencimiento (si está habilitado y el día coincide)
-      if (data.notificar_vencimiento && data.vencimiento === targetDay) {
-        const fechaVencimiento = `${targetDay}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`
-        notificationsToSend.push({
-          tipo: 'vencimiento',
-          userId: data.user_id,
-          tarjetaId: doc.id,
-          tarjetaNombre: data.nombre,
-          dia: targetDay, // Usar el día calculado (targetDay) en lugar del día de la tarjeta
-          fecha: fechaVencimiento,
-          workspaceId: data.workspace_id // Incluir workspace_id si existe
-        })
-        console.log(`✅ [Cron] Agregada notificación de vencimiento para ${data.nombre} (día ${targetDay})`)
-      }
+        // Verificar cierre (si está habilitado y el día coincide)
+        if (data.notificar_cierre && data.cierre === targetDay) {
+          const fechaCierre = `${targetDay}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`
+          notificationsToSend.push({
+            tipo: 'cierre',
+            userId: data.user_id,
+            tarjetaId: doc.id,
+            tarjetaNombre: data.nombre,
+            dia: targetDay,
+            fecha: fechaCierre,
+            workspaceId: data.workspace_id,
+            mensaje: `La tarjeta ${data.nombre} cierra ${timeText} (día ${targetDay})`,
+            targetDate: targetDate
+          })
+          console.log(`✅ [Cron] Agregada notificación de cierre para ${data.nombre} (${timeText}, día ${targetDay})`)
+        }
+
+        // Verificar vencimiento (si está habilitado y el día coincide)
+        if (data.notificar_vencimiento && data.vencimiento === targetDay) {
+          const fechaVencimiento = `${targetDay}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`
+          notificationsToSend.push({
+            tipo: 'vencimiento',
+            userId: data.user_id,
+            tarjetaId: doc.id,
+            tarjetaNombre: data.nombre,
+            dia: targetDay,
+            fecha: fechaVencimiento,
+            workspaceId: data.workspace_id,
+            mensaje: `El vencimiento de pago de ${data.nombre} es ${timeText} (día ${targetDay})`,
+            targetDate: targetDate
+          })
+          console.log(`✅ [Cron] Agregada notificación de vencimiento para ${data.nombre} (${timeText}, día ${targetDay})`)
+        }
+      })
     })
+
+    // --- NUEVO: Procesar Recordatorios Personalizados ---
+    try {
+      const recordatoriosSnap = await firestore.collection('recordatorios').get()
+      console.log(`🔔 [Cron] Total de recordatorios personalizados encontrados: ${recordatoriosSnap.size}`)
+
+      recordatoriosSnap.docs.forEach(doc => {
+        const data = doc.data()
+        if (!data.user_id || !data.fecha || !data.titulo) return
+
+        // Parsear fecha del recordatorio
+        let eventDate: Date
+        if (data.fecha && typeof data.fecha.toDate === 'function') {
+          eventDate = data.fecha.toDate()
+        } else {
+          // Asumir string YYYY-MM-DD
+          const parts = String(data.fecha).split('-')
+          if (parts.length === 3) {
+            eventDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+          } else {
+            eventDate = new Date(data.fecha)
+          }
+        }
+
+        // Normalizar fechas a medianoche para comparar días exactos
+        const today = new Date(year, month, day)
+        const target = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
+        
+        const diffTime = target.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+        // Verificar si coincide con la configuración de "días antes"
+        // Soporta que 'dias_antes' sea un número (ej: 2) o un array (ej: [0, 1])
+        let shouldNotify = false
+        const diasAntes = data.dias_antes
+
+        if (Array.isArray(diasAntes)) {
+          shouldNotify = diasAntes.includes(diffDays)
+        } else if (typeof diasAntes === 'number') {
+          shouldNotify = diasAntes === diffDays
+        } else if (typeof diasAntes === 'string') {
+           shouldNotify = parseInt(diasAntes) === diffDays
+        }
+
+        if (shouldNotify) {
+          let timeText = ''
+          if (diffDays === 0) timeText = 'hoy'
+          else if (diffDays === 1) timeText = 'mañana'
+          else timeText = `en ${diffDays} días`
+
+          notificationsToSend.push({
+            tipo: 'recordatorio',
+            userId: data.user_id,
+            tarjetaId: doc.id,
+            tarjetaNombre: data.titulo, // Usamos el título como nombre
+            dia: target.getDate(),
+            fecha: `${target.getDate()}/${target.getMonth() + 1}/${target.getFullYear()}`,
+            workspaceId: data.workspace_id,
+            mensaje: `${data.titulo} es ${timeText}`,
+            targetDate: target,
+            channels: {
+              email: data.notificar_email === true,
+              push: data.notificar_push === true
+            }
+          })
+          console.log(`✅ [Cron] Agregado recordatorio personalizado: ${data.titulo} (${timeText})`)
+        }
+      })
+    } catch (e) {
+      console.error('❌ [Cron] Error procesando recordatorios:', e)
+    }
+    // ----------------------------------------------------
 
     console.log('🔔 [Cron] Notificaciones a enviar:', notificationsToSend.length)
 
@@ -242,7 +335,8 @@ export async function GET(request: NextRequest) {
       try {
         // Llamar a la API de envío de correo
         // Enviar correo solo si tenemos email
-        if (profileEmail) {
+        const shouldSendEmail = notif.channels ? notif.channels.email : true
+        if (profileEmail && shouldSendEmail) {
           const emailUrl = `${baseUrl}/api/send-notification-email`
           try {
             const response = await fetch(emailUrl, {
@@ -273,15 +367,15 @@ export async function GET(request: NextRequest) {
           tipo: notif.tipo,
           titulo: notif.tipo === 'cierre' 
             ? `Cierre de ${notif.tarjetaNombre}`
-            : `Vencimiento de pago ${notif.tarjetaNombre}`,
-          mensaje: notif.tipo === 'cierre'
-            ? `La tarjeta ${notif.tarjetaNombre} cierra en 2 días (día ${notif.dia})`
-            : `El vencimiento de pago de ${notif.tarjetaNombre} es en 2 días (día ${notif.dia})`,
-          icono: notif.tipo === 'cierre' ? '📅' : '💳',
+            : notif.tipo === 'vencimiento'
+              ? `Vencimiento de pago ${notif.tarjetaNombre}`
+              : `🔔 ${notif.tarjetaNombre}`,
+          mensaje: notif.mensaje,
+          icono: notif.tipo === 'cierre' ? '📅' : (notif.tipo === 'vencimiento' ? '💳' : '⏰'),
           leida: false,
           tarjeta_id: notif.tarjetaId,
-          fecha_evento: admin.firestore.Timestamp.fromDate(targetDate),
-          link: '/dashboard',
+          fecha_evento: admin.firestore.Timestamp.fromDate(notif.targetDate),
+          link: notif.tipo === 'recordatorio' ? '/recordatorios' : '/dashboard',
           created_at: admin.firestore.Timestamp.now()
         }
         // Incluir workspace_id si existe (necesario para permisos)
@@ -291,7 +385,9 @@ export async function GET(request: NextRequest) {
         await firestore.collection('notificaciones').add(notificacionData)
 
         // Enviar notificación push
-        try {
+        const shouldSendPush = notif.channels ? notif.channels.push : true
+        if (shouldSendPush) {
+          try {
           const pushUrl = `${baseUrl}/api/send-push-notification`
           const pushResponse = await fetch(pushUrl, {
             method: 'POST',
@@ -300,11 +396,11 @@ export async function GET(request: NextRequest) {
               userId: notif.userId,
               title: notif.tipo === 'cierre' 
                 ? `🔔 Cierre de ${notif.tarjetaNombre}`
-                : `💳 Vencimiento de ${notif.tarjetaNombre}`,
-              body: notif.tipo === 'cierre'
-                ? `La tarjeta cierra en 2 días (día ${notif.dia})`
-                : `El vencimiento de pago es en 2 días (día ${notif.dia})`,
-              url: '/dashboard',
+                : notif.tipo === 'vencimiento'
+                  ? `💳 Vencimiento de ${notif.tarjetaNombre}`
+                  : `⏰ ${notif.tarjetaNombre}`,
+              body: notif.mensaje,
+              url: notif.tipo === 'recordatorio' ? '/recordatorios' : '/dashboard',
               tag: `${notif.tipo}-${notif.tarjetaId}`,
               workspaceId: notif.workspaceId
             })
@@ -319,6 +415,7 @@ export async function GET(request: NextRequest) {
         } catch (pushError: any) {
           console.warn('⚠️ [Cron] Excepción enviando push notification:', pushError?.message)
           // No fallar si el push falla (el correo y la campanita ya se enviaron)
+        }
         }
 
         results.push({ success: true, notif })
