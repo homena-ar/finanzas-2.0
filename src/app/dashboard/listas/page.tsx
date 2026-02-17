@@ -221,11 +221,6 @@ export default function ListasPage() {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'list' | 'item'; id: string; listaId?: string } | null>(null)
 
-  // Rename inline
-  const [renamingListId, setRenamingListId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
-  const renameInputRef = useRef<HTMLInputElement>(null)
-
   // Toast undo global
   const [undoToast, setUndoToast] = useState<{ message: string; snapshot: ListaSnapshot | null; timeout: ReturnType<typeof setTimeout> | null } | null>(null)
 
@@ -274,13 +269,33 @@ export default function ListasPage() {
     }
   }, [user, currentWorkspace?.id])
 
-  useEffect(() => { fetchListas() }, [fetchListas])
+  // Cargar todos los items al inicio para que los contadores funcionen
+  const fetchAllItems = useCallback(async () => {
+    if (!user || !currentWorkspace?.id) return
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, 'items_lista'),
+          where('workspace_id', '==', currentWorkspace.id),
+          orderBy('created_at', 'asc')
+        )
+      )
+      const newItems: Record<string, ItemLista[]> = {}
+      snap.docs.forEach(d => {
+        const item = { id: d.id, ...d.data() } as ItemLista
+        if (!newItems[item.lista_id]) newItems[item.lista_id] = []
+        newItems[item.lista_id].push(item)
+      })
+      setItems(newItems)
+    } catch (e) {
+      console.error('[Listas] Error fetching all items:', e)
+    }
+  }, [user, currentWorkspace?.id])
 
   useEffect(() => {
-    if (expandedListId) {
-      fetchItems(expandedListId)
-    }
-  }, [expandedListId, fetchItems])
+    fetchListas()
+    fetchAllItems()
+  }, [fetchListas, fetchAllItems])
 
   // Close menu on outside click
   useEffect(() => {
@@ -289,13 +304,6 @@ export default function ListasPage() {
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
   }, [menuOpenId])
-
-  // Auto-focus rename input
-  useEffect(() => {
-    if (renamingListId) {
-      setTimeout(() => renameInputRef.current?.focus(), 50)
-    }
-  }, [renamingListId])
 
   // ── List CRUD ──
 
@@ -438,27 +446,11 @@ export default function ListasPage() {
 
   // ── Menu actions ──
 
-  const handleRename = (lista: ListaCompra) => {
+  const handleEditList = (lista: ListaCompra) => {
     setMenuOpenId(null)
-    setRenamingListId(lista.id)
-    setRenameValue(lista.nombre)
-  }
-
-  const handleRenameSubmit = async (listaId: string) => {
-    if (!renameValue.trim()) {
-      setRenamingListId(null)
-      return
-    }
-    try {
-      await updateDoc(doc(db, 'listas_compra', listaId), {
-        nombre: renameValue.trim(),
-        updated_at: new Date().toISOString(),
-      })
-      await fetchListas()
-    } catch (e) {
-      console.error('[Listas] Error renaming:', e)
-    }
-    setRenamingListId(null)
+    setEditingList(lista)
+    setListForm({ nombre: lista.nombre, icono: lista.icono })
+    setShowListModal(true)
   }
 
   const handleDuplicate = async (lista: ListaCompra) => {
@@ -806,35 +798,18 @@ export default function ListasPage() {
             const isExpanded = expandedListId === lista.id
             const stats = getListStats(lista.id)
             const progress = stats.total > 0 ? (stats.comprados / stats.total) * 100 : 0
-            const isRenaming = renamingListId === lista.id
 
             return (
               <div key={lista.id} className="card overflow-hidden transition-all duration-200">
                 {/* List header */}
                 <div className="relative">
-                  <button
+                  <div
                     onClick={() => toggleExpand(lista.id)}
-                    className="w-full p-4 flex items-center gap-3 hover:bg-slate-50/50 transition-colors"
+                    className="w-full p-4 flex items-center gap-3 hover:bg-slate-50/50 transition-colors cursor-pointer"
                   >
                     <span className="text-2xl flex-shrink-0">{lista.icono}</span>
                     <div className="flex-1 min-w-0 text-left">
-                      {isRenaming ? (
-                        <input
-                          ref={renameInputRef}
-                          type="text"
-                          className="input text-sm font-medium"
-                          value={renameValue}
-                          onChange={e => setRenameValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleRenameSubmit(lista.id)
-                            if (e.key === 'Escape') setRenamingListId(null)
-                          }}
-                          onBlur={() => handleRenameSubmit(lista.id)}
-                          onClick={e => e.stopPropagation()}
-                        />
-                      ) : (
-                        <h3 className="font-medium text-slate-800 text-sm">{lista.nombre}</h3>
-                      )}
+                      <h3 className="font-medium text-slate-800 text-sm">{lista.nombre}</h3>
                       <div className="flex items-center gap-3 mt-1">
                         {stats.total > 0 ? (
                           <>
@@ -873,14 +848,14 @@ export default function ListasPage() {
                         ? <ChevronDown className="w-4 h-4 text-slate-400" />
                         : <ChevronRight className="w-4 h-4 text-slate-400" />}
                     </div>
-                  </button>
+                  </div>
 
                   {/* Dropdown menu */}
                   {menuOpenId === lista.id && (
                     <div className="list-menu" onClick={e => e.stopPropagation()}>
-                      <button className="list-menu-item" onClick={() => handleRename(lista)}>
+                      <button className="list-menu-item" onClick={() => handleEditList(lista)}>
                         <Edit2 className="w-3.5 h-3.5 text-slate-400" />
-                        Renombrar
+                        Editar
                       </button>
                       <button className="list-menu-item" onClick={() => handleDuplicate(lista)}>
                         <Copy className="w-3.5 h-3.5 text-slate-400" />
