@@ -515,6 +515,35 @@ export default function ListasPage() {
     }
   }
 
+  const handleEmptyList = async (listaId: string) => {
+    if (!user || !currentWorkspace?.id) return
+    setMenuOpenId(null)
+    
+    const snapshot = await createSnapshot(listaId)
+    
+    try {
+      const itemsSnap = await getDocs(
+        query(
+          collection(db, 'items_lista'),
+          where('lista_id', '==', listaId),
+          where('workspace_id', '==', currentWorkspace.id)
+        )
+      )
+      
+      if (itemsSnap.empty) return
+
+      const batch = writeBatch(db)
+      itemsSnap.docs.forEach(d => batch.delete(d.ref))
+      await batch.commit()
+      await updateDoc(doc(db, 'listas_compra', listaId), { updated_at: new Date().toISOString() })
+      await fetchItems(listaId)
+      await fetchListas()
+      showUndoToast('Lista vaciada', snapshot)
+    } catch (e) {
+      console.error('[Listas] Error emptying list:', e)
+    }
+  }
+
   const handleSort = async (listaId: string) => {
     setMenuOpenId(null)
     const listItems = items[listaId]
@@ -800,7 +829,7 @@ export default function ListasPage() {
             const progress = stats.total > 0 ? (stats.comprados / stats.total) * 100 : 0
 
             return (
-              <div key={lista.id} className="card overflow-hidden transition-all duration-200">
+              <div key={lista.id} className="card transition-all duration-200">
                 {/* List header */}
                 <div className="relative">
                   <div
@@ -864,6 +893,10 @@ export default function ListasPage() {
                       <button className="list-menu-item" onClick={() => handleClearCompleted(lista.id)}>
                         <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
                         Limpiar completados
+                      </button>
+                      <button className="list-menu-item" onClick={() => handleEmptyList(lista.id)}>
+                        <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                        Vaciar lista
                       </button>
                       <button className="list-menu-item" onClick={() => handleSort(lista.id)}>
                         <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
